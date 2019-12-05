@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "jp.openstandia.midpoint.grpc";
+
+package midpoint;
+
+/**
+ * Provide services for an UserType resource.
+ */
+service UserResourceService {
+    /**
+     * Update credential with current password validating.
+     */
+    rpc updateCredentialByName(UpdateCredentialByNameRequest) returns (UpdateCredentialResponse);
+
+    /**
+     * Force update credential.
+     */
+    rpc forceUpdateCredentialByName(ForceUpdateCredentialByNameRequest) returns (UpdateCredentialResponse);
+
+    /**
+     * Request role.
+     */
+    rpc requestRoleByName(RequestRoleByNameRequest) returns (RequestRoleResponse);
+}
+
+message UpdateCredentialByNameRequest {
+    // Name of target user.
+    string name = 1;
+    // Current credential.
+    string old = 2;
+    // New credential.
+    string new = 3;
+}
+
+message ForceUpdateCredentialByNameRequest {
+    // Name of target user.
+    string name = 1;
+    // New credential.
+    string new = 3;
+}
+
+message UpdateCredentialResponse {
+}
+
+message RequestRoleByNameRequest {
+    // Name of initiator.
+    string name = 1;
+    // Assign requests.
+    repeated AssignRequest assignRequest = 2;
+}
+
+message AssignRequest {
+    // Oid of target user.
+    string assignTargetOid = 1;
+    // Oid of request role/organization/service.
+    string requestObjectOid = 2;
+    // Assign option
+    AssignOption option = 3;
+}
+
+message AssignOption {
+    // Oid of organization reference.
+    string orgRef = 1;
+}
+
+message RequestRoleResponse {
+}
