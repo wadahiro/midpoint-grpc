@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/midpoint-addon.iml" filepath="$PROJECT_DIR$/midpoint-addon.iml" />
+      <module fileurl="file://$PROJECT_DIR$/midpoint-grpc.iml" filepath="$PROJECT_DIR$/midpoint-grpc.iml" />
+      <module fileurl="file://$PROJECT_DIR$/self-services/midpoint-grpc-self-services.iml" filepath="$PROJECT_DIR$/self-services/midpoint-grpc-self-services.iml" />
+      <module fileurl="file://$PROJECT_DIR$/server/midpoint-grpc-server.iml" filepath="$PROJECT_DIR$/server/midpoint-grpc-server.iml" />
+    </modules>
+  </component>
+</project>
