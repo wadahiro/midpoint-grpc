@@ -65,7 +65,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
     @Override
     public void updateCredential(UpdateCredentialRequest request, StreamObserver<UpdateCredentialResponse> responseObserver) {
-        System.out.println("updateCredential");
+        LOGGER.debug("Start updateCredential");
 
         runTask(ctx -> {
             try {
@@ -85,11 +85,13 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         UpdateCredentialResponse res = UpdateCredentialResponse.newBuilder().build();
         responseObserver.onNext(res);
         responseObserver.onCompleted();
+
+        LOGGER.debug("End updateCredential");
     }
 
     @Override
     public void forceUpdateCredential(ForceUpdateCredentialRequest request, StreamObserver<UpdateCredentialResponse> responseObserver) {
-        System.out.println("forceUpdateCredential");
+        LOGGER.debug("Start forceUpdateCredential");
 
         runTask(ctx -> {
             try {
@@ -109,17 +111,20 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         UpdateCredentialResponse res = UpdateCredentialResponse.newBuilder().build();
         responseObserver.onNext(res);
         responseObserver.onCompleted();
+
+        LOGGER.debug("End forceUpdateCredential");
     }
 
     @Override
     public void requestRole(RequestRoleRequest request, StreamObserver<RequestRoleResponse> responseObserver) {
-        System.out.println("requestRole");
+        LOGGER.debug("Start requestRole");
 
+        
+
+        LOGGER.debug("End requestRole");
     }
 
     protected void updateCredential(MidPointTaskContext ctx, String oldCred, String newCred, boolean validate) throws SchemaException, SecurityViolationException, CommunicationException, ConfigurationException, ExpressionEvaluationException, ObjectNotFoundException, EncryptionException, PolicyViolationException, ObjectAlreadyExistsException {
-        final String OPERATION_NAME = "updateCredential";
-
         Task task = ctx.task;
         UserType user = ctx.principal.getUser();
 
@@ -170,20 +175,6 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             throw e;
         } finally {
             updateResult.computeStatusIfUnknown();
-        }
-    }
-
-    private UsernamePasswordAuthenticationToken authenticateUser(String username, String password, OperationResult result) {
-        ConnectionEnvironment connEnv = ConnectionEnvironment.create(CHANNEL_GRPC_SERVICE_URI);
-        try {
-            UsernamePasswordAuthenticationToken token = passwordAuthenticationEvaluator.authenticate(connEnv, new PasswordAuthenticationContext(username, password));
-            return token;
-        } catch (AuthenticationException ex) {
-
-            return null;
-        } catch (Exception ex) {
-            LoggingUtils.logException(LOGGER, "Failed to confirm registration", ex);
-            return null;
         }
     }
 
