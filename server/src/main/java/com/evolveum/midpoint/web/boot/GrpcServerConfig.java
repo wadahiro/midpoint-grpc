@@ -19,7 +19,7 @@ public class GrpcServerConfig {
 
     @Bean
     @GRpcGlobalInterceptor
-    public ServerInterceptor globalInterceptor() {
+    public ServerInterceptor exceptionInterceptor() {
         return TransmitStatusRuntimeExceptionInterceptor.instance();
     }
 }

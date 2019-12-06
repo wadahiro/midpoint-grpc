@@ -6,47 +6,41 @@ option java_package = "jp.openstandia.midpoint.grpc";
 package midpoint;
 
 /**
- * Provide services for an UserType resource.
+ * Provide services for self service resource.
  */
-service UserResourceService {
+service SelfServiceResource {
     /**
      * Update credential with current password validating.
      */
-    rpc updateCredentialByName(UpdateCredentialByNameRequest) returns (UpdateCredentialResponse);
+    rpc updateCredential(UpdateCredentialRequest) returns (UpdateCredentialResponse);
 
     /**
      * Force update credential.
      */
-    rpc forceUpdateCredentialByName(ForceUpdateCredentialByNameRequest) returns (UpdateCredentialResponse);
+    rpc forceUpdateCredential(ForceUpdateCredentialRequest) returns (UpdateCredentialResponse);
 
     /**
      * Request role.
      */
-    rpc requestRoleByName(RequestRoleByNameRequest) returns (RequestRoleResponse);
+    rpc requestRole(RequestRoleRequest) returns (RequestRoleResponse);
 }
 
-message UpdateCredentialByNameRequest {
-    // Name of target user.
-    string name = 1;
+message UpdateCredentialRequest {
     // Current credential.
-    string old = 2;
+    string old = 1;
     // New credential.
-    string new = 3;
+    string new = 2;
 }
 
-message ForceUpdateCredentialByNameRequest {
-    // Name of target user.
-    string name = 1;
+message ForceUpdateCredentialRequest {
     // New credential.
-    string new = 3;
+    string new = 1;
 }
 
 message UpdateCredentialResponse {
 }
 
-message RequestRoleByNameRequest {
-    // Name of initiator.
-    string name = 1;
+message RequestRoleRequest {
     // Assign requests.
     repeated AssignRequest assignRequest = 2;
 }

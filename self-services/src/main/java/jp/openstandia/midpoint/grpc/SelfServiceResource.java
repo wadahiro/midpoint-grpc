@@ -1,13 +1,9 @@
 package jp.openstandia.midpoint.grpc;
 
-import com.evolveum.midpoint.audit.api.AuditService;
 import com.evolveum.midpoint.model.api.AuthenticationEvaluator;
 import com.evolveum.midpoint.model.api.ModelInteractionService;
 import com.evolveum.midpoint.model.api.ModelService;
-import com.evolveum.midpoint.model.api.authentication.MidPointUserProfilePrincipal;
-import com.evolveum.midpoint.model.api.authentication.UserProfileService;
 import com.evolveum.midpoint.model.api.context.PasswordAuthenticationContext;
-import com.evolveum.midpoint.prism.PrismConstants;
 import com.evolveum.midpoint.prism.PrismContext;
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.PrismObjectDefinition;
@@ -21,11 +17,7 @@ import com.evolveum.midpoint.prism.schema.SchemaRegistry;
 import com.evolveum.midpoint.schema.SchemaConstantsGenerated;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.security.api.ConnectionEnvironment;
-import com.evolveum.midpoint.security.api.MidPointPrincipal;
-import com.evolveum.midpoint.security.api.SecurityContextManager;
 import com.evolveum.midpoint.task.api.Task;
-import com.evolveum.midpoint.task.api.TaskManager;
-import com.evolveum.midpoint.util.QNameUtil;
 import com.evolveum.midpoint.util.exception.*;
 import com.evolveum.midpoint.util.logging.LoggingUtils;
 import com.evolveum.midpoint.util.logging.Trace;
@@ -41,89 +33,54 @@ import io.grpc.stub.StreamObserver;
 import org.lognet.springboot.grpc.GRpcService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.context.SecurityContextHolder;
 
 import javax.xml.namespace.QName;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import static com.evolveum.midpoint.schema.constants.SchemaConstants.NS_MODEL_CHANNEL;
-
-@GRpcService
-public class UserResourceService extends UserResourceServiceGrpc.UserResourceServiceImplBase {
+@GRpcService(interceptors = BasicAuthenticationInterceptor.class)
+public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceResourceImplBase implements MidPointGrpcService {
     static {
-        System.out.println("UserResourceService loaded");
+        System.out.println("SelfServiceResource loaded");
     }
 
-    public static final String CLASS_DOT = UserResourceService.class.getName() + ".";
+    public static final String CLASS_DOT = SelfServiceResource.class.getName() + ".";
     public static final String OPERATION_EXECUTE_CREDENTIAL_CHECK = CLASS_DOT + "executeCredentialCheck";
     public static final String OPERATION_EXECUTE_CREDENTIAL_UPDATE = CLASS_DOT + "executeCredentialUpdate";
 
-    public static final QName CHANNEL_GRPC_SERVICE_QNAME = new QName(NS_MODEL_CHANNEL, "grpc");
-    public static final String CHANNEL_GRPC_SERVICE_URI = QNameUtil.qNameToUri(CHANNEL_GRPC_SERVICE_QNAME);
-
-    private static final Trace LOGGER = TraceManager.getTrace(UserResourceService.class);
+    private static final Trace LOGGER = TraceManager.getTrace(SelfServiceResource.class);
 
     @Autowired
     protected ModelService modelService;
     @Autowired
-    private ModelInteractionService modelInteraction;
-    @Autowired
-    protected TaskManager taskManager;
-    @Autowired
-    protected AuditService auditService;
+    protected ModelInteractionService modelInteraction;
     @Autowired
     protected PrismContext prismContext;
-    @Autowired
-    private UserProfileService userService;
-    @Autowired
-    protected SecurityContextManager securityContextManager;
     @Autowired
     protected Protector protector;
     @Autowired
     protected transient AuthenticationEvaluator<PasswordAuthenticationContext> passwordAuthenticationEvaluator;
 
     @Override
-    public void updateCredentialByName(UpdateCredentialByNameRequest request, StreamObserver<UpdateCredentialResponse> responseObserver) {
-        String name = request.getName();
-        System.out.println("updateCredentialByName name: " + name);
+    public void updateCredential(UpdateCredentialRequest request, StreamObserver<UpdateCredentialResponse> responseObserver) {
+        System.out.println("updateCredential");
 
-        try {
-            updateCredential(request.getName(), request.getOld(), request.getNew(), true);
-        } catch (ObjectNotFoundException e) {
-            StatusRuntimeException exception = Status.NOT_FOUND
-                    .withDescription("Not Found")
-                    .asRuntimeException();
-            throw exception;
-        } catch (Exception e) {
-            responseObserver.onError(e);
-            return;
-        }
-
-        UpdateCredentialResponse res = UpdateCredentialResponse.newBuilder().build();
-        responseObserver.onNext(res);
-        responseObserver.onCompleted();
-    }
-
-    @Override
-    public void forceUpdateCredentialByName(ForceUpdateCredentialByNameRequest request, StreamObserver<UpdateCredentialResponse> responseObserver) {
-        String name = request.getName();
-        System.out.println("forceUpdateCredentialByName name: " + name);
-
-        try {
-            updateCredential(request.getName(), null, request.getNew(), false);
-        } catch (ObjectNotFoundException e) {
-            StatusRuntimeException exception = Status.NOT_FOUND
-                    .withDescription("Not Found")
-                    .asRuntimeException();
-            throw exception;
-        } catch (Exception e) {
-            responseObserver.onError(e);
-            return;
-        }
+        runTask(ctx -> {
+            try {
+                updateCredential(ctx, request.getOld(), request.getNew(), true);
+                return null;
+            } catch (ObjectNotFoundException e) {
+                StatusRuntimeException exception = Status.NOT_FOUND
+                        .withDescription("Not Found")
+                        .asRuntimeException();
+                throw exception;
+            } catch (Exception e) {
+                responseObserver.onError(e);
+                return null;
+            }
+        });
 
         UpdateCredentialResponse res = UpdateCredentialResponse.newBuilder().build();
         responseObserver.onNext(res);
@@ -131,53 +88,40 @@ public class UserResourceService extends UserResourceServiceGrpc.UserResourceSer
     }
 
     @Override
-    public void requestRoleByName(RequestRoleByNameRequest request, StreamObserver<RequestRoleResponse> responseObserver) {
-        String name = request.getName();
-        System.out.println("requestRoleByName name: " + name);
+    public void forceUpdateCredential(ForceUpdateCredentialRequest request, StreamObserver<UpdateCredentialResponse> responseObserver) {
+        System.out.println("forceUpdateCredential");
 
-        // Set auth context
-        initInitiator(name);
+        runTask(ctx -> {
+            try {
+                updateCredential(ctx, null, request.getNew(), false);
+                return null;
+            } catch (ObjectNotFoundException e) {
+                StatusRuntimeException exception = Status.NOT_FOUND
+                        .withDescription("Not Found")
+                        .asRuntimeException();
+                throw exception;
+            } catch (Exception e) {
+                responseObserver.onError(e);
+                return null;
+            }
+        });
 
+        UpdateCredentialResponse res = UpdateCredentialResponse.newBuilder().build();
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void requestRole(RequestRoleRequest request, StreamObserver<RequestRoleResponse> responseObserver) {
+        System.out.println("requestRole");
 
     }
 
-    protected void initInitiator(String name) {
-        try {
-            MidPointUserProfilePrincipal principal = userService.getPrincipal(name);
-            UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(principal, null);
-            SecurityContextHolder.getContext().setAuthentication(token);
-        } catch (ObjectNotFoundException e) {
-            StatusRuntimeException exception = Status.NOT_FOUND
-                    .withDescription("Not Found")
-                    .asRuntimeException();
-            throw exception;
-        } catch (Exception e) {
-            StatusRuntimeException exception = Status.INTERNAL
-                    .withDescription("internal_error")
-                    .asRuntimeException();
-            throw exception;
-        }
-    }
-
-    protected void updateCredential(String name, String oldCred, String newCred, boolean validate) throws SchemaException, SecurityViolationException, CommunicationException, ConfigurationException, ExpressionEvaluationException, ObjectNotFoundException, EncryptionException, PolicyViolationException, ObjectAlreadyExistsException {
+    protected void updateCredential(MidPointTaskContext ctx, String oldCred, String newCred, boolean validate) throws SchemaException, SecurityViolationException, CommunicationException, ConfigurationException, ExpressionEvaluationException, ObjectNotFoundException, EncryptionException, PolicyViolationException, ObjectAlreadyExistsException {
         final String OPERATION_NAME = "updateCredential";
 
-        initInitiator(name);
-
-        Task task = createTaskInstance(UserResourceService.class.getName() + OPERATION_NAME);
-        OperationResult result = task.getResult();
-
-        List<PrismObject<UserType>> users = findUsers(UserType.F_NAME, name,
-                PrismConstants.POLY_STRING_NORM_MATCHING_RULE_NAME, task, result);
-
-        if (users.size() != 1) {
-            StatusRuntimeException exception = Status.NOT_FOUND
-                    .withDescription("Not Found")
-                    .asRuntimeException();
-            throw exception;
-        }
-
-        PrismObject<UserType> user = users.get(0);
+        Task task = ctx.task;
+        UserType user = ctx.principal.getUser();
 
         ProtectedStringType oldPassword = null;
         if (validate) {
@@ -260,25 +204,5 @@ public class UserResourceService extends UserResourceServiceGrpc.UserResourceSer
                 .eq(value)
                 .matching(matchingRule)
                 .build();
-    }
-
-    protected Task createTaskInstance(String operationName) {
-        // TODO: better task initialization
-        Task task = taskManager.createTaskInstance(operationName);
-        setTaskOwner(task);
-        task.setChannel(CHANNEL_GRPC_SERVICE_URI);
-        return task;
-    }
-
-    protected void setTaskOwner(Task task) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null) {
-            throw new SystemException("Failed to get authentication object");
-        }
-        UserType userType = ((MidPointPrincipal) (SecurityContextHolder.getContext().getAuthentication().getPrincipal())).getUser();
-        if (userType == null) {
-            throw new SystemException("Failed to get user from authentication object");
-        }
-        task.setOwner(userType.asPrismObject());
     }
 }
