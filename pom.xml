@@ -26,6 +26,8 @@
 
         <java.version>1.8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <github.global.server>github</github.global.server>
     </properties>
 
     <modules>
@@ -140,7 +142,7 @@
                             </goals>
                             <configuration>
                                 <pluginId>doc</pluginId>
-                                <pluginExecutable>${user.home}/dev/tools/protoc-gen-doc.exe</pluginExecutable>
+                                <pluginExecutable>${user.home}/go/bin/protoc-gen-doc</pluginExecutable>
                                 <pluginParameter>html,index.html</pluginParameter>
                             </configuration>
                         </execution>
