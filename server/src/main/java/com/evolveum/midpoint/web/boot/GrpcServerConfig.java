@@ -1,5 +1,7 @@
 package com.evolveum.midpoint.web.boot;
 
+import com.evolveum.midpoint.util.logging.Trace;
+import com.evolveum.midpoint.util.logging.TraceManager;
 import io.grpc.ServerInterceptor;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import org.lognet.springboot.grpc.GRpcGlobalInterceptor;
@@ -13,8 +15,12 @@ import org.springframework.context.annotation.Configuration;
 })
 @Configuration
 public class GrpcServerConfig {
+
+    private static final Trace LOGGER = TraceManager.getTrace(GrpcServerConfig.class);
+
     static {
-        System.out.println("CustomConfig loaded");
+        System.out.println("GrpcServerConfig loaded");
+        LOGGER.info("GrpcServerConfig loaded");
     }
 
     @Bean

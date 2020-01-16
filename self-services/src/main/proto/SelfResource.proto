@@ -10,6 +10,16 @@ package midpoint;
  */
 service SelfServiceResource {
     /**
+     * Modify user profile by deltas.
+     */
+    rpc modifyProfile(ModifyProfileRequest) returns (ModifyProfileResponse);
+
+    /**
+     * Update user profile.
+     */
+    rpc updateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+
+    /**
      * Update credential with current password validating.
      */
     rpc updateCredential(UpdateCredentialRequest) returns (UpdateCredentialResponse);
@@ -23,6 +33,89 @@ service SelfServiceResource {
      * Request role.
      */
     rpc requestRole(RequestRoleRequest) returns (RequestRoleResponse);
+}
+
+message ModifyProfileRequest {
+    repeated UserItemDelta modifications = 1;
+}
+
+message UserItemDelta {
+    UserItemPath name = 1;
+    string valuesToAdd = 4;
+    string valuesToReplace = 5;
+    string valuesToDelete = 6;
+}
+
+enum UserItemPath {
+    NAME = 0;
+    FULL_NAME = 1;
+    GIVEN_NAME = 2;
+    FAMILY_NAME = 3;
+    ADDITIONAL_NAME = 4;
+    NICK_NAME = 5;
+    HONORIFIC_PREFIX = 6;
+    HONORIFIC_SUFFIX = 7;
+    TITLE = 8;
+    PREFERRED_LANGUAGE = 9;
+    LOCALE = 10;
+    TIMEZONE = 11;
+    EMAIL_ADDRESS = 12;
+    TELEPHONE_NUMBER = 13;
+    EMPLOYEE_NUMBER = 14;
+    EMPLOYEE_TYPE = 15;
+    COST_CENTER = 16;
+    ORGANIZATION = 17;
+    ORGANIZATIONAL_UNIT = 18;
+    LOCALITY = 19;
+}
+
+message ModifyProfileResponse {
+}
+
+message UpdateProfileRequest {
+    // New name.
+    string name = 1;
+    // New full name.
+    string fullName = 2;
+    // New given name.
+    string givenName = 3;
+    // New family name.
+    string familyName = 4;
+    // New additional name.
+    string additionalName = 5;
+    // New nick name.
+    string nickName = 6;
+    // New honorific prefix.
+    string honorificPrefix = 7;
+    // New honorific suffix.
+    string honorificSuffix = 8;
+    // New title.
+    string title = 9;
+    // New preferredLanguage.
+    string preferredLanguage = 10;
+    // New locale.
+    string locale = 11;
+    // New timezone.
+    string timezone = 12;
+    // New email address.
+    string emailAddress = 13;
+    // New telephone number.
+    string telephoneNumber = 14;
+    // New employee number.
+    string employeeNumber = 15;
+    // New employee type.
+    repeated string employeeType = 16;
+    // New cost center.
+    string costCenter = 17;
+    // New organization.
+    repeated string organization = 18;
+    // New organizational unit.
+    repeated string organizationalUnit = 19;
+    // New locality.
+    string locality = 20;
+}
+
+message UpdateProfileResponse {
 }
 
 message UpdateCredentialRequest {

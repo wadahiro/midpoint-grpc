@@ -14,11 +14,13 @@ import org.springframework.stereotype.Component;
 @Component
 @ComponentScan(basePackages = {"jp.openstandia.midpoint.grpc"})
 public class GrpcServerConfiguration implements MidPointApplicationConfiguration, ApplicationContextAware {
+
+    private static final Trace LOGGER = TraceManager.getTrace(GrpcServerConfiguration.class);
+
     static {
         System.out.println("GrpcServerConfiguration loaded");
+        LOGGER.info("GrpcServerConfiguration loaded");
     }
-
-    private static final Trace LOGGER = TraceManager.getTrace(MidPointApplication.class);
 
     private static ApplicationContext applicationContext;
     private static MidPointApplication application;
