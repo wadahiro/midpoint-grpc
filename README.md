@@ -12,7 +12,7 @@
 
 ### Build
 
-Install JDK 8+ and [maven3](https://maven.apache.org/download.cgi) then build:
+Install JDK 11+ and [maven3](https://maven.apache.org/download.cgi) then build:
 
 ```
 mvn install
