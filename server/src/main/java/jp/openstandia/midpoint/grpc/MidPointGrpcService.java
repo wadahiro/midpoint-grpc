@@ -24,12 +24,12 @@ public interface MidPointGrpcService {
     public static final String CHANNEL_GRPC_SERVICE_URI = QNameUtil.qNameToUri(CHANNEL_GRPC_SERVICE_QNAME);
 
     default <T> T runTask(MidPointTask<T> task) {
-        Authentication auth = Constant.AuthenticationContextKey.get();
+        Authentication auth = ServerConstant.AuthenticationContextKey.get();
         SecurityContextHolder.getContext().setAuthentication(auth);
 
-        HttpConnectionInformation connection = Constant.ConnectionContextKey.get();
-        ConnectionEnvironment connEnv = Constant.ConnectionEnvironmentContextKey.get();
-        Task t = Constant.TaskContextKey.get();
+        HttpConnectionInformation connection = ServerConstant.ConnectionContextKey.get();
+        ConnectionEnvironment connEnv = ServerConstant.ConnectionEnvironmentContextKey.get();
+        Task t = ServerConstant.TaskContextKey.get();
 
         MidPointPrincipal principal = (MidPointPrincipal) auth.getPrincipal();
 

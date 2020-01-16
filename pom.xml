@@ -31,6 +31,7 @@
     </properties>
 
     <modules>
+        <module>client-spi</module>
         <module>server</module>
         <module>self-services</module>
     </modules>
@@ -87,6 +88,23 @@
                 <groupId>com.google.protobuf</groupId>
                 <artifactId>protobuf-java</artifactId>
                 <version>${version.protoc}</version>
+            </dependency>
+
+            <!-- For client-spi -->
+            <dependency>
+                <groupId>io.grpc</groupId>
+                <artifactId>grpc-netty-shaded</artifactId>
+                <version>${version.grpc-java}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.grpc</groupId>
+                <artifactId>grpc-protobuf</artifactId>
+                <version>${version.grpc-java}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.grpc</groupId>
+                <artifactId>grpc-stub</artifactId>
+                <version>${version.grpc-java}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

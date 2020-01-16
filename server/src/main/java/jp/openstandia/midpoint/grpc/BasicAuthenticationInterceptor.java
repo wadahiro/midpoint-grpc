@@ -86,11 +86,11 @@ public class BasicAuthenticationInterceptor implements ServerInterceptor {
         }
 
         Context ctx = Context.current()
-                .withValue(Constant.ConnectionContextKey, connection)
-                .withValue(Constant.ConnectionEnvironmentContextKey, connEnv)
-                .withValue(Constant.TaskContextKey, task)
-                .withValue(Constant.AuthenticationContextKey, auth)
-                .withValue(Constant.AuthorizationHeaderContextKey, token);
+                .withValue(ServerConstant.ConnectionContextKey, connection)
+                .withValue(ServerConstant.ConnectionEnvironmentContextKey, connEnv)
+                .withValue(ServerConstant.TaskContextKey, task)
+                .withValue(ServerConstant.AuthenticationContextKey, auth)
+                .withValue(ServerConstant.AuthorizationHeaderContextKey, token);
 
         ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT> serverCall = new ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT>(call) {
             @Override

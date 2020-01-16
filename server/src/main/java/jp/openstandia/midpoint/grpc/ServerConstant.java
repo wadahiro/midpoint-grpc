@@ -9,12 +9,7 @@ import org.springframework.security.core.Authentication;
 
 import static io.grpc.Metadata.ASCII_STRING_MARSHALLER;
 
-public class Constant {
-    public static final Metadata.Key<String> AuthorizationMetadataKey =
-            Metadata.Key.of("Authorization", ASCII_STRING_MARSHALLER);
-    public static final Metadata.Key<String> SwitchToPrincipalMetadataKey =
-            Metadata.Key.of("Switch-To-Principal", ASCII_STRING_MARSHALLER);
-
+public class ServerConstant {
     public static final Context.Key<HttpConnectionInformation> ConnectionContextKey = Context.key("connection");
     public static final Context.Key<ConnectionEnvironment> ConnectionEnvironmentContextKey = Context.key("connectionEnvironment");
     public static final Context.Key<Task> TaskContextKey = Context.key("midpointTask");
