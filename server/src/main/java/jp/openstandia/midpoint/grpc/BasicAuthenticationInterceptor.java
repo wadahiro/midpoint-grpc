@@ -1,194 +1,82 @@
 package jp.openstandia.midpoint.grpc;
 
 import com.evolveum.midpoint.model.api.AuthenticationEvaluator;
-import com.evolveum.midpoint.model.api.ModelService;
 import com.evolveum.midpoint.model.api.context.PasswordAuthenticationContext;
-import com.evolveum.midpoint.prism.PrismContext;
 import com.evolveum.midpoint.prism.PrismObject;
-import com.evolveum.midpoint.prism.polystring.PolyString;
-import com.evolveum.midpoint.prism.query.ObjectQuery;
-import com.evolveum.midpoint.schema.result.OperationResult;
-import com.evolveum.midpoint.schema.util.ObjectQueryUtil;
+import com.evolveum.midpoint.security.api.AuthorizationConstants;
 import com.evolveum.midpoint.security.api.ConnectionEnvironment;
-import com.evolveum.midpoint.security.api.HttpConnectionInformation;
 import com.evolveum.midpoint.security.api.MidPointPrincipal;
 import com.evolveum.midpoint.task.api.Task;
-import com.evolveum.midpoint.util.exception.*;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
-import com.evolveum.midpoint.web.boot.GrpcServerConfiguration;
-import com.evolveum.midpoint.web.security.MidPointApplication;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
-import io.grpc.*;
+import io.grpc.Metadata;
+import io.grpc.Status;
 import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
 import org.springframework.stereotype.Component;
 
-import java.io.UnsupportedEncodingException;
-import java.util.Base64;
-import java.util.List;
-
-import static jp.openstandia.midpoint.grpc.MidPointGrpcService.CHANNEL_GRPC_SERVICE_URI;
-import static jp.openstandia.midpoint.grpc.MidPointGrpcService.OPERATION_GRPC_SERVICE;
-
 @Component
-public class BasicAuthenticationInterceptor implements ServerInterceptor {
+@ConditionalOnMissingBean(JWTAuthenticationInterceptor.class)
+public class BasicAuthenticationInterceptor extends AbstractGrpcAuthenticationInterceptor {
 
-    private static final Trace LOGGER = TraceManager.getTrace(MidPointApplication.class);
-
-    @Autowired
-    private PrismContext prismContext;
-
-    @Autowired
-    private ModelService modelService;
+    private static final Trace LOGGER = TraceManager.getTrace(BasicAuthenticationInterceptor.class);
+    private static final String TYPE = "Basic";
 
     @Autowired
-    private transient AuthenticationEvaluator<PasswordAuthenticationContext> passwordAuthenticationEvaluator;
+    transient AuthenticationEvaluator<PasswordAuthenticationContext> passwordAuthenticationEvaluator;
 
     @Override
-    public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(ServerCall<ReqT, RespT> call, Metadata headers, ServerCallHandler<ReqT, RespT> next) {
-        // How to get remote address/port
-        // https://github.com/grpc/grpc-java/blob/30b59885b7496b53eb17f64ba1d822c2d9a6c69a/interop-testing/src/main/java/io/grpc/testing/integration/AbstractInteropTest.java#L1627-L1639
+    public String getType() {
+        return TYPE;
+    }
 
-        final String remoteInetSocketString = call.getAttributes().get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR).toString();
-        final String localInetSocketString = call.getAttributes().get(Grpc.TRANSPORT_ATTR_LOCAL_ADDR).toString();
+    @Override
+    public Authentication authenticate(ConnectionEnvironment connEnv, Task task, String header) {
+        String[] tokens = extractAndDecodeBasicAuthzHeader(header);
 
-        HttpConnectionInformation connection = new HttpConnectionInformation();
-        connection.setRemoteHostAddress(remoteInetSocketString);
-        connection.setLocalHostName(localInetSocketString);
+        Authentication authToken = authenticateUser(connEnv, tokens[0], tokens[1]);
 
-        LOGGER.trace("Authenticating to gRPC service");
+        return authToken;
+    }
 
-        // We need to create task before attempting authentication. Task ID is also a session ID.
-        final Task task = GrpcServerConfiguration.getApplication().getTaskManager().createTaskInstance(OPERATION_GRPC_SERVICE);
-        task.setChannel(CHANNEL_GRPC_SERVICE_URI);
+    @Override
+    protected void authorizeClient(Authentication auth, ConnectionEnvironment connEnv, Task task) {
+        MidPointPrincipal p = (MidPointPrincipal) auth.getPrincipal();
+        UserType user = p.getUser();
+        authenticateUser(user.asPrismObject(), connEnv, task);
+        authorizeUser(auth, AuthorizationConstants.AUTZ_REST_ALL_URL, user, null, connEnv);
+    }
 
-        connection.setSessionId(task.getTaskIdentifier());
-        ConnectionEnvironment connEnv = new ConnectionEnvironment(CHANNEL_GRPC_SERVICE_URI, connection);
-
-        // Client authentication
-        String token = headers.get(Constant.AuthorizationMetadataKey);
-        Authentication auth = authenticate(connEnv, token);
-
-        UserType user = ((MidPointPrincipal) auth.getPrincipal()).getUser();
-        task.setOwner(user.asPrismObject());
-
-        // Switch user authentication
+    @Override
+    protected Authentication switchToUser(Authentication auth, Metadata headers, ConnectionEnvironment connEnv, Task task) {
         String switchUser = headers.get(Constant.SwitchToPrincipalMetadataKey);
         String switchUserByName = headers.get(Constant.SwitchToPrincipalByNameMetadataKey);
 
+        // Find proxy user
+        PrismObject<UserType> authorizedUser;
         if (StringUtils.isNotBlank(switchUser)) {
-            auth = authenticateSwitchUser(switchUser, task);
-            task.setOwner(((MidPointPrincipal) auth.getPrincipal()).getUser().asPrismObject());
-            // TODO Authorize
-//                if (!authorizeUser(AuthorizationConstants.AUTZ_REST_PROXY_URL, user, authorizedUser, enteredUsername, connEnv, requestCtx)){
-//                    return;
-//                }
+            authorizedUser = findByOid(switchUser, task);
         } else if (StringUtils.isNotBlank(switchUserByName)) {
-            auth = authenticateSwitchUserByName(switchUserByName, task);
-            task.setOwner(((MidPointPrincipal) auth.getPrincipal()).getUser().asPrismObject());
-            // TODO Authorize
-//                if (!authorizeUser(AuthorizationConstants.AUTZ_REST_PROXY_URL, user, authorizedUser, enteredUsername, connEnv, requestCtx)){
-//                    return;
-//                }
+            authorizedUser = findByUsername(switchUserByName, task);
+        } else {
+            // No switching
+            return auth;
         }
 
-        Context ctx = Context.current()
-                .withValue(ServerConstant.ConnectionContextKey, connection)
-                .withValue(ServerConstant.ConnectionEnvironmentContextKey, connEnv)
-                .withValue(ServerConstant.TaskContextKey, task)
-                .withValue(ServerConstant.AuthenticationContextKey, auth)
-                .withValue(ServerConstant.AuthorizationHeaderContextKey, token);
+        // Authorization proxy user
+        UserType client = ((MidPointPrincipal) auth.getPrincipal()).getUser();
+        authorizeUser(auth, AuthorizationConstants.AUTZ_REST_PROXY_URL, client, authorizedUser, connEnv);
 
-        ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT> serverCall = new ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT>(call) {
-            @Override
-            public void close(Status status, Metadata trailers) {
-                if (!status.isOk()) {
-                    LOGGER.error("Error in calling gRPC service. status={}, metadata={}", status, trailers);
-                }
-                // TODO Check REST API implementation
-//                task.setOwner(user.asPrismObject());
-                finishRequest(task, connEnv);
-                super.close(status, trailers);
-            }
-        };
-
-        return Contexts.interceptCall(ctx, serverCall, headers, next);
+        return authenticateUser(authorizedUser, connEnv, task);
     }
 
-    private PrismObject<UserType> findByOid(String oid, Task task) {
-        OperationResult result = task.getResult();
-        try {
-           PrismObject<UserType> user = modelService.getObject(UserType.class, oid, null, task, result);
-           return user;
-        } catch (SchemaException | ObjectNotFoundException | SecurityViolationException | CommunicationException | ConfigurationException | ExpressionEvaluationException e) {
-            LOGGER.trace("Exception while authenticating user identified with oid: '{}' to gRPC service: {}", oid, e.getMessage(), e);
-            throw Status.UNAUTHENTICATED
-                    .withDescription(e.getMessage())
-                    .asRuntimeException();
-        }
-    }
-
-    private PrismObject<UserType> findByUsername(String username, Task task) {
-        OperationResult result = task.getResult();
-        try {
-            PolyString usernamePoly = new PolyString(username);
-            ObjectQuery query = ObjectQueryUtil.createNormNameQuery(usernamePoly, prismContext);
-            LOGGER.trace("Looking for user, query:\n" + query.debugDump());
-
-            List<PrismObject<UserType>> list = GrpcServerConfiguration.getApplication().getRepositoryService().searchObjects(UserType.class, query, null, result);
-            LOGGER.trace("Users found: {}.", list.size());
-            if (list.size() != 1) {
-                throw Status.NOT_FOUND
-                        .withDescription("Not found user")
-                        .asRuntimeException();
-            }
-            return list.get(0);
-        } catch (SchemaException e) {
-            LOGGER.trace("Exception while authenticating user identified with name: '{}' to gRPC service: {}", username, e.getMessage(), e);
-            throw Status.UNAUTHENTICATED
-                    .withDescription(e.getMessage())
-                    .asRuntimeException();
-        }
-    }
-
-    protected Authentication authenticate(ConnectionEnvironment connEnv, String header) {
-        if (header == null || !header.toLowerCase().startsWith("basic ")) {
-            throw Status.UNAUTHENTICATED
-                    .withDescription("Not authorization header")
-                    .asRuntimeException();
-        }
-        try {
-            String[] tokens = extractAndDecodeHeader(header);
-
-            UsernamePasswordAuthenticationToken authToken = authenticateUser(connEnv, tokens[0], tokens[1]);
-            return authToken;
-
-        } catch (UnsupportedEncodingException e) {
-            StatusRuntimeException exception = Status.INTERNAL
-                    .withDescription("internal_error")
-                    .withCause(e)
-                    .asRuntimeException();
-            throw exception;
-        }
-    }
-
-    private String[] extractAndDecodeHeader(String header) throws UnsupportedEncodingException {
-        byte[] base64Token = header.substring(6).getBytes("UTF-8");
-        byte[] decoded;
-        try {
-            decoded = Base64.getDecoder().decode(base64Token);
-        } catch (IllegalArgumentException e) {
-            throw Status.UNAUTHENTICATED
-                    .withDescription("Failed to decode basic authentication token")
-                    .asRuntimeException();
-        }
-
-        String token = new String(decoded, "UTF-8");
+    protected String[] extractAndDecodeBasicAuthzHeader(String header) {
+        String token = extractAndDecodeHeader(header, "basic");
 
         int delim = token.indexOf(":");
 
@@ -202,42 +90,15 @@ public class BasicAuthenticationInterceptor implements ServerInterceptor {
 
     private UsernamePasswordAuthenticationToken authenticateUser(ConnectionEnvironment connEnv, String username, String password) {
         try {
+            // login session is recorded here
             UsernamePasswordAuthenticationToken token = passwordAuthenticationEvaluator.authenticate(connEnv, new PasswordAuthenticationContext(username, password));
             return token;
         } catch (AuthenticationException ex) {
+            LOGGER.info("Not authenticated. user: {}, reason: {}", username, ex.getMessage());
             throw Status.UNAUTHENTICATED
-                    .withDescription("Unauthorized")
+                    .withDescription("invalid_token")
+                    .withCause(ex)
                     .asRuntimeException();
         }
-    }
-
-    protected Authentication authenticateSwitchUser(String oid, Task task) {
-        PrismObject<UserType> user = findByOid(oid, task);
-        return authenticateSwitchUser(user, task);
-    }
-
-    protected Authentication authenticateSwitchUserByName(String username, Task task) {
-        PrismObject<UserType> user = findByUsername(username, task);
-        return authenticateSwitchUser(user, task);
-    }
-
-    protected Authentication authenticateSwitchUser(PrismObject<UserType> user, Task task) {
-        try {
-            OperationResult result = task.getResult();
-            MidPointPrincipal principal = GrpcServerConfiguration.getApplication().getSecurityContextManager().getUserProfileService().getPrincipal(user, null, result);
-            PreAuthenticatedAuthenticationToken token = new PreAuthenticatedAuthenticationToken(principal, null, principal.getAuthorities());
-            return token;
-        } catch (Exception e) {
-            StatusRuntimeException exception = Status.INTERNAL
-                    .withDescription("internal_error")
-                    .asRuntimeException();
-            throw exception;
-        }
-    }
-
-    protected void finishRequest(Task task, ConnectionEnvironment connEnv) {
-        task.getResult().computeStatus();
-        connEnv.setSessionIdOverride(task.getTaskIdentifier());
-        GrpcServerConfiguration.getSecurityHelper().auditLogout(connEnv, task);
     }
 }

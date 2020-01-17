@@ -21,6 +21,7 @@
 
     <properties>
         <version.midpoint>4.0.1</version.midpoint>
+        <version.spring-boot>2.1.8.RELEASE</version.spring-boot>
         <version.grpc-java>1.25.0</version.grpc-java>
         <version.protoc>3.10.0</version.protoc>
 
@@ -90,6 +91,27 @@
                 <version>${version.protoc}</version>
             </dependency>
 
+            <!-- OAuth2.0 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+                <version>${version.spring-boot}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.springframework.security</groupId>
+                        <artifactId>spring-security-config</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.springframework.security</groupId>
+                        <artifactId>spring-security-core</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
             <!-- For client-spi -->
             <dependency>
                 <groupId>io.grpc</groupId>
@@ -105,6 +127,19 @@
                 <groupId>io.grpc</groupId>
                 <artifactId>grpc-stub</artifactId>
                 <version>${version.grpc-java}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter-api</artifactId>
+                <version>5.3.2</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter-engine</artifactId>
+                <version>5.3.2</version>
+                <scope>test</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>

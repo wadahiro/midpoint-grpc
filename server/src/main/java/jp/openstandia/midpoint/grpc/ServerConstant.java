@@ -4,10 +4,7 @@ import com.evolveum.midpoint.security.api.ConnectionEnvironment;
 import com.evolveum.midpoint.security.api.HttpConnectionInformation;
 import com.evolveum.midpoint.task.api.Task;
 import io.grpc.Context;
-import io.grpc.Metadata;
 import org.springframework.security.core.Authentication;
-
-import static io.grpc.Metadata.ASCII_STRING_MARSHALLER;
 
 public class ServerConstant {
     public static final Context.Key<HttpConnectionInformation> ConnectionContextKey = Context.key("connection");

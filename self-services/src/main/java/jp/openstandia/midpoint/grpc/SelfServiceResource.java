@@ -28,7 +28,10 @@ import com.evolveum.midpoint.util.exception.*;
 import com.evolveum.midpoint.util.logging.LoggingUtils;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.CredentialsType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.PasswordType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 import com.evolveum.prism.xml.ns._public.types_3.ProtectedStringType;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -41,7 +44,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-@GRpcService(interceptors = BasicAuthenticationInterceptor.class)
+@GRpcService
 public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceResourceImplBase implements MidPointGrpcService {
 
     private static final Trace LOGGER = TraceManager.getTrace(SelfServiceResource.class);
@@ -149,9 +152,6 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                         .withDescription("Not Found")
                         .asRuntimeException();
                 throw exception;
-            } catch (Exception e) {
-                responseObserver.onError(e);
-                return null;
             }
         });
 
@@ -174,18 +174,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         LOGGER.debug("Start updateCredential");
 
         runTask(ctx -> {
-            try {
-                updateCredential(ctx, request.getOld(), request.getNew(), true);
-                return null;
-            } catch (ObjectNotFoundException e) {
-                StatusRuntimeException exception = Status.NOT_FOUND
-                        .withDescription("Not Found")
-                        .asRuntimeException();
-                throw exception;
-            } catch (Exception e) {
-                responseObserver.onError(e);
-                return null;
-            }
+            updateCredential(ctx, request.getOld(), request.getNew(), true);
+            return null;
         });
 
         UpdateCredentialResponse res = UpdateCredentialResponse.newBuilder().build();
@@ -200,18 +190,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         LOGGER.debug("Start forceUpdateCredential");
 
         runTask(ctx -> {
-            try {
-                updateCredential(ctx, null, request.getNew(), false);
-                return null;
-            } catch (ObjectNotFoundException e) {
-                StatusRuntimeException exception = Status.NOT_FOUND
-                        .withDescription("Not Found")
-                        .asRuntimeException();
-                throw exception;
-            } catch (Exception e) {
-                responseObserver.onError(e);
-                return null;
-            }
+            updateCredential(ctx, null, request.getNew(), false);
+            return null;
         });
 
         UpdateCredentialResponse res = UpdateCredentialResponse.newBuilder().build();

@@ -5,8 +5,13 @@ import com.evolveum.midpoint.security.api.HttpConnectionInformation;
 import com.evolveum.midpoint.security.api.MidPointPrincipal;
 import com.evolveum.midpoint.task.api.Task;
 import com.evolveum.midpoint.util.QNameUtil;
+import com.evolveum.midpoint.util.exception.AuthorizationException;
+import com.evolveum.midpoint.util.exception.ObjectAlreadyExistsException;
+import com.evolveum.midpoint.util.exception.ObjectNotFoundException;
+import com.evolveum.midpoint.util.exception.PolicyViolationException;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
+import io.grpc.Status;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -36,8 +41,31 @@ public interface MidPointGrpcService {
         try {
             T result = task.run(new MidPointTaskContext(connection, connEnv, t, auth, principal));
             return result;
+        } catch (ObjectNotFoundException e) {
+            throw Status.NOT_FOUND
+                    .withDescription(e.getErrorTypeMessage())
+                    .withCause(e)
+                    .asRuntimeException();
+        } catch (PolicyViolationException e) {
+            throw Status.INVALID_ARGUMENT
+                    .withDescription(e.getErrorTypeMessage())
+                    .withCause(e)
+                    .asRuntimeException();
+        } catch (AuthorizationException e) {
+            throw Status.PERMISSION_DENIED
+                    .withDescription(e.getErrorTypeMessage())
+                    .withCause(e)
+                    .asRuntimeException();
+        } catch (ObjectAlreadyExistsException e) {
+            throw Status.ALREADY_EXISTS
+                    .withDescription(e.getErrorTypeMessage())
+                    .withCause(e)
+                    .asRuntimeException();
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw Status.INTERNAL
+                    .withDescription(e.getMessage())
+                    .withCause(e)
+                    .asRuntimeException();
         } finally {
             SecurityContextHolder.getContext().setAuthentication(null);
         }

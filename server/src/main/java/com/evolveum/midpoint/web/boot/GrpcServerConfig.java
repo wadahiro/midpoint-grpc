@@ -2,16 +2,15 @@ package com.evolveum.midpoint.web.boot;
 
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
-import io.grpc.ServerInterceptor;
-import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
-import org.lognet.springboot.grpc.GRpcGlobalInterceptor;
 import org.lognet.springboot.grpc.autoconfigure.GRpcAutoConfiguration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
-import org.springframework.context.annotation.Bean;
+import org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Configuration;
 
 @ImportAutoConfiguration(classes = {
-        GRpcAutoConfiguration.class
+        GRpcAutoConfiguration.class,
+        OAuth2ResourceServerAutoConfiguration.class
 })
 @Configuration
 public class GrpcServerConfig {
@@ -23,9 +22,6 @@ public class GrpcServerConfig {
         LOGGER.info("GrpcServerConfig loaded");
     }
 
-    @Bean
-    @GRpcGlobalInterceptor
-    public ServerInterceptor exceptionInterceptor() {
-        return TransmitStatusRuntimeExceptionInterceptor.instance();
-    }
+    private ApplicationContext applicationContext;
+
 }
