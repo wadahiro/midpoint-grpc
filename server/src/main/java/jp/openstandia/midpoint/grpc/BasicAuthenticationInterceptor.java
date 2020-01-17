@@ -1,6 +1,7 @@
 package jp.openstandia.midpoint.grpc;
 
 import com.evolveum.midpoint.model.api.AuthenticationEvaluator;
+import com.evolveum.midpoint.model.api.ModelService;
 import com.evolveum.midpoint.model.api.context.PasswordAuthenticationContext;
 import com.evolveum.midpoint.prism.PrismContext;
 import com.evolveum.midpoint.prism.PrismObject;
@@ -12,7 +13,7 @@ import com.evolveum.midpoint.security.api.ConnectionEnvironment;
 import com.evolveum.midpoint.security.api.HttpConnectionInformation;
 import com.evolveum.midpoint.security.api.MidPointPrincipal;
 import com.evolveum.midpoint.task.api.Task;
-import com.evolveum.midpoint.util.exception.SchemaException;
+import com.evolveum.midpoint.util.exception.*;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.web.boot.GrpcServerConfiguration;
@@ -41,6 +42,9 @@ public class BasicAuthenticationInterceptor implements ServerInterceptor {
 
     @Autowired
     private PrismContext prismContext;
+
+    @Autowired
+    private ModelService modelService;
 
     @Autowired
     private transient AuthenticationEvaluator<PasswordAuthenticationContext> passwordAuthenticationEvaluator;
@@ -75,9 +79,17 @@ public class BasicAuthenticationInterceptor implements ServerInterceptor {
 
         // Switch user authentication
         String switchUser = headers.get(Constant.SwitchToPrincipalMetadataKey);
-        OperationResult result = task.getResult();
+        String switchUserByName = headers.get(Constant.SwitchToPrincipalByNameMetadataKey);
+
         if (StringUtils.isNotBlank(switchUser)) {
-            auth = authenticateSwitchUser(switchUser, result);
+            auth = authenticateSwitchUser(switchUser, task);
+            task.setOwner(((MidPointPrincipal) auth.getPrincipal()).getUser().asPrismObject());
+            // TODO Authorize
+//                if (!authorizeUser(AuthorizationConstants.AUTZ_REST_PROXY_URL, user, authorizedUser, enteredUsername, connEnv, requestCtx)){
+//                    return;
+//                }
+        } else if (StringUtils.isNotBlank(switchUserByName)) {
+            auth = authenticateSwitchUserByName(switchUserByName, task);
             task.setOwner(((MidPointPrincipal) auth.getPrincipal()).getUser().asPrismObject());
             // TODO Authorize
 //                if (!authorizeUser(AuthorizationConstants.AUTZ_REST_PROXY_URL, user, authorizedUser, enteredUsername, connEnv, requestCtx)){
@@ -108,7 +120,21 @@ public class BasicAuthenticationInterceptor implements ServerInterceptor {
         return Contexts.interceptCall(ctx, serverCall, headers, next);
     }
 
-    private PrismObject<UserType> findByUsername(String username, OperationResult result) {
+    private PrismObject<UserType> findByOid(String oid, Task task) {
+        OperationResult result = task.getResult();
+        try {
+           PrismObject<UserType> user = modelService.getObject(UserType.class, oid, null, task, result);
+           return user;
+        } catch (SchemaException | ObjectNotFoundException | SecurityViolationException | CommunicationException | ConfigurationException | ExpressionEvaluationException e) {
+            LOGGER.trace("Exception while authenticating user identified with oid: '{}' to gRPC service: {}", oid, e.getMessage(), e);
+            throw Status.UNAUTHENTICATED
+                    .withDescription(e.getMessage())
+                    .asRuntimeException();
+        }
+    }
+
+    private PrismObject<UserType> findByUsername(String username, Task task) {
+        OperationResult result = task.getResult();
         try {
             PolyString usernamePoly = new PolyString(username);
             ObjectQuery query = ObjectQueryUtil.createNormNameQuery(usernamePoly, prismContext);
@@ -123,7 +149,7 @@ public class BasicAuthenticationInterceptor implements ServerInterceptor {
             }
             return list.get(0);
         } catch (SchemaException e) {
-            LOGGER.trace("Exception while authenticating user identified with '{}' to gRPC service: {}", username, e.getMessage(), e);
+            LOGGER.trace("Exception while authenticating user identified with name: '{}' to gRPC service: {}", username, e.getMessage(), e);
             throw Status.UNAUTHENTICATED
                     .withDescription(e.getMessage())
                     .asRuntimeException();
@@ -185,9 +211,19 @@ public class BasicAuthenticationInterceptor implements ServerInterceptor {
         }
     }
 
-    protected Authentication authenticateSwitchUser(String username, OperationResult result) {
+    protected Authentication authenticateSwitchUser(String oid, Task task) {
+        PrismObject<UserType> user = findByOid(oid, task);
+        return authenticateSwitchUser(user, task);
+    }
+
+    protected Authentication authenticateSwitchUserByName(String username, Task task) {
+        PrismObject<UserType> user = findByUsername(username, task);
+        return authenticateSwitchUser(user, task);
+    }
+
+    protected Authentication authenticateSwitchUser(PrismObject<UserType> user, Task task) {
         try {
-            PrismObject<UserType> user = findByUsername(username, result);
+            OperationResult result = task.getResult();
             MidPointPrincipal principal = GrpcServerConfiguration.getApplication().getSecurityContextManager().getUserProfileService().getPrincipal(user, null, result);
             PreAuthenticatedAuthenticationToken token = new PreAuthenticatedAuthenticationToken(principal, null, principal.getAuthorities());
             return token;
