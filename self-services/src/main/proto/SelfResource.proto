@@ -15,11 +15,6 @@ service SelfServiceResource {
     rpc modifyProfile(ModifyProfileRequest) returns (ModifyProfileResponse);
 
     /**
-     * Update user profile.
-     */
-    rpc updateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
-
-    /**
      * Update credential with current password validating.
      */
     rpc updateCredential(UpdateCredentialRequest) returns (UpdateCredentialResponse);
@@ -47,26 +42,35 @@ message UserItemDelta {
 }
 
 enum UserItemPath {
-    NAME = 0;
-    FULL_NAME = 1;
-    GIVEN_NAME = 2;
-    FAMILY_NAME = 3;
-    ADDITIONAL_NAME = 4;
-    NICK_NAME = 5;
-    HONORIFIC_PREFIX = 6;
-    HONORIFIC_SUFFIX = 7;
-    TITLE = 8;
-    PREFERRED_LANGUAGE = 9;
-    LOCALE = 10;
-    TIMEZONE = 11;
-    EMAIL_ADDRESS = 12;
-    TELEPHONE_NUMBER = 13;
-    EMPLOYEE_NUMBER = 14;
-    EMPLOYEE_TYPE = 15;
-    COST_CENTER = 16;
-    ORGANIZATION = 17;
-    ORGANIZATIONAL_UNIT = 18;
-    LOCALITY = 19;
+    // ObjectType
+    F_NAME = 0;
+    F_DESCRIPTION = 1;
+    F_SUBTYPE = 2;
+    F_LIFECYCLE_STATE = 3;
+
+    // FocusType
+    F_JPEG_PHOTO = 20;
+    F_COST_CENTER = 21;
+    F_LOCALITY = 22;
+    F_PREFERRED_LANGUAGE = 23;
+    F_LOCALE = 24;
+    F_TIMEZONE = 25;
+    F_EMAIL_ADDRESS = 26;
+    F_TELEPHONE_NUMBER = 27;
+
+    // UserType
+    F_FULL_NAME = 40;
+    F_GIVEN_NAME = 41;
+    F_FAMILY_NAME = 42;
+    F_ADDITIONAL_NAME = 43;
+    F_NICK_NAME = 44;
+    F_HONORIFIC_PREFIX = 45;
+    F_HONORIFIC_SUFFIX = 46;
+    F_TITLE = 47;
+    F_EMPLOYEE_NUMBER = 48;
+    F_EMPLOYEE_TYPE = 49;
+    F_ORGANIZATION = 50;
+    F_ORGANIZATIONAL_UNIT = 51;
 }
 
 message ModifyProfileResponse {
@@ -153,4 +157,25 @@ message AssignOption {
 }
 
 message RequestRoleResponse {
+}
+
+message Message {
+    string key = 1;
+    repeated MessageWrapper args = 2;
+}
+
+message MessageWrapper {
+    oneof arg {
+         Message msgArg = 3;
+         MessageList msgListArg = 4;
+         string stringArg = 5;
+    }
+}
+
+message MessageList {
+    repeated MessageWrapper args = 1;
+}
+
+message PolicyError {
+  repeated MessageWrapper errors = 1;
 }

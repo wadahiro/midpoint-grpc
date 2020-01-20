@@ -37,7 +37,7 @@ public class TestJWTAuthClient {
         ModifyProfileRequest request = ModifyProfileRequest.newBuilder()
                 .addModifications(
                         UserItemDelta.newBuilder()
-                                .setName(UserItemPath.FAMILY_NAME)
+                                .setName(UserItemPath.F_FAMILY_NAME)
                                 .setValuesToReplace("Bar")
                         .build()
                 )

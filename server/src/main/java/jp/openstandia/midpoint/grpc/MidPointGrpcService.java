@@ -4,13 +4,17 @@ import com.evolveum.midpoint.security.api.ConnectionEnvironment;
 import com.evolveum.midpoint.security.api.HttpConnectionInformation;
 import com.evolveum.midpoint.security.api.MidPointPrincipal;
 import com.evolveum.midpoint.task.api.Task;
+import com.evolveum.midpoint.util.LocalizableMessage;
 import com.evolveum.midpoint.util.QNameUtil;
+import com.evolveum.midpoint.util.SingleLocalizableMessage;
 import com.evolveum.midpoint.util.exception.AuthorizationException;
 import com.evolveum.midpoint.util.exception.ObjectAlreadyExistsException;
 import com.evolveum.midpoint.util.exception.ObjectNotFoundException;
 import com.evolveum.midpoint.util.exception.PolicyViolationException;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
+import com.lowagie.text.Meta;
+import io.grpc.Metadata;
 import io.grpc.Status;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -47,10 +51,12 @@ public interface MidPointGrpcService {
                     .withCause(e)
                     .asRuntimeException();
         } catch (PolicyViolationException e) {
+            Metadata metadata = handlePolicyViolationException(e);
+
             throw Status.INVALID_ARGUMENT
                     .withDescription(e.getErrorTypeMessage())
                     .withCause(e)
-                    .asRuntimeException();
+                    .asRuntimeException(metadata);
         } catch (AuthorizationException e) {
             throw Status.PERMISSION_DENIED
                     .withDescription(e.getErrorTypeMessage())
@@ -70,4 +76,9 @@ public interface MidPointGrpcService {
             SecurityContextHolder.getContext().setAuthentication(null);
         }
     }
+
+    default Metadata handlePolicyViolationException(PolicyViolationException e) {
+        return new Metadata();
+    }
 }
+

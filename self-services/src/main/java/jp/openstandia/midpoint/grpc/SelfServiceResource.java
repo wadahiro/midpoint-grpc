@@ -17,6 +17,7 @@ import com.evolveum.midpoint.prism.delta.PropertyDelta;
 import com.evolveum.midpoint.prism.delta.builder.S_ItemEntry;
 import com.evolveum.midpoint.prism.delta.builder.S_MaybeDelete;
 import com.evolveum.midpoint.prism.delta.builder.S_ValuesEntry;
+import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
@@ -24,6 +25,9 @@ import com.evolveum.midpoint.prism.schema.SchemaRegistry;
 import com.evolveum.midpoint.schema.SchemaConstantsGenerated;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.task.api.Task;
+import com.evolveum.midpoint.util.LocalizableMessage;
+import com.evolveum.midpoint.util.LocalizableMessageList;
+import com.evolveum.midpoint.util.SingleLocalizableMessage;
 import com.evolveum.midpoint.util.exception.*;
 import com.evolveum.midpoint.util.logging.LoggingUtils;
 import com.evolveum.midpoint.util.logging.Trace;
@@ -33,8 +37,10 @@ import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.PasswordType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 import com.evolveum.prism.xml.ns._public.types_3.ProtectedStringType;
+import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.grpc.protobuf.ProtoUtils;
 import io.grpc.stub.StreamObserver;
 import org.lognet.springboot.grpc.GRpcService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -73,6 +79,18 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     protected transient AuthenticationEvaluator<PasswordAuthenticationContext> passwordAuthenticationEvaluator;
 
     @Override
+    public Metadata handlePolicyViolationException(PolicyViolationException e) {
+        PolicyError error = TypeConverter.toPolicyError(e);
+        Metadata metadata = new Metadata();
+
+        Metadata.Key<PolicyError> POLICY_ERROR_KEY =
+                ProtoUtils.keyForProto(PolicyError.getDefaultInstance());
+        metadata.put(POLICY_ERROR_KEY, error);
+
+        return metadata;
+    }
+
+    @Override
     public void modifyProfile(ModifyProfileRequest request, StreamObserver<ModifyProfileResponse> responseObserver) {
         LOGGER.debug("Start modifyProfile");
 
@@ -89,41 +107,24 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
                     // https://wiki.evolveum.com/display/midPoint/Using+Prism+Deltas
                     for (UserItemDelta m : request.getModificationsList()) {
-                        S_ValuesEntry v = null;
-                        boolean isPolyString = false;
-                        switch (m.getName()) {
-                            case NAME:
-                                v = i.item(UserType.F_NAME);
-                                isPolyString = true;
-                                break;
-                            case EMAIL_ADDRESS:
-                                v = i.item(UserType.F_EMAIL_ADDRESS);
-                                break;
-                            case GIVEN_NAME:
-                                v = i.item(UserType.F_GIVEN_NAME);
-                                isPolyString = true;
-                                break;
-                            case FAMILY_NAME:
-                                v = i.item(UserType.F_FAMILY_NAME);
-                                isPolyString = true;
-                                break;
-                        }
+                        UserItemPath path = m.getName();
 
-                        if (v == null) {
-                            LOGGER.warn("Invalid argument. Unsupported name: {}", m.getName());
-                            throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-                        }
+                        ItemName itemName = TypeConverter.toItemName(path);
+                        S_ValuesEntry v = i.item(itemName);
 
                         S_ItemEntry entry = null;
                         if (!m.getValuesToAdd().isEmpty()) {
-                            S_MaybeDelete av = v.add(asStringOrPolyString(m.getValuesToAdd(), isPolyString));
+                            S_MaybeDelete av = v.add(TypeConverter.toValue(path, m.getValuesToAdd()));
+
                             if (!m.getValuesToDelete().isEmpty()) {
-                                entry = av.delete(asStringOrPolyString(m.getValuesToDelete(), isPolyString));
+                                entry = av.delete(TypeConverter.toValue(path, m.getValuesToDelete()));
                             }
+
                         } else if (!m.getValuesToReplace().isEmpty()) {
-                            entry = v.replace(asStringOrPolyString(m.getValuesToReplace(), isPolyString));
+                            entry = v.replace(TypeConverter.toValue(path, m.getValuesToReplace()));
+
                         } else if (!m.getValuesToDelete().isEmpty()) {
-                            entry = v.delete(asStringOrPolyString(m.getValuesToDelete(), isPolyString));
+                            entry = v.delete(TypeConverter.toValue(path, m.getValuesToDelete()));
                         }
 
                         if (entry == null) {
@@ -140,6 +141,10 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                     modelCrudService.modifyObject(UserType.class, user.getOid(), deltas, options, task, updateResult);
 
                     updateResult.computeStatus();
+                } catch (UnsupportedOperationException e) {
+                    LOGGER.warn("Invalid argument. ", e);
+                    throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+
                 } catch (ObjectAlreadyExistsException | PolicyViolationException e) {
                     LoggingUtils.logUnexpectedException(LOGGER, "Couldn't update user changes", e);
                     throw e;
@@ -160,13 +165,6 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         responseObserver.onCompleted();
 
         LOGGER.debug("End updateProfile");
-    }
-
-    private Object asStringOrPolyString(String s, boolean isPolyString) {
-        if (isPolyString) {
-            return PolyString.fromOrig(s);
-        }
-        return s;
     }
 
     @Override
@@ -205,7 +203,6 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     public void requestRole(RequestRoleRequest request, StreamObserver<RequestRoleResponse> responseObserver) {
         LOGGER.debug("Start requestRole");
 
-        
 
         LOGGER.debug("End requestRole");
     }
@@ -256,7 +253,10 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             modelService.executeChanges(deltas, null, task, updateResult);
 
             updateResult.computeStatus();
-        } catch (EncryptionException | ObjectAlreadyExistsException | PolicyViolationException e) {
+        } catch (PolicyViolationException e) {
+            LoggingUtils.logExceptionAsWarning(LOGGER, "Couldn't save password changes because of policy violation: {}", e, e.getMessage());
+            throw e;
+        } catch (EncryptionException | ObjectAlreadyExistsException e) {
             LoggingUtils.logUnexpectedException(LOGGER, "Couldn't save password changes", e);
             throw e;
         } finally {
