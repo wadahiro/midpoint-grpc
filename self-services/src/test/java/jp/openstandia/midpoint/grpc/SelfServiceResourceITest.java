@@ -108,43 +108,37 @@ class SelfServiceResourceITest {
         } catch (StatusRuntimeException e) {
             assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
 
-            Metadata.Key<PolicyError> POLICY_ERROR =
-                    ProtoUtils.keyForProto(PolicyError.getDefaultInstance());
+            PolicyError policyError = e.getTrailers().get(SelfServiceResource.PolicyErrorMetadataKey);
 
-            PolicyError policyError = e.getTrailers().get(POLICY_ERROR);
+            Message error = policyError.getMessage();
+            assertTrue(error.hasSingle());
 
-            List<MessageWrapper> errorsList = policyError.getErrorsList();
-            assertEquals(1, errorsList.size());
-
-            MessageWrapper wrapper = errorsList.get(0);
-            assertTrue(wrapper.hasMsgArg());
-
-            Message msg = wrapper.getMsgArg();
+            SingleMessage msg = error.getSingle();
             String errKey = msg.getKey();
             assertEquals("PolicyViolationException.message.credentials.password", errKey);
 
-            List<MessageWrapper> argsList = msg.getArgsList();
+            List<Message> argsList = msg.getArgsList();
             assertEquals(1, argsList.size());
 
-            MessageWrapper argsWrapper = argsList.get(0);
-            assertTrue(argsWrapper.hasMsgArg());
+            Message argsWrapper = argsList.get(0);
+            assertTrue(argsWrapper.hasSingle());
 
-            Message subMsgArgs = argsWrapper.getMsgArg();
+            SingleMessage subMsgArgs = argsWrapper.getSingle();
             String subErrKey = subMsgArgs.getKey();
             assertEquals("ValuePolicy.minimalSizeNotMet", subErrKey);
 
-            List<MessageWrapper> subMsgArgsList = subMsgArgs.getArgsList();
+            List<Message> subMsgArgsList = subMsgArgs.getArgsList();
             assertEquals(2, subMsgArgsList.size());
 
-            MessageWrapper subMsgArg1 = subMsgArgsList.get(0);
-            assertFalse(subMsgArg1.hasMsgArg());
-            assertFalse(subMsgArg1.hasMsgListArg());
-            assertEquals("5", subMsgArg1.getStringArg());
+            Message subMsgArg1 = subMsgArgsList.get(0);
+            assertFalse(subMsgArg1.hasSingle());
+            assertFalse(subMsgArg1.hasList());
+            assertEquals("5", subMsgArg1.getString());
 
-            MessageWrapper subMsgArg2= subMsgArgsList.get(1);
-            assertFalse(subMsgArg2.hasMsgArg());
-            assertFalse(subMsgArg2.hasMsgListArg());
-            assertEquals("3", subMsgArg2.getStringArg());
+            Message subMsgArg2= subMsgArgsList.get(1);
+            assertFalse(subMsgArg2.hasSingle());
+            assertFalse(subMsgArg2.hasList());
+            assertEquals("3", subMsgArg2.getString());
         }
     }
 
@@ -170,41 +164,37 @@ class SelfServiceResourceITest {
         } catch (StatusRuntimeException e) {
             assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
 
-            Metadata.Key<PolicyError> POLICY_ERROR =
-                    ProtoUtils.keyForProto(PolicyError.getDefaultInstance());
+            PolicyError policyError = e.getTrailers().get(SelfServiceResource.PolicyErrorMetadataKey);
 
-            PolicyError policyError = e.getTrailers().get(POLICY_ERROR);
+            Message message = policyError.getMessage();
+            assertTrue(message.hasSingle());
 
-            List<MessageWrapper> errorsList = policyError.getErrorsList();
-            assertEquals(1, errorsList.size());
-
-            MessageWrapper wrapper = errorsList.get(0);
-            assertTrue(wrapper.hasMsgArg());
-
-            Message msg = wrapper.getMsgArg();
+            SingleMessage msg = message.getSingle();
             String errKey = msg.getKey();
             assertEquals("PolicyViolationException.message.credentials.password", errKey);
 
-            List<MessageWrapper> argsList = msg.getArgsList();
+            List<Message> argsList = msg.getArgsList();
             assertEquals(1, argsList.size());
 
-            MessageWrapper argsWrapper = argsList.get(0);
-            assertFalse(argsWrapper.hasMsgArg(), "Should have multiple errors");
-            assertTrue(argsWrapper.hasMsgListArg(), "Should have multiple errors");
+            Message argsWrapper = argsList.get(0);
+            assertFalse(argsWrapper.hasSingle(), "Should have multiple errors");
+            assertTrue(argsWrapper.hasList(), "Should have multiple errors");
 
-            MessageList msgListArg = argsWrapper.getMsgListArg();
-            List<MessageWrapper> subMsgList = msgListArg.getArgsList();
+            MessageList msgListArg = argsWrapper.getList();
+            List<Message> subMsgList = msgListArg.getMessageList();
             assertEquals(2, subMsgList.size(), "Should have multiple errors");
 
-            MessageWrapper argsWrapper1 = subMsgList.get(0);
+            Message argsWrapper1 = subMsgList.get(0);
+            assertTrue(argsWrapper1.hasSingle());
 
-            Message subMsg1Args = argsWrapper1.getMsgArg();
+            SingleMessage subMsg1Args = argsWrapper1.getSingle();
             String subErr1Key = subMsg1Args.getKey();
             assertEquals("ValuePolicy.minimalSizeNotMet", subErr1Key);
 
-            MessageWrapper argsWrapper2 = subMsgList.get(1);
+            Message argsWrapper2 = subMsgList.get(1);
+            assertTrue(argsWrapper2.hasSingle());
 
-            Message subMsg2Args = argsWrapper2.getMsgArg();
+            SingleMessage subMsg2Args = argsWrapper2.getSingle();
             String subErr2Key = subMsg2Args.getKey();
             assertEquals("ValuePolicy.minimalUniqueCharactersNotMet", subErr2Key);
         }

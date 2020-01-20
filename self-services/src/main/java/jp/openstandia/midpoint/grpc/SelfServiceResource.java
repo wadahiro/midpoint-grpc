@@ -19,15 +19,11 @@ import com.evolveum.midpoint.prism.delta.builder.S_MaybeDelete;
 import com.evolveum.midpoint.prism.delta.builder.S_ValuesEntry;
 import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.path.ItemPath;
-import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
 import com.evolveum.midpoint.prism.schema.SchemaRegistry;
 import com.evolveum.midpoint.schema.SchemaConstantsGenerated;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.task.api.Task;
-import com.evolveum.midpoint.util.LocalizableMessage;
-import com.evolveum.midpoint.util.LocalizableMessageList;
-import com.evolveum.midpoint.util.SingleLocalizableMessage;
 import com.evolveum.midpoint.util.exception.*;
 import com.evolveum.midpoint.util.logging.LoggingUtils;
 import com.evolveum.midpoint.util.logging.Trace;
@@ -75,17 +71,15 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     protected PrismContext prismContext;
     @Autowired
     protected Protector protector;
-    @Autowired
-    protected transient AuthenticationEvaluator<PasswordAuthenticationContext> passwordAuthenticationEvaluator;
+
+    public static final Metadata.Key<PolicyError> PolicyErrorMetadataKey = ProtoUtils.keyForProto(PolicyError.getDefaultInstance());
 
     @Override
     public Metadata handlePolicyViolationException(PolicyViolationException e) {
         PolicyError error = TypeConverter.toPolicyError(e);
-        Metadata metadata = new Metadata();
 
-        Metadata.Key<PolicyError> POLICY_ERROR_KEY =
-                ProtoUtils.keyForProto(PolicyError.getDefaultInstance());
-        metadata.put(POLICY_ERROR_KEY, error);
+        Metadata metadata = new Metadata();
+        metadata.put(PolicyErrorMetadataKey, error);
 
         return metadata;
     }

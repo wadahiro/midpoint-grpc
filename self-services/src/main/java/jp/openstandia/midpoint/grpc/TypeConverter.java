@@ -91,29 +91,29 @@ public class TypeConverter {
 
     public static PolicyError toPolicyError(PolicyViolationException e) {
         PolicyError.Builder builder = PolicyError.newBuilder();
-        MessageWrapper wrapper = null;
+        Message wrapper = null;
 
         LocalizableMessage msg = e.getUserFriendlyMessage();
         if (msg instanceof SingleLocalizableMessage) {
-            wrapper = toMessageWrapper((SingleLocalizableMessage) msg);
+            wrapper = toMessage((SingleLocalizableMessage) msg);
 
         } else if (msg instanceof LocalizableMessageList) {
-            wrapper = toMessageWrapper((LocalizableMessageList) msg);
+            wrapper = toMessage((LocalizableMessageList) msg);
         }
 
         if (wrapper == null) {
             throw new UnsupportedOperationException(msg.getClass() + " is not supported");
         }
 
-        builder.addErrors(wrapper);
+        builder.setMessage(wrapper);
 
         return builder.build();
     }
 
-    private static MessageWrapper toMessageWrapper(LocalizableMessageList list) {
+    private static Message toMessage(LocalizableMessageList list) {
         MessageList messageList = toMessageList(list);
-        return MessageWrapper.newBuilder()
-                .setMsgListArg(messageList)
+        return Message.newBuilder()
+                .setList(messageList)
                 .build();
     }
 
@@ -121,46 +121,50 @@ public class TypeConverter {
         MessageList.Builder builder = MessageList.newBuilder();
 
         for (LocalizableMessage msg : list.getMessages()) {
-            MessageWrapper wrapper = null;
+            Message wrapper = null;
             if (msg instanceof SingleLocalizableMessage) {
-                wrapper = toMessageWrapper((SingleLocalizableMessage) msg);
+                wrapper = toMessage((SingleLocalizableMessage) msg);
 
             } else if (msg instanceof LocalizableMessageList) {
-                wrapper = toMessageWrapper((LocalizableMessageList) msg);
+                wrapper = toMessage((LocalizableMessageList) msg);
             }
 
-            builder.addArgs(wrapper);
+            if (wrapper == null) {
+                throw new UnsupportedOperationException(msg.getClass() + " is not supported");
+            }
+
+            builder.addMessage(wrapper);
         }
 
         return builder.build();
     }
 
-    private static MessageWrapper toMessageWrapper(SingleLocalizableMessage msg) {
-        return MessageWrapper.newBuilder()
-                .setMsgArg(toMessage(msg))
-                .build();
-    }
-
     private static Message toMessage(SingleLocalizableMessage msg) {
         return Message.newBuilder()
-                .setKey(msg.getKey())
-                .addAllArgs(toMessageWrappers(msg.getArgs()))
+                .setSingle(toSingleMessage(msg))
                 .build();
     }
 
-    private static Iterable<? extends MessageWrapper> toMessageWrappers(Object[] args) {
-        List<MessageWrapper> list = new ArrayList<>();
+    private static SingleMessage toSingleMessage(SingleLocalizableMessage msg) {
+        return SingleMessage.newBuilder()
+                .setKey(msg.getKey())
+                .addAllArgs(toMessages(msg.getArgs()))
+                .build();
+    }
+
+    private static Iterable<? extends Message> toMessages(Object[] args) {
+        List<Message> list = new ArrayList<>();
 
         for (Object arg : args) {
-            MessageWrapper wrapper;
+            Message wrapper;
 
             if (arg instanceof SingleLocalizableMessage) {
-                wrapper = toMessageWrapper((SingleLocalizableMessage) arg);
+                wrapper = toMessage((SingleLocalizableMessage) arg);
             } else if (arg instanceof LocalizableMessageList) {
-                wrapper = toMessageWrapper((LocalizableMessageList) arg);
+                wrapper = toMessage((LocalizableMessageList) arg);
             } else {
-                wrapper = MessageWrapper.newBuilder()
-                        .setStringArg(arg != null ? arg.toString() : "")
+                wrapper = Message.newBuilder()
+                        .setString(arg != null ? arg.toString() : "")
                         .build();
             }
 

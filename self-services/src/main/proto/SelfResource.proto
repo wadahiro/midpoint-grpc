@@ -159,23 +159,23 @@ message AssignOption {
 message RequestRoleResponse {
 }
 
-message Message {
+message SingleMessage {
     string key = 1;
-    repeated MessageWrapper args = 2;
+    repeated Message args = 2;
 }
 
-message MessageWrapper {
+message Message {
     oneof arg {
-         Message msgArg = 3;
-         MessageList msgListArg = 4;
-         string stringArg = 5;
+         SingleMessage single = 3;
+         MessageList list = 4;
+         string string = 5;
     }
 }
 
 message MessageList {
-    repeated MessageWrapper args = 1;
+    repeated Message message = 1;
 }
 
 message PolicyError {
-  repeated MessageWrapper errors = 1;
+    Message message = 1;
 }
