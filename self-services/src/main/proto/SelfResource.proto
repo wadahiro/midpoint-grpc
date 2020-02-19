@@ -15,17 +15,17 @@ service SelfServiceResource {
     rpc getSelf(GetSelfRequest) returns (GetSelfResponse);
 
     /**
-     * Modify user profile by deltas.
+     * Modify self profile by deltas.
      */
     rpc modifyProfile(ModifyProfileRequest) returns (ModifyProfileResponse);
 
     /**
-     * Update credential with current password validating.
+     * Update self credential with current password validating.
      */
     rpc updateCredential(UpdateCredentialRequest) returns (UpdateCredentialResponse);
 
     /**
-     * Force update credential.
+     * Force update self credential.
      */
     rpc forceUpdateCredential(ForceUpdateCredentialRequest) returns (UpdateCredentialResponse);
 
@@ -33,6 +33,11 @@ service SelfServiceResource {
      * Request role.
      */
     rpc requestRole(RequestRoleRequest) returns (RequestRoleResponse);
+
+    /**
+     * Add new user.
+     */
+    rpc addUser(AddUserRequest) returns (AddUserResponse);
 }
 
 message GetSelfRequest {
@@ -47,14 +52,35 @@ message GetSelfResponse {
 }
 
 message ExtensionMessage {
-    repeated ExtensionValue value = 1;
-    bool is_single_value = 2;
+    string namespaceURI = 1;
+    repeated ExtensionValue value = 2;
+    bool is_single_value = 3;
 }
 
 message ExtensionValue {
     oneof value {
         string string = 1;
         PolyStringMessage poly_string = 2;
+        IntegerMessage integer = 3;
+        LongMessage long = 4;
+    }
+}
+
+message BytesMessage {
+    oneof bytes_optional {
+        bytes value = 1;
+    }
+}
+
+message IntegerMessage {
+    oneof int_optional {
+        int32 value = 1;
+    }
+}
+
+message LongMessage {
+    oneof long_optional {
+        int64 value = 1;
     }
 }
 
@@ -76,7 +102,7 @@ message UserTypeMessage {
     string lifecycleState = 4;
 
     // FocusType
-    bytes jpegPhoto = 20;
+    BytesMessage jpegPhoto = 20;
     // cost center.
     string costCenter = 21;
     // locality.
@@ -169,52 +195,6 @@ enum UserItemPath {
 message ModifyProfileResponse {
 }
 
-message UpdateProfileRequest {
-    // New name.
-    string name = 1;
-    // New full name.
-    string fullName = 2;
-    // New given name.
-    string givenName = 3;
-    // New family name.
-    string familyName = 4;
-    // New additional name.
-    string additionalName = 5;
-    // New nick name.
-    string nickName = 6;
-    // New honorific prefix.
-    string honorificPrefix = 7;
-    // New honorific suffix.
-    string honorificSuffix = 8;
-    // New title.
-    string title = 9;
-    // New preferredLanguage.
-    string preferredLanguage = 10;
-    // New locale.
-    string locale = 11;
-    // New timezone.
-    string timezone = 12;
-    // New email address.
-    string emailAddress = 13;
-    // New telephone number.
-    string telephoneNumber = 14;
-    // New employee number.
-    string employeeNumber = 15;
-    // New employee type.
-    repeated string employeeType = 16;
-    // New cost center.
-    string costCenter = 17;
-    // New organization.
-    repeated string organization = 18;
-    // New organizational unit.
-    repeated string organizationalUnit = 19;
-    // New locality.
-    string locality = 20;
-}
-
-message UpdateProfileResponse {
-}
-
 message UpdateCredentialRequest {
     // Current credential.
     string old = 1;
@@ -271,4 +251,13 @@ message MessageList {
 
 message PolicyError {
     Message message = 1;
+}
+
+message AddUserRequest {
+    repeated string options = 1;
+    UserTypeMessage profile = 2;
+}
+
+message AddUserResponse {
+    string oid = 1;
 }

@@ -4,7 +4,9 @@ import com.evolveum.midpoint.model.api.ModelExecuteOptions;
 import com.evolveum.midpoint.model.api.ModelInteractionService;
 import com.evolveum.midpoint.model.api.ModelService;
 import com.evolveum.midpoint.model.impl.ModelCrudService;
-import com.evolveum.midpoint.prism.*;
+import com.evolveum.midpoint.prism.PrismContext;
+import com.evolveum.midpoint.prism.PrismObject;
+import com.evolveum.midpoint.prism.PrismObjectDefinition;
 import com.evolveum.midpoint.prism.crypto.EncryptionException;
 import com.evolveum.midpoint.prism.crypto.Protector;
 import com.evolveum.midpoint.prism.delta.ItemDelta;
@@ -17,7 +19,6 @@ import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
 import com.evolveum.midpoint.prism.schema.SchemaRegistry;
-import com.evolveum.midpoint.schema.DefinitionProcessingOption;
 import com.evolveum.midpoint.schema.GetOperationOptions;
 import com.evolveum.midpoint.schema.SchemaConstantsGenerated;
 import com.evolveum.midpoint.schema.SelectorOptions;
@@ -32,7 +33,6 @@ import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.PasswordType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 import com.evolveum.prism.xml.ns._public.types_3.ProtectedStringType;
-import com.google.protobuf.ProtocolStringList;
 import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -47,6 +47,7 @@ import java.util.Collection;
 import java.util.List;
 
 import static jp.openstandia.midpoint.grpc.TypeConverter.toMessage;
+import static jp.openstandia.midpoint.grpc.TypeConverter.toPrismObject;
 
 @GRpcService
 public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceResourceImplBase implements MidPointGrpcService {
@@ -60,6 +61,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
     public static final String CLASS_DOT = SelfServiceResource.class.getName() + ".";
     public static final String OPERATION_SELF = CLASS_DOT + "self";
+    public static final String OPERATION_ADD_USER = CLASS_DOT + "addUser";
     public static final String OPERATION_EXECUTE_USER_UPDATE = CLASS_DOT + "executeUserUpdate";
     public static final String OPERATION_EXECUTE_CREDENTIAL_CHECK = CLASS_DOT + "executeCredentialCheck";
     public static final String OPERATION_EXECUTE_CREDENTIAL_UPDATE = CLASS_DOT + "executeCredentialUpdate";
@@ -74,6 +76,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     protected PrismContext prismContext;
     @Autowired
     protected Protector protector;
+//    @Autowired
+//    protected SchemaRegistry registry;
 
     public static final Metadata.Key<PolicyError> PolicyErrorMetadataKey = ProtoUtils.keyForProto(PolicyError.getDefaultInstance());
 
@@ -233,6 +237,35 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
 
         LOGGER.debug("End requestRole");
+    }
+
+    @Override
+    public void addUser(AddUserRequest request, StreamObserver<AddUserResponse> responseObserver) {
+        LOGGER.debug("Start addUser");
+
+        String resultOid = runTask(ctx -> {
+            Task task = ctx.task;
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_ADD_USER);
+            ModelExecuteOptions modelExecuteOptions = ModelExecuteOptions.fromRestOptions(request.getOptionsList());
+
+            UserTypeMessage message = request.getProfile();
+            PrismObject<UserType> user = toPrismObject(prismContext, message);
+
+            String oid = modelCrudService.addObject(user, modelExecuteOptions, task, parentResult);
+            LOGGER.debug("returned oid :  {}", oid );
+
+            return oid;
+        });
+
+        AddUserResponse res = AddUserResponse.newBuilder()
+                .setOid(resultOid)
+                .build();
+
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End addUser");
     }
 
     protected void updateCredential(MidPointTaskContext ctx, String oldCred, String newCred, boolean validate) throws SchemaException, SecurityViolationException, CommunicationException, ConfigurationException, ExpressionEvaluationException, ObjectNotFoundException, EncryptionException, PolicyViolationException, ObjectAlreadyExistsException {

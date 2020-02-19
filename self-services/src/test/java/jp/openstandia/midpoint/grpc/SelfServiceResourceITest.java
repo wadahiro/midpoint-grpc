@@ -224,4 +224,25 @@ class SelfServiceResourceITest {
     @Test
     void requestRole() {
     }
+
+    @Test
+    void addUser() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        AddUserRequest request = AddUserRequest.newBuilder()
+                .setProfile(UserTypeMessage.newBuilder()
+                .setName(PolyStringMessage.newBuilder().setOrig("foo")))
+                .build();
+
+        AddUserResponse response = stub.addUser(request);
+
+        assertNotNull(response.getOid());
+    }
 }

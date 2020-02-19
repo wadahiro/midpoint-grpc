@@ -3,15 +3,20 @@ package jp.openstandia.midpoint.grpc;
 import com.evolveum.midpoint.prism.*;
 import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.polystring.PolyString;
+import com.evolveum.midpoint.prism.schema.PrismSchema;
+import com.evolveum.midpoint.prism.schema.SchemaRegistry;
 import com.evolveum.midpoint.util.LocalizableMessage;
 import com.evolveum.midpoint.util.LocalizableMessageList;
 import com.evolveum.midpoint.util.SingleLocalizableMessage;
 import com.evolveum.midpoint.util.exception.PolicyViolationException;
+import com.evolveum.midpoint.util.exception.SchemaException;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.ExtensionType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 import com.evolveum.prism.xml.ns._public.types_3.PolyStringType;
 import com.google.protobuf.ByteString;
 
 import javax.xml.bind.annotation.XmlElement;
+import javax.xml.namespace.QName;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
@@ -176,6 +181,15 @@ public class TypeConverter {
         return list;
     }
 
+    public static BytesMessage toMessage(byte[] bytes) {
+        if (bytes == null) {
+            return null;
+        }
+        return BytesMessage.newBuilder()
+                .setValue(ByteString.copyFrom(bytes))
+                .build();
+    }
+
     public static PolyStringMessage toMessage(PolyString polyString) {
         if (polyString == null) {
             return null;
@@ -202,11 +216,113 @@ public class TypeConverter {
                 .collect(Collectors.toList());
     }
 
-    private static String nullSafe(String s) {
-        if (s == null) {
-            return "";
+    public static byte[] toBytes(BytesMessage message) {
+        if (message.getBytesOptionalCase() == BytesMessage.BytesOptionalCase.BYTESOPTIONAL_NOT_SET) {
+            return null;
         }
-        return s;
+        return message.getValue().toByteArray();
+    }
+
+    public static PolyStringType toPolyStringType(PolyStringMessage message) {
+        if (isEmpty(message)) {
+            return null;
+        }
+        return new PolyStringType(new PolyString(message.getOrig(), message.getNorm()));
+    }
+
+    public static boolean isEmpty(PolyStringMessage message) {
+        if (message.getNorm().isEmpty() && message.getOrig().isEmpty()) {
+            return true;
+        }
+        return false;
+    }
+
+    public static List<PolyStringType> toPolyStringType(List<PolyStringMessage> message) {
+        return message.stream()
+                .filter(x -> !isEmpty(x))
+                .map(x -> toPolyStringType(x))
+                .collect(Collectors.toList());
+    }
+
+    public static ExtensionType toExtensionType(SchemaRegistry registry, Map<String, ExtensionMessage> map) throws SchemaException {
+        if (map.isEmpty()) {
+            return null;
+        }
+        ExtensionType extension = new ExtensionType();
+        PrismContainerValue extensionValue = extension.asPrismContainerValue();
+
+        for (Map.Entry<String, ExtensionMessage> entry : map.entrySet()) {
+            String k = entry.getKey();
+            ExtensionMessage v = entry.getValue();
+//            PrismSchema schema = registry.findSchemaByNamespace(v.getNamespaceURI());
+//            if (schema == null) {
+//                throw new SchemaException("Cannot find schema for extension. namespaceURI: " + v.getNamespaceURI() + ", localPart: " + k);
+//            }
+//
+//            ItemDefinition definition = schema.findItemDefinitionByElementName(new QName(v.getNamespaceURI(), k));
+//            if (definition == null) {
+//                throw new SchemaException("Cannot find definition for extension. namespaceURI: " + v.getNamespaceURI() + ", localPart: " + k);
+//            }
+
+            PrismProperty property = extensionValue.createProperty(new QName(v.getNamespaceURI(), k));
+            if (property.isSingleValue()) {
+                if (!v.getIsSingleValue()) {
+                    throw new SchemaException("Cannot set as multiple value. namespaceURI: " + v.getNamespaceURI() + ", localPart: " + k);
+                }
+                if (!v.getValueList().isEmpty()) {
+                    property.setRealValue(v.getValueList().get(0));
+                }
+            } else {
+                if (v.getIsSingleValue()) {
+                    throw new SchemaException("Cannot set as single value. namespaceURI: " + v.getNamespaceURI() + ", localPart: " + k);
+                }
+                if (!v.getValueList().isEmpty()) {
+                    property.setRealValue(v.getValueList());
+                }
+            }
+        }
+
+        return extension;
+    }
+
+    public static PrismObject<UserType> toPrismObject(PrismContext context, UserTypeMessage message) throws SchemaException {
+        UserType user = new UserType(context);
+
+        // ObjectType
+        user.setName(nullable(toPolyStringType(message.getName())));
+        user.setDescription(nullable(message.getDescription()));
+        user.createSubtypeList().addAll(message.getSubtypeList());
+        user.setLifecycleState(nullable(message.getLifecycleState()));
+
+        // FocusType
+        user.setJpegPhoto(nullable(toBytes(message.getJpegPhoto())));
+        user.setCostCenter(nullable(message.getCostCenter()));
+        user.setLocality(nullable(toPolyStringType(message.getLocality())));
+        user.setPreferredLanguage(nullable(message.getPreferredLanguage()));
+        user.setLocale(nullable(message.getLocale()));
+        user.setTimezone(nullable(message.getTimezone()));
+        user.setEmailAddress(nullable(message.getEmailAddress()));
+        user.setTelephoneNumber(nullable(message.getTelephoneNumber()));
+
+        // UserType
+        user.setFullName(nullable(toPolyStringType(message.getFullName())));
+        user.setGivenName(nullable(toPolyStringType(message.getGivenName())));
+        user.setFamilyName(nullable(toPolyStringType(message.getFamilyName())));
+        user.setAdditionalName(nullable(toPolyStringType(message.getAdditionalName())));
+        user.setNickName(nullable(toPolyStringType(message.getNickName())));
+        user.setHonorificPrefix(nullable(toPolyStringType(message.getHonorificPrefix())));
+        user.setHonorificSuffix(nullable(toPolyStringType(message.getHonorificSuffix())));
+        user.setTitle(nullable(toPolyStringType(message.getTitle())));
+        user.setEmployeeNumber(nullable(message.getEmployeeNumber()));
+        user.createOrganizationList().addAll(toPolyStringType(message.getOrganizationList()));
+        user.createOrganizationalUnitList().addAll(toPolyStringType(message.getOrganizationalUnitList()));
+
+        // Extension
+        user.setExtension(nullable(toExtensionType(null, message.getExtensionMap())));
+
+        PrismObject<UserType> object = user.asPrismObject();
+
+        return user.asPrismObject();
     }
 
     public static UserTypeMessage toMessage(PrismObject<UserType> user) {
@@ -218,7 +334,7 @@ public class TypeConverter {
                 .nullSafe(u.getSubtype(), (b, v) -> b.addAllSubtype(v))
                 .nullSafe(u.getLifecycleState(), (b, v) -> b.setLifecycleState(v))
                 // FocusType
-                .nullSafe(u.getJpegPhoto(), (b, v) -> b.setJpegPhoto(ByteString.copyFrom(v)))
+                .nullSafe(toMessage(u.getJpegPhoto()), (b, v) -> b.setJpegPhoto(v))
                 .nullSafe(u.getCostCenter(), (b, v) -> b.setCostCenter(v))
                 .nullSafe(toMessage(u.getLocality()), (b, v) -> b.setLocality(v))
                 .nullSafe(u.getPreferredLanguage(), (b, v) -> b.setPreferredLanguage(v))
@@ -283,5 +399,31 @@ public class TypeConverter {
             entryValueBuilder.setPolyString(toMessage((PolyString) value));
         }
         extBuilder.addValue(entryValueBuilder);
+    }
+
+    private static <T> T nullable(T s) {
+        if (s != null) {
+            if (s instanceof String) {
+                if (((String) s).isEmpty()) {
+                    return null;
+                }
+            } else if (s instanceof byte[]) {
+                byte[] b = (byte[]) s;
+                if (b.length == 0) {
+                    return null;
+                }
+            } else if (s instanceof IntegerMessage) {
+                IntegerMessage i = (IntegerMessage) s;
+                if (i.getIntOptionalCase() == IntegerMessage.IntOptionalCase.INTOPTIONAL_NOT_SET) {
+                    return null;
+                }
+            } else if (s instanceof LongMessage) {
+                LongMessage i = (LongMessage) s;
+                if (i.getLongOptionalCase() == LongMessage.LongOptionalCase.LONGOPTIONAL_NOT_SET) {
+                    return null;
+                }
+            }
+        }
+        return s;
     }
 }
