@@ -32,6 +32,27 @@ class SelfServiceResourceITest {
     }
 
     @Test
+    void getSelf() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        GetSelfRequest request = GetSelfRequest.newBuilder()
+                .build();
+
+        GetSelfResponse response = stub.getSelf(request);
+        UserTypeMessage user  = response.getProfile();
+
+        assertEquals("Administrator", user.getFamilyName().getOrig());
+        assertEquals("administrator", user.getFamilyName().getNorm());
+    }
+
+    @Test
     void modifyProfile() throws Exception {
         SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
 

@@ -1,9 +1,6 @@
 package jp.openstandia.midpoint.grpc;
 
-import com.evolveum.midpoint.prism.Item;
-import com.evolveum.midpoint.prism.ItemDefinition;
-import com.evolveum.midpoint.prism.PrismContainerValue;
-import com.evolveum.midpoint.prism.PrismObject;
+import com.evolveum.midpoint.prism.*;
 import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.util.LocalizableMessage;
@@ -241,17 +238,22 @@ public class TypeConverter {
                 .nullSafe(u.getEmployeeNumber(), (b, v) -> b.setEmployeeNumber(v))
                 .nullSafe(toMessage(u.getOrganization()), (b, v) -> b.addAllOrganization(v))
                 .nullSafe(toMessage(u.getOrganizationalUnit()), (b, v) -> b.addAllOrganizationalUnit(v))
-                .unwrap()
                 // Extension
-                .putAllExtension(toExtensionMessageMap(user))
+                .nullSafe(toExtensionMessageMap(user), (b, v) -> b.putAllExtension(v))
+                .unwrap()
                 .build();
     }
 
     public static Map<String, ExtensionMessage> toExtensionMessageMap(PrismObject<?> object) {
+        PrismContainer<?> extension = object.getExtension();
+        if (extension == null) {
+            return null;
+        }
+
         Map<String, ExtensionMessage> map = new LinkedHashMap<>();
 
-        PrismContainerValue<?> extension = object.getExtension().getValue();
-        for (Item item : extension.getItems()) {
+        PrismContainerValue<?> extensionValue = extension.getValue();
+        for (Item item : extensionValue.getItems()) {
             ItemDefinition definition = item.getDefinition();
 
             ExtensionMessage.Builder extBuilder = ExtensionMessage.newBuilder();
