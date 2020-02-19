@@ -15,7 +15,6 @@ import com.evolveum.midpoint.prism.delta.builder.S_MaybeDelete;
 import com.evolveum.midpoint.prism.delta.builder.S_ValuesEntry;
 import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.path.ItemPath;
-import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
 import com.evolveum.midpoint.prism.schema.SchemaRegistry;
 import com.evolveum.midpoint.schema.SchemaConstantsGenerated;

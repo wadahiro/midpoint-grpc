@@ -43,10 +43,8 @@ message GetSelfResponse {
 }
 
 message ExtensionMessage {
-    string prefix = 1;
-    string key = 2;
-    repeated ExtensionValue value = 3;
-    bool is_single_value = 4;
+    repeated ExtensionValue value = 1;
+    bool is_single_value = 2;
 }
 
 message ExtensionValue {
@@ -74,7 +72,7 @@ message UserTypeMessage {
     string lifecycleState = 4;
 
     // FocusType
-    string jpegPhoto = 20;
+    bytes jpegPhoto = 20;
     // cost center.
     string costCenter = 21;
     // locality.

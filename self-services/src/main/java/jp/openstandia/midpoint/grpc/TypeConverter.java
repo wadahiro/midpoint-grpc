@@ -12,6 +12,7 @@ import com.evolveum.midpoint.util.SingleLocalizableMessage;
 import com.evolveum.midpoint.util.exception.PolicyViolationException;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 import com.evolveum.prism.xml.ns._public.types_3.PolyStringType;
+import com.google.protobuf.ByteString;
 
 import javax.xml.bind.annotation.XmlElement;
 import java.lang.reflect.Field;
@@ -185,9 +186,50 @@ public class TypeConverter {
                 .build();
     }
 
+    public static PolyStringMessage toMessage(PolyStringType polyStringType) {
+        return PolyStringMessage.newBuilder()
+                .setOrig(polyStringType.getOrig())
+                .setNorm(polyStringType.getNorm())
+                .build();
+    }
+
+    public static List<PolyStringMessage> toMessage(List<PolyStringType> polyStringType) {
+        return polyStringType.stream()
+                .map(x -> toMessage(x))
+                .collect(Collectors.toList());
+    }
+
     public static UserTypeMessage toMessage(PrismObject<UserType> user) {
+        UserType v = user.getRealValue();
         UserTypeMessage.Builder builder = UserTypeMessage.newBuilder()
-                .setName(toMessage(user.getName()))
+                // ObjectType
+                .setName(toMessage(v.getName()))
+                .setDescription(v.getDescription())
+                .addAllSubtype(v.getSubtype())
+                .setLifecycleState(v.getLifecycleState())
+                // FocusType
+                .setJpegPhoto(ByteString.copyFrom(v.getJpegPhoto()))
+                .setCostCenter(v.getCostCenter())
+                .setLocality(toMessage(v.getLocality()))
+                .setPreferredLanguage(v.getPreferredLanguage())
+                .setLocale(v.getLocale())
+                .setTimezone(v.getTimezone())
+                .setEmailAddress(v.getEmailAddress())
+                .setTelephoneNumber(v.getTelephoneNumber())
+                // UserType
+                .setFullName(toMessage(v.getFullName()))
+                .setGivenName(toMessage(v.getGivenName()))
+                .setFamilyName(toMessage(v.getFamilyName()))
+                .setAdditionalName(toMessage(v.getAdditionalName()))
+                .setNickName(toMessage(v.getNickName()))
+                .setHonorificPrefix(toMessage(v.getHonorificPrefix()))
+                .setHonorificSuffix(toMessage(v.getHonorificSuffix()))
+                .setTitle(toMessage(v.getTitle()))
+                .setEmployeeNumber(v.getEmployeeNumber())
+                .addAllEmployeeType(v.getEmployeeType())
+                .addAllOrganization(toMessage(v.getOrganization()))
+                .addAllOrganizationalUnit(toMessage(v.getOrganizationalUnit()))
+                // Extension
                 .putAllExtension(toExtensionMessageMap(user));
 
         return builder.build();
@@ -202,9 +244,6 @@ public class TypeConverter {
 
             ExtensionMessage.Builder extBuilder = ExtensionMessage.newBuilder();
 
-            extBuilder.setPrefix(definition.getTypeName().getPrefix());
-            extBuilder.setKey(definition.getTypeName().getLocalPart());
-
             if (item.isSingleValue()) {
                 extBuilder.setIsSingleValue(true);
                 addExtensionEntryValue(extBuilder, definition, item.getRealValue());
@@ -214,7 +253,9 @@ public class TypeConverter {
                     addExtensionEntryValue(extBuilder, definition, val);
                 }
             }
-            map.put(definition.getTypeName().getPrefix() + ":" + definition.getTypeName().getLocalPart(), extBuilder.build());
+            // Currently, it doesn't use namespaceURI as the key
+            String key = definition.getItemName().getLocalPart();
+            map.put(key, extBuilder.build());
         }
 
         return map;

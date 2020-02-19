@@ -23,15 +23,22 @@ public class TestBasicAuthClient {
 
         stub = MetadataUtils.attachHeaders(stub, headers);
 
-        ModifyProfileRequest request = ModifyProfileRequest.newBuilder()
-                .addModifications(
-                        UserItemDelta.newBuilder()
-                                .setName(UserItemPath.F_FAMILY_NAME)
-                                .setValuesToReplace("Foo")
-                        .build()
-                )
-                .build();
+        GetSelfRequest req = GetSelfRequest.newBuilder().build();
 
-        stub.modifyProfile(request);
+        GetSelfResponse self = stub.getSelf(req);
+
+        UserTypeMessage profile = self.getProfile();
+        System.out.println(profile);
+
+//        ModifyProfileRequest request = ModifyProfileRequest.newBuilder()
+//                .addModifications(
+//                        UserItemDelta.newBuilder()
+//                                .setName(UserItemPath.F_FAMILY_NAME)
+//                                .setValuesToReplace("Foo")
+//                        .build()
+//                )
+//                .build();
+
+//        stub.modifyProfile(request);
     }
 }
