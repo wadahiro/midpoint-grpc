@@ -4,9 +4,7 @@ import com.evolveum.midpoint.model.api.ModelExecuteOptions;
 import com.evolveum.midpoint.model.api.ModelInteractionService;
 import com.evolveum.midpoint.model.api.ModelService;
 import com.evolveum.midpoint.model.impl.ModelCrudService;
-import com.evolveum.midpoint.prism.PrismContext;
-import com.evolveum.midpoint.prism.PrismObject;
-import com.evolveum.midpoint.prism.PrismObjectDefinition;
+import com.evolveum.midpoint.prism.*;
 import com.evolveum.midpoint.prism.crypto.EncryptionException;
 import com.evolveum.midpoint.prism.crypto.Protector;
 import com.evolveum.midpoint.prism.delta.ItemDelta;
@@ -17,6 +15,7 @@ import com.evolveum.midpoint.prism.delta.builder.S_MaybeDelete;
 import com.evolveum.midpoint.prism.delta.builder.S_ValuesEntry;
 import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.path.ItemPath;
+import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
 import com.evolveum.midpoint.prism.schema.SchemaRegistry;
 import com.evolveum.midpoint.schema.SchemaConstantsGenerated;
@@ -44,6 +43,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import static jp.openstandia.midpoint.grpc.TypeConverter.toMessage;
+
 @GRpcService
 public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceResourceImplBase implements MidPointGrpcService {
 
@@ -55,6 +56,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     }
 
     public static final String CLASS_DOT = SelfServiceResource.class.getName() + ".";
+    public static final String OPERATION_SELF = CLASS_DOT + "self";
     public static final String OPERATION_EXECUTE_USER_UPDATE = CLASS_DOT + "executeUserUpdate";
     public static final String OPERATION_EXECUTE_CREDENTIAL_CHECK = CLASS_DOT + "executeCredentialCheck";
     public static final String OPERATION_EXECUTE_CREDENTIAL_UPDATE = CLASS_DOT + "executeCredentialUpdate";
@@ -82,74 +84,97 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         return metadata;
     }
 
+
+    /**
+     * Getting self profile API based on
+     * {@link com.evolveum.midpoint.model.impl.ModelRestService#getSelf(org.apache.cxf.jaxrs.ext.MessageContext)}.
+     *
+     * @param request
+     * @param responseObserver
+     */
+    @Override
+    public void getSelf(GetSelfRequest request, StreamObserver<GetSelfResponse> responseObserver) {
+        LOGGER.debug("Start getSelf");
+
+        PrismObject<UserType> self = runTask(ctx -> {
+            Task task = ctx.task;
+            UserType loggedInUser = ctx.principal.getUser();
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_SELF);
+
+            try {
+                PrismObject<UserType> user = modelCrudService.getObject(UserType.class, loggedInUser.getOid(), null, task, parentResult);
+                parentResult.recordSuccessIfUnknown();
+                return user;
+            } finally {
+                parentResult.computeStatusIfUnknown();
+            }
+        });
+
+        GetSelfResponse res = GetSelfResponse.newBuilder()
+                .setProfile(toMessage(self))
+                .build();
+
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End getSelf");
+    }
+
     @Override
     public void modifyProfile(ModifyProfileRequest request, StreamObserver<ModifyProfileResponse> responseObserver) {
         LOGGER.debug("Start modifyProfile");
 
         runTask(ctx -> {
+            Task task = ctx.task;
+            UserType user = ctx.principal.getUser();
+
+            OperationResult updateResult = task.getResult().createSubresult(OPERATION_EXECUTE_USER_UPDATE);
             try {
-                Task task = ctx.task;
-                UserType user = ctx.principal.getUser();
+                Collection<ObjectDelta<? extends ObjectType>> modifications = new ArrayList<>();
 
-                OperationResult updateResult = task.getResult().createSubresult(OPERATION_EXECUTE_USER_UPDATE);
-                try {
-                    Collection<ObjectDelta<? extends ObjectType>> modifications = new ArrayList<>();
+                S_ItemEntry i = prismContext.deltaFor(UserType.class);
 
-                    S_ItemEntry i = prismContext.deltaFor(UserType.class);
+                // https://wiki.evolveum.com/display/midPoint/Using+Prism+Deltas
+                for (UserItemDelta m : request.getModificationsList()) {
+                    UserItemPath path = m.getName();
 
-                    // https://wiki.evolveum.com/display/midPoint/Using+Prism+Deltas
-                    for (UserItemDelta m : request.getModificationsList()) {
-                        UserItemPath path = m.getName();
+                    ItemName itemName = TypeConverter.toItemName(path);
+                    S_ValuesEntry v = i.item(itemName);
 
-                        ItemName itemName = TypeConverter.toItemName(path);
-                        S_ValuesEntry v = i.item(itemName);
+                    S_ItemEntry entry = null;
+                    if (!m.getValuesToAdd().isEmpty()) {
+                        S_MaybeDelete av = v.add(TypeConverter.toValue(path, m.getValuesToAdd()));
 
-                        S_ItemEntry entry = null;
-                        if (!m.getValuesToAdd().isEmpty()) {
-                            S_MaybeDelete av = v.add(TypeConverter.toValue(path, m.getValuesToAdd()));
-
-                            if (!m.getValuesToDelete().isEmpty()) {
-                                entry = av.delete(TypeConverter.toValue(path, m.getValuesToDelete()));
-                            }
-
-                        } else if (!m.getValuesToReplace().isEmpty()) {
-                            entry = v.replace(TypeConverter.toValue(path, m.getValuesToReplace()));
-
-                        } else if (!m.getValuesToDelete().isEmpty()) {
-                            entry = v.delete(TypeConverter.toValue(path, m.getValuesToDelete()));
+                        if (!m.getValuesToDelete().isEmpty()) {
+                            entry = av.delete(TypeConverter.toValue(path, m.getValuesToDelete()));
                         }
 
-                        if (entry == null) {
-                            LOGGER.warn("Invalid argument. No values for modification.");
-                            throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-                        }
-                        i = entry;
+                    } else if (!m.getValuesToReplace().isEmpty()) {
+                        entry = v.replace(TypeConverter.toValue(path, m.getValuesToReplace()));
+
+                    } else if (!m.getValuesToDelete().isEmpty()) {
+                        entry = v.delete(TypeConverter.toValue(path, m.getValuesToDelete()));
                     }
-                    // TODO implement options
-                    ModelExecuteOptions options = new ModelExecuteOptions();
 
-                    List<ItemDelta<?, ?>> deltas = i.asItemDeltas();
-
-                    modelCrudService.modifyObject(UserType.class, user.getOid(), deltas, options, task, updateResult);
-
-                    updateResult.computeStatus();
-                } catch (UnsupportedOperationException e) {
-                    LOGGER.warn("Invalid argument. ", e);
-                    throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-
-                } catch (ObjectAlreadyExistsException | PolicyViolationException e) {
-                    LoggingUtils.logUnexpectedException(LOGGER, "Couldn't update user changes", e);
-                    throw e;
-                } finally {
-                    updateResult.computeStatusIfUnknown();
+                    if (entry == null) {
+                        LOGGER.warn("Invalid argument. No values for modification.");
+                        throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+                    }
+                    i = entry;
                 }
-                return null;
-            } catch (ObjectNotFoundException e) {
-                StatusRuntimeException exception = Status.NOT_FOUND
-                        .withDescription("Not Found")
-                        .asRuntimeException();
-                throw exception;
+                // TODO implement options
+                ModelExecuteOptions options = new ModelExecuteOptions();
+
+                List<ItemDelta<?, ?>> deltas = i.asItemDeltas();
+
+                modelCrudService.modifyObject(UserType.class, user.getOid(), deltas, options, task, updateResult);
+
+                updateResult.computeStatus();
+            } finally {
+                updateResult.computeStatusIfUnknown();
             }
+            return null;
         });
 
         ModifyProfileResponse res = ModifyProfileResponse.newBuilder().build();

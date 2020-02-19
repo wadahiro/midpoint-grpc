@@ -10,6 +10,11 @@ package midpoint;
  */
 service SelfServiceResource {
     /**
+     * Get my profile.
+     */
+    rpc getSelf(GetSelfRequest) returns (GetSelfResponse);
+
+    /**
      * Modify user profile by deltas.
      */
     rpc modifyProfile(ModifyProfileRequest) returns (ModifyProfileResponse);
@@ -28,6 +33,92 @@ service SelfServiceResource {
      * Request role.
      */
     rpc requestRole(RequestRoleRequest) returns (RequestRoleResponse);
+}
+
+message GetSelfRequest {
+}
+
+message GetSelfResponse {
+    UserTypeMessage profile = 1;
+}
+
+message ExtensionMessage {
+    string prefix = 1;
+    string key = 2;
+    repeated ExtensionValue value = 3;
+    bool is_single_value = 4;
+}
+
+message ExtensionValue {
+    oneof value {
+        string string = 1;
+        PolyStringMessage poly_string = 2;
+    }
+}
+
+message PolyStringMessage {
+    string orig = 1;
+    string norm = 2;
+}
+
+message UserTypeMessage {
+    // ObjectType
+
+    // name.
+    PolyStringMessage name = 1;
+    // description
+    string description = 2;
+    // subtype
+    repeated string subtype = 3;
+    // lifecycleState
+    string lifecycleState = 4;
+
+    // FocusType
+    string jpegPhoto = 20;
+    // cost center.
+    string costCenter = 21;
+    // locality.
+    PolyStringMessage locality = 22;
+    // preferredLanguage.
+    string preferredLanguage = 23;
+    // locale.
+    string locale = 24;
+    // timezone.
+    string timezone = 25;
+    // email address.
+    string emailAddress = 26;
+    // telephone number.
+    string telephoneNumber = 27;
+
+    // UserType
+
+    // full name.
+    PolyStringMessage fullName = 50;
+    // given name.
+    PolyStringMessage givenName = 51;
+    // family name.
+    PolyStringMessage familyName = 52;
+    // additional name.
+    PolyStringMessage additionalName = 53;
+    // nick name.
+    PolyStringMessage nickName = 54;
+    // honorific prefix.
+    PolyStringMessage honorificPrefix = 55;
+    // honorific suffix.
+    PolyStringMessage honorificSuffix = 56;
+    // title.
+    PolyStringMessage title = 57;
+    // employee number.
+    string employeeNumber = 58;
+    // employee type.
+    repeated string employeeType = 59;
+    // organization.
+    repeated PolyStringMessage organization = 60;
+    // organizational unit.
+    repeated PolyStringMessage organizationalUnit = 61;
+
+    // extension. the key is "prefix:localPart" format of the QName.
+    map<string, ExtensionMessage> extension = 100;
 }
 
 message ModifyProfileRequest {

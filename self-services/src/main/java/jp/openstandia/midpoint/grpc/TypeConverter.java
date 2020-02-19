@@ -1,5 +1,9 @@
 package jp.openstandia.midpoint.grpc;
 
+import com.evolveum.midpoint.prism.Item;
+import com.evolveum.midpoint.prism.ItemDefinition;
+import com.evolveum.midpoint.prism.PrismContainerValue;
+import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.util.LocalizableMessage;
@@ -172,5 +176,57 @@ public class TypeConverter {
         }
 
         return list;
+    }
+
+    public static PolyStringMessage toMessage(PolyString polyString) {
+        return PolyStringMessage.newBuilder()
+                .setOrig(polyString.getOrig())
+                .setNorm(polyString.getNorm())
+                .build();
+    }
+
+    public static UserTypeMessage toMessage(PrismObject<UserType> user) {
+        UserTypeMessage.Builder builder = UserTypeMessage.newBuilder()
+                .setName(toMessage(user.getName()))
+                .putAllExtension(toExtensionMessageMap(user));
+
+        return builder.build();
+    }
+
+    public static Map<String, ExtensionMessage> toExtensionMessageMap(PrismObject<?> object) {
+        Map<String, ExtensionMessage> map = new LinkedHashMap<>();
+
+        PrismContainerValue<?> extension = object.getExtension().getValue();
+        for (Item item : extension.getItems()) {
+            ItemDefinition definition = item.getDefinition();
+
+            ExtensionMessage.Builder extBuilder = ExtensionMessage.newBuilder();
+
+            extBuilder.setPrefix(definition.getTypeName().getPrefix());
+            extBuilder.setKey(definition.getTypeName().getLocalPart());
+
+            if (item.isSingleValue()) {
+                extBuilder.setIsSingleValue(true);
+                addExtensionEntryValue(extBuilder, definition, item.getRealValue());
+            } else {
+                extBuilder.setIsSingleValue(false);
+                for (Object val : item.getRealValues()) {
+                    addExtensionEntryValue(extBuilder, definition, val);
+                }
+            }
+            map.put(definition.getTypeName().getPrefix() + ":" + definition.getTypeName().getLocalPart(), extBuilder.build());
+        }
+
+        return map;
+    }
+
+    private static void addExtensionEntryValue(ExtensionMessage.Builder extBuilder, ItemDefinition definition, Object value) {
+        ExtensionValue.Builder entryValueBuilder = ExtensionValue.newBuilder();
+        if (definition.getTypeClass() == String.class) {
+            entryValueBuilder.setString((String) value);
+        } else if (definition.getTypeClass() == PolyString.class) {
+            entryValueBuilder.setPolyString(toMessage((PolyString) value));
+        }
+        extBuilder.addValue(entryValueBuilder);
     }
 }
