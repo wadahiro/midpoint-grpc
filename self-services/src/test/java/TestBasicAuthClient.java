@@ -23,7 +23,9 @@ public class TestBasicAuthClient {
 
         stub = MetadataUtils.attachHeaders(stub, headers);
 
-        GetSelfRequest req = GetSelfRequest.newBuilder().build();
+        GetSelfRequest req = GetSelfRequest.newBuilder()
+                .addInclude("jpegPhoto")
+                .build();
 
         GetSelfResponse self = stub.getSelf(req);
 

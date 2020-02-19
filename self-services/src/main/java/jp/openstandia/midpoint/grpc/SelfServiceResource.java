@@ -17,7 +17,10 @@ import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
 import com.evolveum.midpoint.prism.schema.SchemaRegistry;
+import com.evolveum.midpoint.schema.DefinitionProcessingOption;
+import com.evolveum.midpoint.schema.GetOperationOptions;
 import com.evolveum.midpoint.schema.SchemaConstantsGenerated;
+import com.evolveum.midpoint.schema.SelectorOptions;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.task.api.Task;
 import com.evolveum.midpoint.util.exception.*;
@@ -29,6 +32,7 @@ import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.PasswordType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 import com.evolveum.prism.xml.ns._public.types_3.ProtectedStringType;
+import com.google.protobuf.ProtocolStringList;
 import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -101,8 +105,16 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
             OperationResult parentResult = task.getResult().createSubresult(OPERATION_SELF);
 
+            List<String> options = request.getOptionsList();
+            List<String> include = request.getIncludeList();
+            List<String> exclude = request.getExcludeList();
+            List<String> resolveNames = request.getResolveNamesList();
+
+            Collection<SelectorOptions<GetOperationOptions>> getOptions = GetOperationOptions.fromRestOptions(options, include,
+                    exclude, resolveNames, null, prismContext);
+
             try {
-                PrismObject<UserType> user = modelCrudService.getObject(UserType.class, loggedInUser.getOid(), null, task, parentResult);
+                PrismObject<UserType> user = modelCrudService.getObject(UserType.class, loggedInUser.getOid(), getOptions, task, parentResult);
                 parentResult.recordSuccessIfUnknown();
                 return user;
             } finally {

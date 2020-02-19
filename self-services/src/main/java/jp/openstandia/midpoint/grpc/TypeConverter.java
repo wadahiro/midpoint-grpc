@@ -180,6 +180,9 @@ public class TypeConverter {
     }
 
     public static PolyStringMessage toMessage(PolyString polyString) {
+        if (polyString == null) {
+            return null;
+        }
         return PolyStringMessage.newBuilder()
                 .setOrig(polyString.getOrig())
                 .setNorm(polyString.getNorm())
@@ -187,6 +190,9 @@ public class TypeConverter {
     }
 
     public static PolyStringMessage toMessage(PolyStringType polyStringType) {
+        if (polyStringType == null) {
+            return null;
+        }
         return PolyStringMessage.newBuilder()
                 .setOrig(polyStringType.getOrig())
                 .setNorm(polyStringType.getNorm())
@@ -199,40 +205,46 @@ public class TypeConverter {
                 .collect(Collectors.toList());
     }
 
-    public static UserTypeMessage toMessage(PrismObject<UserType> user) {
-        UserType v = user.getRealValue();
-        UserTypeMessage.Builder builder = UserTypeMessage.newBuilder()
-                // ObjectType
-                .setName(toMessage(v.getName()))
-                .setDescription(v.getDescription())
-                .addAllSubtype(v.getSubtype())
-                .setLifecycleState(v.getLifecycleState())
-                // FocusType
-                .setJpegPhoto(ByteString.copyFrom(v.getJpegPhoto()))
-                .setCostCenter(v.getCostCenter())
-                .setLocality(toMessage(v.getLocality()))
-                .setPreferredLanguage(v.getPreferredLanguage())
-                .setLocale(v.getLocale())
-                .setTimezone(v.getTimezone())
-                .setEmailAddress(v.getEmailAddress())
-                .setTelephoneNumber(v.getTelephoneNumber())
-                // UserType
-                .setFullName(toMessage(v.getFullName()))
-                .setGivenName(toMessage(v.getGivenName()))
-                .setFamilyName(toMessage(v.getFamilyName()))
-                .setAdditionalName(toMessage(v.getAdditionalName()))
-                .setNickName(toMessage(v.getNickName()))
-                .setHonorificPrefix(toMessage(v.getHonorificPrefix()))
-                .setHonorificSuffix(toMessage(v.getHonorificSuffix()))
-                .setTitle(toMessage(v.getTitle()))
-                .setEmployeeNumber(v.getEmployeeNumber())
-                .addAllEmployeeType(v.getEmployeeType())
-                .addAllOrganization(toMessage(v.getOrganization()))
-                .addAllOrganizationalUnit(toMessage(v.getOrganizationalUnit()))
-                // Extension
-                .putAllExtension(toExtensionMessageMap(user));
+    private static String nullSafe(String s) {
+        if (s == null) {
+            return "";
+        }
+        return s;
+    }
 
-        return builder.build();
+    public static UserTypeMessage toMessage(PrismObject<UserType> user) {
+        UserType u = user.getRealValue();
+        return BuilderWrapper.wrap(UserTypeMessage.newBuilder())
+                // ObjectType
+                .nullSafe(toMessage(u.getName()), (b, v) -> b.setName(v))
+                .nullSafe(u.getDescription(), (b, v) -> b.setDescription(v))
+                .nullSafe(u.getSubtype(), (b, v) -> b.addAllSubtype(v))
+                .nullSafe(u.getLifecycleState(), (b, v) -> b.setLifecycleState(v))
+                // FocusType
+                .nullSafe(u.getJpegPhoto(), (b, v) -> b.setJpegPhoto(ByteString.copyFrom(v)))
+                .nullSafe(u.getCostCenter(), (b, v) -> b.setCostCenter(v))
+                .nullSafe(toMessage(u.getLocality()), (b, v) -> b.setLocality(v))
+                .nullSafe(u.getPreferredLanguage(), (b, v) -> b.setPreferredLanguage(v))
+                .nullSafe(u.getLocale(), (b, v) -> b.setLocale(v))
+                .nullSafe(u.getTimezone(), (b, v) -> b.setTimezone(v))
+                .nullSafe(u.getEmailAddress(), (b, v) -> b.setEmailAddress(v))
+                .nullSafe(u.getTelephoneNumber(), (b, v) -> b.setTelephoneNumber(v))
+                // UserType
+                .nullSafe(toMessage(u.getFullName()), (b, v) -> b.setFullName(v))
+                .nullSafe(toMessage(u.getGivenName()), (b, v) -> b.setGivenName(v))
+                .nullSafe(toMessage(u.getFamilyName()), (b, v) -> b.setFamilyName(v))
+                .nullSafe(toMessage(u.getAdditionalName()), (b, v) -> b.setAdditionalName(v))
+                .nullSafe(toMessage(u.getNickName()), (b, v) -> b.setNickName(v))
+                .nullSafe(toMessage(u.getHonorificPrefix()), (b, v) -> b.setHonorificPrefix(v))
+                .nullSafe(toMessage(u.getHonorificSuffix()), (b, v) -> b.setHonorificSuffix(v))
+                .nullSafe(toMessage(u.getTitle()), (b, v) -> b.setTitle(v))
+                .nullSafe(u.getEmployeeNumber(), (b, v) -> b.setEmployeeNumber(v))
+                .nullSafe(toMessage(u.getOrganization()), (b, v) -> b.addAllOrganization(v))
+                .nullSafe(toMessage(u.getOrganizationalUnit()), (b, v) -> b.addAllOrganizationalUnit(v))
+                .unwrap()
+                // Extension
+                .putAllExtension(toExtensionMessageMap(user))
+                .build();
     }
 
     public static Map<String, ExtensionMessage> toExtensionMessageMap(PrismObject<?> object) {

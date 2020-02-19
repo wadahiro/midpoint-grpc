@@ -36,6 +36,10 @@ service SelfServiceResource {
 }
 
 message GetSelfRequest {
+    repeated string options = 1;
+    repeated string include = 2;
+    repeated string exclude = 3;
+    repeated string resolveNames = 4;
 }
 
 message GetSelfResponse {
