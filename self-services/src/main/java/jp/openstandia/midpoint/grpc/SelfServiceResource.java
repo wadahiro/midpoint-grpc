@@ -59,6 +59,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
     public static final String CLASS_DOT = SelfServiceResource.class.getName() + ".";
     public static final String OPERATION_SELF = CLASS_DOT + "self";
+    public static final String OPERATION_SELF_ASSIGNMENT = CLASS_DOT + "selfAssignment";
     public static final String OPERATION_ADD_USER = CLASS_DOT + "addUser";
     public static final String OPERATION_EXECUTE_USER_UPDATE = CLASS_DOT + "executeUserUpdate";
     public static final String OPERATION_EXECUTE_CREDENTIAL_CHECK = CLASS_DOT + "executeCredentialCheck";
@@ -162,18 +163,36 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                         .map(x -> x.getTargetRef().getOid())
                         .collect(Collectors.toList());
 
-                List<String> orgRefOids = assignment.stream()
-                        .filter(x -> x.getOrgRef() != null)
-                        .map(x -> x.getOrgRef().getOid())
-                        .collect(Collectors.toList());
-                oids.addAll(orgRefOids);
+                if (request.getIncludeOrgRefDetail()) {
+                    List<String> orgRefOids = assignment.stream()
+                            .filter(x -> x.getOrgRef() != null)
+                            .map(x -> x.getOrgRef().getOid())
+                            .collect(Collectors.toList());
+                    oids.addAll(orgRefOids);
+                }
 
-                // For caching detail of the target objects
-                ObjectQuery query = createInOidQuery(ObjectType.class, oids);
-                SearchResultList<PrismObject<AbstractRoleType>> foundObjects = modelService.searchObjects(AbstractRoleType.class, query, null,
-                        task, parentResult);
                 Map<String, AbstractRoleType> cache = new HashMap<>();
-                foundObjects.stream().forEach(x -> cache.put(x.getOid(), x.asObjectable()));
+
+                // TODO: use search mode for performance?
+                // For caching detail of the target objects
+                oids.stream().forEach(x -> {
+                    try {
+                        AbstractRoleType o = modelService.getObject(AbstractRoleType.class, x,
+                                SelectorOptions.createCollection(GetOperationOptions.createExecutionPhase()), task, parentResult)
+                                .asObjectable();
+                        cache.put(x, o);
+                    } catch (CommonException e) {
+                        LOGGER.warn("Cannot fetch the object for collecting assignment detail. oid: {}", x);
+                    }
+                });
+
+                // End User doesn't have search permission with default setting...
+                // TODO: use admin permission partially?
+                // For caching detail of the target objects
+//                ObjectQuery query = createInOidQuery(ObjectType.class, oids);
+//                SearchResultList<PrismObject<AbstractRoleType>> foundObjects = modelService.searchObjects(AbstractRoleType.class, query, null,
+//                        task, parentResult);
+//                foundObjects.stream().forEach(x -> cache.put(x.getOid(), x.asObjectable()));
 
                 List<AssignmentMessage> assignmentMessages = assignment.stream()
                         // The user might not have permission to get the target. So filter them.

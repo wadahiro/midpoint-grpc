@@ -26,6 +26,7 @@ public class TestGetAssignmentClient {
         stub = MetadataUtils.attachHeaders(stub, headers);
 
         GetSelfAssignmentRequest req = GetSelfAssignmentRequest.newBuilder()
+                .setIncludeOrgRefDetail(true)
                 .build();
 
         GetSelfAssignmentResponse self = stub.getSelfAssignment(req);
