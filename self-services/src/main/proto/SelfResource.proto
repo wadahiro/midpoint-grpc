@@ -180,6 +180,7 @@ message ReferenceMessage {
     PolyStringMessage name = 3;
     PolyStringMessage display_name = 4;
     string description = 5;
+    repeated ReferenceMessage archetype_ref = 6;
 }
 
 message RelationMessage {

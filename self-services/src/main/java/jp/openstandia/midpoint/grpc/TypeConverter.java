@@ -227,13 +227,22 @@ public class TypeConverter {
                 .collect(Collectors.toList());
     }
 
+
+    public static List<ReferenceMessage> toMessage(List<ObjectReferenceType> ref, Map<String, AbstractRoleType> resolved) {
+        return ref.stream()
+                .map(x -> toMessage(x, resolved.get(x.getOid())))
+                .collect(Collectors.toList());
+    }
+
     public static ReferenceMessage toMessage(ObjectReferenceType ref, AbstractRoleType resolved) {
         if (ref == null) {
             return null;
         }
 
         QName relation = ref.getRelation();
-        ReferenceMessage.Builder builder = ReferenceMessage.newBuilder()
+        ReferenceMessage.Builder builder = BuilderWrapper.wrap(ReferenceMessage.newBuilder())
+                .nullSafe(toMessage(ref.getTargetName()),(b, v) -> b.setName(v))
+                .unwrap()
                 .setOid(ref.getOid())
                 .setRelation(
                         RelationMessage.newBuilder()

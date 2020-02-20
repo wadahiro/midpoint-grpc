@@ -171,6 +171,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                     oids.addAll(orgRefOids);
                 }
 
+                // key: oid, value: Org/Role/Archetype etc.
                 Map<String, AbstractRoleType> cache = new HashMap<>();
 
                 // TODO: use search mode for performance?
@@ -178,11 +179,28 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 oids.stream().forEach(x -> {
                     try {
                         AbstractRoleType o = modelService.getObject(AbstractRoleType.class, x,
-                                SelectorOptions.createCollection(GetOperationOptions.createExecutionPhase()), task, parentResult)
+                                SelectorOptions.createCollection(GetOperationOptions.createExecutionPhase().resolveNames(true)), task, parentResult)
                                 .asObjectable();
                         cache.put(x, o);
+
+                        // End User doesn't have get permission for Archetype with default.
+                        // So currently, we rely on `resolveNames` mode to get name of archetype.
+//                        if (request.getIncludeArchetypeRefDetail()) {
+//                            o.getArchetypeRef().stream()
+//                                    .forEach(ref -> {
+//                                        try {
+//                                            ArchetypeType a = modelService.getObject(ArchetypeType.class, ref.getOid(),
+//                                                    SelectorOptions.createCollection(GetOperationOptions.createExecutionPhase().resolve(true)), task, parentResult)
+//                                                    .asObjectable();
+//                                            cache.put(ref.getOid(), a);
+//
+//                                        } catch (CommonException e) {
+//                                            LOGGER.warn("Cannot fetch the archetype for collecting assignment detail. oid: {}", ref.getOid(), e);
+//                                        }
+//                                    });
+//                        }
                     } catch (CommonException e) {
-                        LOGGER.warn("Cannot fetch the object for collecting assignment detail. oid: {}", x);
+                        LOGGER.warn("Cannot fetch the object for collecting assignment detail. oid: {}", x, e);
                     }
                 });
 
@@ -217,6 +235,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                                                     .nullSafe(toMessage(o.getName()), (b, v) -> b.setName(v))
                                                     .nullSafe(toMessage(o.getDescription()), (b, v) -> b.setDescription(v))
                                                     .nullSafe(toMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                                                    .nullSafe(toMessage(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
                                                     .unwrap()
                                                     .setRelation(
                                                             RelationMessage.newBuilder()
