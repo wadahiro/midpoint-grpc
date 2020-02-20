@@ -1,10 +1,19 @@
 package jp.openstandia.midpoint.grpc;
 
 import com.evolveum.midpoint.prism.*;
+import com.evolveum.midpoint.prism.impl.query.builder.QueryBuilder;
+import com.evolveum.midpoint.prism.match.MatchingRule;
+import com.evolveum.midpoint.prism.match.MatchingRuleRegistry;
 import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.polystring.PolyString;
+import com.evolveum.midpoint.prism.query.FilterCreationUtil;
+import com.evolveum.midpoint.prism.query.FilterUtil;
+import com.evolveum.midpoint.prism.query.ObjectFilter;
+import com.evolveum.midpoint.prism.query.ObjectQuery;
 import com.evolveum.midpoint.prism.schema.PrismSchema;
 import com.evolveum.midpoint.prism.schema.SchemaRegistry;
+import com.evolveum.midpoint.repo.api.RepositoryService;
+import com.evolveum.midpoint.schema.SearchResultList;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import com.evolveum.midpoint.schema.util.ObjectTypeUtil;
 import com.evolveum.midpoint.util.LocalizableMessage;
@@ -13,9 +22,12 @@ import com.evolveum.midpoint.util.SingleLocalizableMessage;
 import com.evolveum.midpoint.util.exception.PolicyViolationException;
 import com.evolveum.midpoint.util.exception.SchemaException;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
+import com.evolveum.prism.xml.ns._public.query_3.SearchFilterType;
 import com.evolveum.prism.xml.ns._public.types_3.ObjectDeltaType;
 import com.evolveum.prism.xml.ns._public.types_3.PolyStringType;
 import com.google.protobuf.ByteString;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.namespace.QName;
@@ -110,6 +122,8 @@ public class TypeConverter {
 
         } else if (msg instanceof LocalizableMessageList) {
             wrapper = toMessage((LocalizableMessageList) msg);
+        } else if (msg == null) {
+            wrapper = toMessages(new Object[]{e.getMessage()}).iterator().next();
         }
 
         if (wrapper == null) {
@@ -241,11 +255,11 @@ public class TypeConverter {
 
         QName relation = ref.getRelation();
         ReferenceMessage.Builder builder = BuilderWrapper.wrap(ReferenceMessage.newBuilder())
-                .nullSafe(toMessage(ref.getTargetName()),(b, v) -> b.setName(v))
+                .nullSafe(toMessage(ref.getTargetName()), (b, v) -> b.setName(v))
                 .unwrap()
                 .setOid(ref.getOid())
                 .setRelation(
-                        RelationMessage.newBuilder()
+                        QNameMessage.newBuilder()
                                 .setNamespaceURI(relation.getNamespaceURI())
                                 .setLocalPart(relation.getLocalPart())
                                 .setPrefix(relation.getPrefix())
@@ -331,6 +345,85 @@ public class TypeConverter {
         return message.getValue();
     }
 
+    public static Collection<? extends AssignmentType> toRealValue(PrismContext prismContext, List<AssignmentMessage> assignmentList) {
+        return assignmentList.stream()
+                .map(x -> toRealValue(prismContext, x))
+                .filter(x -> x != null)
+                .collect(Collectors.toList());
+    }
+
+    public static AssignmentType toRealValue(PrismContext prismContext, AssignmentMessage x) {
+        AssignmentType assignment = new AssignmentType();
+            assignment.setTargetRef(toRealValue(prismContext, x.getTargetRef()));
+            if (x.hasOrgRef()) {
+                assignment.setOrgRef(toRealValue(prismContext, x.getOrgRef()));
+            }
+            return assignment;
+    }
+
+    private static ObjectReferenceType toRealValue(PrismContext prismContext, ReferenceMessage message)  {
+        ObjectReferenceType ref = new ObjectReferenceType();
+        if (message.hasName()) {
+            ObjectFilter filter = QueryBuilder.queryFor(ObjectType.class, prismContext)
+                    .item(ObjectType.F_NAME)
+                    .eqPoly(message.getName().getOrig())
+                    .build()
+                    .getFilter();
+
+            SearchFilterType searchFilterType = null;
+            try {
+                searchFilterType = prismContext.getQueryConverter().createSearchFilterType(filter);
+            } catch (SchemaException e) {
+                StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                        .withCause(e)
+                        .withDescription("invalid_filter")
+                        .asRuntimeException();
+                throw exception;
+            }
+            ref.setFilter(searchFilterType);
+            ref.setType(toRealValue(message.getType()));
+        } else if (!message.getOid().isEmpty()) {
+            ref.setOid(message.getOid());
+        } else {
+            return null;
+        }
+        ref.setRelation(toRealValue(message.getRelation()));
+        return ref;
+    }
+
+
+//    private static ObjectQuery createSearchByName(PrismContext prismContext, Class<? extends Containerable> queryClass, PolyStringMessage message)
+//            throws SchemaException {
+//        if (!message.getOrig().isEmpty()) {
+//            return prismContext.queryFor(queryClass)
+//                    .item(ObjectType.F_NAME)
+//                    .eq(message.getOrig())
+//                    .matching(PrismConstants.POLY_STRING_ORIG_MATCHING_RULE_NAME)
+//                    .build();
+//        } else if (!message.getNorm().isEmpty()) {
+//            return prismContext.queryFor(queryClass)
+//                    .item(ObjectType.F_NAME)
+//                    .eq(message.getNorm())
+//                    .matching(PrismConstants.POLY_STRING_NORM_MATCHING_RULE_NAME)
+//                    .build();
+//        }
+//        return null;
+//    }
+
+    private static QName toRealValue(QNameMessage relation) {
+        if (relation.getNamespaceURI().isEmpty()) {
+            return SchemaConstants.ORG_DEFAULT;
+        }
+
+        QName q;
+        if (relation.getLocalPart().isEmpty()) {
+            q = new QName(relation.getNamespaceURI(), relation.getLocalPart());
+        } else {
+            q = new QName(relation.getNamespaceURI(), relation.getLocalPart(), relation.getPrefix());
+        }
+        return q;
+    }
+
     public static boolean isEmpty(PolyStringMessage message) {
         if (message.getNorm().isEmpty() && message.getOrig().isEmpty()) {
             return true;
@@ -385,7 +478,7 @@ public class TypeConverter {
         return ext.getRealValue();
     }
 
-    public static PrismObject<UserType> toPrismObject(PrismContext prismContext, UserTypeMessage message) throws SchemaException {
+    public static PrismObject<UserType> toPrismObject(PrismContext prismContext, RepositoryService repo, UserTypeMessage message) throws SchemaException {
         UserType user = new UserType(prismContext);
 
         // ObjectType
@@ -393,6 +486,10 @@ public class TypeConverter {
         user.setDescription(toRealValue(message.getDescription()));
         user.createSubtypeList().addAll(toRealValue(String.class, message.getSubtypeList()));
         user.setLifecycleState(toRealValue(message.getLifecycleState()));
+
+        // AssignmentHolderType
+        user.createAssignmentList().addAll(toRealValue(prismContext, message.getAssignmentList()));
+        // can't set Archetype here directly because it throws policy error always.
 
         // FocusType
         user.setJpegPhoto(toRealValue(message.getJpegPhoto()));
@@ -424,6 +521,7 @@ public class TypeConverter {
 
         return user.asPrismObject();
     }
+
 
     public static UserTypeMessage toMessage(PrismObject<UserType> user) {
         UserType u = user.getRealValue();

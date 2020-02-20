@@ -1,9 +1,14 @@
+import com.evolveum.midpoint.schema.constants.RelationTypes;
+import com.evolveum.midpoint.schema.constants.SchemaConstants;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.RoleType;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import jp.openstandia.midpoint.grpc.*;
 
+import javax.management.relation.RelationType;
+import javax.management.relation.Role;
 import java.io.UnsupportedEncodingException;
 import java.util.Base64;
 
@@ -26,7 +31,21 @@ public class TestAddClient {
         AddUserRequest request = AddUserRequest.newBuilder()
                 .setProfile(
                         UserTypeMessage.newBuilder()
-                                .setName(PolyStringMessage.newBuilder().setOrig("foo"))
+                                .setName(PolyStringMessage.newBuilder().setOrig("foo3"))
+                                .addAssignment(
+                                        AssignmentMessage.newBuilder()
+                                                .setTargetRef(
+                                                        ReferenceMessage.newBuilder()
+                                                                .setName(PolyStringMessage.newBuilder().setOrig("ProjUser"))
+                                                                .setType(
+                                                                        QNameMessage.newBuilder()
+                                                                                .setNamespaceURI(RoleType.COMPLEX_TYPE.getNamespaceURI())
+                                                                                .setLocalPart(RoleType.COMPLEX_TYPE.getLocalPart()))
+                                                                .setRelation(QNameMessage.newBuilder()
+                                                                        .setNamespaceURI(SchemaConstants.ORG_MANAGER.getNamespaceURI())
+                                                                        .setLocalPart(SchemaConstants.ORG_MANAGER.getLocalPart()))
+                                                )
+                                )
                                 .putExtension("singleString",
                                         ExtensionMessage.newBuilder()
                                                 .setNamespaceURI("http://test.example.com/my")

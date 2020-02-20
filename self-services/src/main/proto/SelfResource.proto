@@ -111,6 +111,13 @@ message UserTypeMessage {
     // lifecycleState
     string lifecycleState = 4;
 
+    // AssignmentHolderType
+
+    // assignment
+    repeated AssignmentMessage assignment = 10;
+    // archetypeRef
+    repeated ReferenceMessage archetype_ref = 11;
+
     // FocusType
     BytesMessage jpegPhoto = 20;
     // cost center.
@@ -176,14 +183,15 @@ message AssignmentMessage {
 
 message ReferenceMessage {
     string oid = 1;
-    RelationMessage relation = 2;
+    QNameMessage relation = 2;
     PolyStringMessage name = 3;
     PolyStringMessage display_name = 4;
     string description = 5;
     repeated ReferenceMessage archetype_ref = 6;
+    QNameMessage type = 7;
 }
 
-message RelationMessage {
+message QNameMessage {
     string namespace_URI = 1;
     string local_part = 2;
     string prefix = 3;

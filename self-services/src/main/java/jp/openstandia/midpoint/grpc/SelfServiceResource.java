@@ -20,9 +20,9 @@ import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
 import com.evolveum.midpoint.prism.schema.SchemaRegistry;
+import com.evolveum.midpoint.repo.api.RepositoryService;
 import com.evolveum.midpoint.schema.GetOperationOptions;
 import com.evolveum.midpoint.schema.SchemaConstantsGenerated;
-import com.evolveum.midpoint.schema.SearchResultList;
 import com.evolveum.midpoint.schema.SelectorOptions;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.task.api.Task;
@@ -68,6 +68,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     @Autowired
     protected ModelService modelService;
     @Autowired
+    protected RepositoryService repositoryService;
+    @Autowired
     protected ModelCrudService modelCrudService;
     @Autowired
     protected ModelInteractionService modelInteraction;
@@ -75,8 +77,6 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     protected PrismContext prismContext;
     @Autowired
     protected Protector protector;
-//    @Autowired
-//    protected SchemaRegistry registry;
 
     public static final Metadata.Key<PolicyError> PolicyErrorMetadataKey = ProtoUtils.keyForProto(PolicyError.getDefaultInstance());
 
@@ -238,7 +238,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                                                     .nullSafe(toMessage(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
                                                     .unwrap()
                                                     .setRelation(
-                                                            RelationMessage.newBuilder()
+                                                            QNameMessage.newBuilder()
                                                                     .setNamespaceURI(relation.getNamespaceURI())
                                                                     .setLocalPart(relation.getLocalPart())
                                                                     .setPrefix(relation.getPrefix())
@@ -379,7 +379,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             ModelExecuteOptions modelExecuteOptions = ModelExecuteOptions.fromRestOptions(request.getOptionsList());
 
             UserTypeMessage message = request.getProfile();
-            PrismObject<UserType> user = toPrismObject(prismContext, message);
+            PrismObject<UserType> user = toPrismObject(prismContext, repositoryService, message);
 
             String oid = modelCrudService.addObject(user, modelExecuteOptions, task, parentResult);
             LOGGER.debug("returned oid :  {}", oid);
