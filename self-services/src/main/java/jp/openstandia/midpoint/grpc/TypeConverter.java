@@ -12,9 +12,7 @@ import com.evolveum.midpoint.util.LocalizableMessageList;
 import com.evolveum.midpoint.util.SingleLocalizableMessage;
 import com.evolveum.midpoint.util.exception.PolicyViolationException;
 import com.evolveum.midpoint.util.exception.SchemaException;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.ExtensionType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.TaskType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
 import com.evolveum.prism.xml.ns._public.types_3.ObjectDeltaType;
 import com.evolveum.prism.xml.ns._public.types_3.PolyStringType;
 import com.google.protobuf.ByteString;
@@ -187,6 +185,13 @@ public class TypeConverter {
         return list;
     }
 
+    public static String toMessage(String string) {
+        if (string == null) {
+            return null;
+        }
+        return string;
+    }
+
     public static BytesMessage toMessage(byte[] bytes) {
         if (bytes == null) {
             return null;
@@ -220,6 +225,31 @@ public class TypeConverter {
         return polyStringType.stream()
                 .map(x -> toMessage(x))
                 .collect(Collectors.toList());
+    }
+
+    public static ReferenceMessage toMessage(ObjectReferenceType ref, AbstractRoleType resolved) {
+        if (ref == null) {
+            return null;
+        }
+
+        QName relation = ref.getRelation();
+        ReferenceMessage.Builder builder = ReferenceMessage.newBuilder()
+                .setOid(ref.getOid())
+                .setRelation(
+                        RelationMessage.newBuilder()
+                                .setNamespaceURI(relation.getNamespaceURI())
+                                .setLocalPart(relation.getLocalPart())
+                                .setPrefix(relation.getPrefix())
+                );
+        if (resolved != null) {
+            builder = BuilderWrapper.wrap(builder)
+                    .nullSafe(toMessage(resolved.getName()), (b, v) -> b.setName(v))
+                    .nullSafe(toMessage(resolved.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                    .nullSafe(toMessage(resolved.getDescription()), (b, v) -> b.setDescription(v))
+                    .unwrap();
+        }
+
+        return builder.build();
     }
 
     public static <T> List<T> toRealValue(Class<T> toClass, List<?> message) {

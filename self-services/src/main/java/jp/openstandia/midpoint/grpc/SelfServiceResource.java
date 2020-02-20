@@ -4,6 +4,7 @@ import com.evolveum.midpoint.model.api.ModelExecuteOptions;
 import com.evolveum.midpoint.model.api.ModelInteractionService;
 import com.evolveum.midpoint.model.api.ModelService;
 import com.evolveum.midpoint.model.impl.ModelCrudService;
+import com.evolveum.midpoint.prism.Containerable;
 import com.evolveum.midpoint.prism.PrismContext;
 import com.evolveum.midpoint.prism.PrismObject;
 import com.evolveum.midpoint.prism.PrismObjectDefinition;
@@ -21,6 +22,7 @@ import com.evolveum.midpoint.prism.query.ObjectQuery;
 import com.evolveum.midpoint.prism.schema.SchemaRegistry;
 import com.evolveum.midpoint.schema.GetOperationOptions;
 import com.evolveum.midpoint.schema.SchemaConstantsGenerated;
+import com.evolveum.midpoint.schema.SearchResultList;
 import com.evolveum.midpoint.schema.SelectorOptions;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.task.api.Task;
@@ -28,10 +30,7 @@ import com.evolveum.midpoint.util.exception.*;
 import com.evolveum.midpoint.util.logging.LoggingUtils;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.CredentialsType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.ObjectType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.PasswordType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
 import com.evolveum.prism.xml.ns._public.types_3.ProtectedStringType;
 import io.grpc.Metadata;
 import io.grpc.Status;
@@ -42,9 +41,8 @@ import org.lognet.springboot.grpc.GRpcService;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.xml.namespace.QName;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static jp.openstandia.midpoint.grpc.TypeConverter.toMessage;
 import static jp.openstandia.midpoint.grpc.TypeConverter.toPrismObject;
@@ -91,7 +89,6 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         return metadata;
     }
 
-
     /**
      * Getting self profile API based on
      * {@link com.evolveum.midpoint.model.impl.ModelRestService#getSelf(org.apache.cxf.jaxrs.ext.MessageContext)}.
@@ -134,6 +131,100 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         responseObserver.onCompleted();
 
         LOGGER.debug("End getSelf");
+    }
+
+    private class A {
+
+    }
+
+    /**
+     * Getting self assignments API.
+     *
+     * @param request
+     * @param responseObserver
+     */
+    @Override
+    public void getSelfAssignment(GetSelfAssignmentRequest request, StreamObserver<GetSelfAssignmentResponse> responseObserver) {
+        LOGGER.debug("Start getSelf");
+
+        List<AssignmentMessage> assignments = runTask(ctx -> {
+            Task task = ctx.task;
+            UserType loggedInUser = ctx.principal.getUser();
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_SELF);
+
+            try {
+                PrismObject<UserType> user = modelCrudService.getObject(UserType.class, loggedInUser.getOid(), null, task, parentResult);
+                UserType userType = user.asObjectable();
+
+                List<AssignmentType> assignment = userType.getAssignment();
+                List<String> oids = assignment.stream()
+                        .map(x -> x.getTargetRef().getOid())
+                        .collect(Collectors.toList());
+
+                List<String> orgRefOids = assignment.stream()
+                        .filter(x -> x.getOrgRef() != null)
+                        .map(x -> x.getOrgRef().getOid())
+                        .collect(Collectors.toList());
+                oids.addAll(orgRefOids);
+
+                // For caching detail of the target objects
+                ObjectQuery query = createInOidQuery(ObjectType.class, oids);
+                SearchResultList<PrismObject<AbstractRoleType>> foundObjects = modelService.searchObjects(AbstractRoleType.class, query, null,
+                        task, parentResult);
+                Map<String, AbstractRoleType> cache = new HashMap<>();
+                foundObjects.stream().forEach(x -> cache.put(x.getOid(), x.asObjectable()));
+
+                List<AssignmentMessage> assignmentMessages = assignment.stream()
+                        // The user might not have permission to get the target. So filter them.
+                        .filter(x -> cache.containsKey(x.getTargetRef().getOid()))
+                        .map(x -> {
+                            AbstractRoleType o = cache.get(x.getTargetRef().getOid());
+
+                            ObjectReferenceType orgRef = x.getOrgRef();
+                            AbstractRoleType resolvedOrgRef = null;
+                            if (orgRef != null) {
+                                resolvedOrgRef = cache.get(orgRef.getOid());
+                            }
+
+                            QName relation = x.getTargetRef().getRelation();
+
+                            return BuilderWrapper.wrap(AssignmentMessage.newBuilder())
+                                    .nullSafe(toMessage(orgRef, resolvedOrgRef), (b, v) -> b.setOrgRef(v))
+                                    .unwrap()
+                                    .setTargetRef(
+                                            BuilderWrapper.wrap(ReferenceMessage.newBuilder())
+                                                    .nullSafe(o.getOid(), (b, v) -> b.setOid(v))
+                                                    .nullSafe(toMessage(o.getName()), (b, v) -> b.setName(v))
+                                                    .nullSafe(toMessage(o.getDescription()), (b, v) -> b.setDescription(v))
+                                                    .nullSafe(toMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                                                    .unwrap()
+                                                    .setRelation(
+                                                            RelationMessage.newBuilder()
+                                                                    .setNamespaceURI(relation.getNamespaceURI())
+                                                                    .setLocalPart(relation.getLocalPart())
+                                                                    .setPrefix(relation.getPrefix())
+                                                    )
+                                                    .build()
+                                    ).build();
+                        })
+                        .collect(Collectors.toList());
+
+                parentResult.recordSuccessIfUnknown();
+                return assignmentMessages;
+            } finally {
+                parentResult.computeStatusIfUnknown();
+            }
+        });
+
+        GetSelfAssignmentResponse res = GetSelfAssignmentResponse.newBuilder()
+                .addAllAssignment(assignments)
+                .build();
+
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End getSelfAssignment");
     }
 
     @Override
@@ -253,7 +344,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             PrismObject<UserType> user = toPrismObject(prismContext, message);
 
             String oid = modelCrudService.addObject(user, modelExecuteOptions, task, parentResult);
-            LOGGER.debug("returned oid :  {}", oid );
+            LOGGER.debug("returned oid :  {}", oid);
 
             return oid;
         });
@@ -341,6 +432,12 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 .item(property)
                 .eq(value)
                 .matching(matchingRule)
+                .build();
+    }
+
+    private <T> ObjectQuery createInOidQuery(Class<? extends Containerable> queryClass, List<String> oids) throws SchemaException {
+        return prismContext.queryFor(queryClass)
+                .id(oids.toArray(new String[]{}))
                 .build();
     }
 }

@@ -10,9 +10,14 @@ package midpoint;
  */
 service SelfServiceResource {
     /**
-     * Get my profile.
+     * Get self profile.
      */
     rpc getSelf(GetSelfRequest) returns (GetSelfResponse);
+
+    /**
+     * Get self assignments.
+     */
+    rpc getSelfAssignment(GetSelfAssignmentRequest) returns (GetSelfAssignmentResponse);
 
     /**
      * Modify self profile by deltas.
@@ -38,6 +43,11 @@ service SelfServiceResource {
      * Add new user.
      */
     rpc addUser(AddUserRequest) returns (AddUserResponse);
+
+    /**
+     * Search users.
+     */
+    rpc searchUsers(SearchUsersRequest) returns (SearchUsersResponse);
 }
 
 message GetSelfRequest {
@@ -147,6 +157,35 @@ message UserTypeMessage {
 
     // extension. the key is "prefix:localPart" format of the QName.
     map<string, ExtensionMessage> extension = 100;
+}
+
+message GetSelfAssignmentRequest {
+    bool include_org_ref_detail = 1;
+}
+
+message GetSelfAssignmentResponse {
+    repeated AssignmentMessage assignment = 1;
+}
+
+message AssignmentMessage {
+    ReferenceMessage target_ref = 1;
+    oneof org_ref_holder {
+        ReferenceMessage org_ref = 2;
+    }
+}
+
+message ReferenceMessage {
+    string oid = 1;
+    RelationMessage relation = 2;
+    PolyStringMessage name = 3;
+    PolyStringMessage display_name = 4;
+    string description = 5;
+}
+
+message RelationMessage {
+    string namespace_URI = 1;
+    string local_part = 2;
+    string prefix = 3;
 }
 
 message ModifyProfileRequest {
@@ -261,3 +300,60 @@ message AddUserRequest {
 message AddUserResponse {
     string oid = 1;
 }
+
+message SearchUsersRequest {
+    QueryMessage query = 1;
+    repeated string options = 2;
+    repeated string include = 3;
+    repeated string exclude = 4;
+    repeated string resolveNames = 5;
+}
+
+message SearchUsersResponse {
+    repeated UserTypeMessage users = 1;
+}
+
+message QueryMessage {
+    PagingMessage paging = 1;
+    ObjectFilter filter = 2;
+}
+
+message PagingMessage {
+    int32 offset = 1;
+    int32 max_size = 2;
+}
+
+message ObjectFilter {
+    oneof filter {
+        AndFilterMessage and = 1;
+        OrFilterMessage or = 2;
+        NotFilterMessage not = 3;
+        EqualFilterMessage eq = 4;
+        SubStringFilterMessage sub_string = 5;
+    }
+}
+
+message AndFilterMessage {
+    repeated ObjectFilter conditions = 1;
+}
+
+message OrFilterMessage {
+    repeated ObjectFilter conditions = 1;
+}
+
+message NotFilterMessage {
+    repeated ObjectFilter filter = 1;
+}
+
+message EqualFilterMessage {
+    string full_path = 1;
+    string matching_rule = 2;
+    string value = 3;
+}
+
+message SubStringFilterMessage {
+    string full_path = 1;
+    string matching_rule = 2;
+    string value = 3;
+}
+
