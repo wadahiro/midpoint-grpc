@@ -288,7 +288,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                         path = TypeConverter.toRealValue(m.getItemPath());
 
                     } else if (m.getPathWrapperCase() == UserItemDelta.PathWrapperCase.PATH) {
-                        path = ItemPath.create(m.getPath());
+                        path = ItemPath.create(m.getPath().split("/"));
 
                     } else if (m.getPathWrapperCase() == UserItemDelta.PathWrapperCase.USER_TYPE_PATH) {
                         path = TypeConverter.toItemName(m.getUserTypePath());

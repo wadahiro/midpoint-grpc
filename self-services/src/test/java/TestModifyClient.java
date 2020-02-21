@@ -28,14 +28,20 @@ public class TestModifyClient {
                 .addModifications(
                         UserItemDelta.newBuilder()
 //                                .setUserTypePath(DefaultUserTypePath.F_FAMILY_NAME)
-//                                .setPath("singleString")
+                                .setPath("familyName")
+                                .setValuesToAdd("hoge1")
+                )
+                .addModifications(
+                        UserItemDelta.newBuilder()
+//                                .setUserTypePath(DefaultUserTypePath.F_FAMILY_NAME)
+                                .setPath("extension/singleString")
 //                                .setPath("familyName")
-                                .setItemPath(
-                                        ItemPathMessage.newBuilder()
-                                                .addPath(QNameMessage.newBuilder().setLocalPart("extension"))
-                                                .addPath(QNameMessage.newBuilder().setLocalPart("singleString"))
-                                )
-                                .setValuesToAdd("foobar")
+//                                .setItemPath(
+//                                        ItemPathMessage.newBuilder()
+//                                                .addPath(QNameMessage.newBuilder().setLocalPart("extension"))
+//                                                .addPath(QNameMessage.newBuilder().setLocalPart("singleString"))
+//                                )
+                                .setValuesToAdd("hoge2")
                 )
                 .build();
 
