@@ -32,10 +32,12 @@ import io.grpc.StatusRuntimeException;
 
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.namespace.QName;
+import java.awt.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.*;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import static com.evolveum.midpoint.schema.constants.SchemaConstants.NS_MODEL_EXTENSION;
@@ -405,8 +407,26 @@ public class TypeConverter {
             return null;
         }
 
-        ref.setType(toRealValue(message.getType()));
-        ref.setRelation(toRealValue(message.getRelation()));
+        if (message.hasRelation()) {
+            ref.setRelation(toRealValue(message.getRelation()));
+        } else if (message.getRelationWrapperCase() == ReferenceMessage.RelationWrapperCase.RELATION_TYPE) {
+            ref.setRelation(toRealValue(message.getRelationType()));
+        } else {
+            // Use default relation if missing relation
+            ref.setRelation(prismContext.getDefaultRelation());
+        }
+
+        if (message.hasType()) {
+            ref.setType(toRealValue(message.getType()));
+        } else if (message.getTypeWrapperCase() == ReferenceMessage.TypeWrapperCase.OBJECT_TYPE) {
+            ref.setType(toRealValue(message.getObjectType()));
+        } else {
+            StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                    .withDescription("invalid_relation")
+                    .asRuntimeException();
+            throw exception;
+        }
+
         return ref;
     }
 
@@ -429,7 +449,7 @@ public class TypeConverter {
 //        return null;
 //    }
 
-    private static QName toRealValue(QNameMessage message) {
+    public static QName toRealValue(QNameMessage message) {
         if (message.getNamespaceURI().isEmpty() && message.getLocalPart().isEmpty()) {
             return SchemaConstants.ORG_DEFAULT;
         }
@@ -441,6 +461,46 @@ public class TypeConverter {
             return new QName(message.getNamespaceURI(), message.getLocalPart());
         }
         return new QName(message.getNamespaceURI(), message.getLocalPart(), message.getPrefix());
+    }
+
+    public static QName toRealValue(DefaultRelationType type) {
+        switch (type) {
+            case ORG_DEFAULT:
+                return SchemaConstants.ORG_DEFAULT;
+            case ORG_MANAGER:
+                return SchemaConstants.ORG_MANAGER;
+            case ORG_META:
+                return SchemaConstants.ORG_META;
+            case ORG_DEPUTY:
+                return SchemaConstants.ORG_DEPUTY;
+            case ORG_APPROVER:
+                return SchemaConstants.ORG_APPROVER;
+            case ORG_OWNER:
+                return SchemaConstants.ORG_OWNER;
+            case ORG_CONSENT:
+                return SchemaConstants.ORG_CONSENT;
+        }
+        return null;
+    }
+
+    public static QName toRealValue(DefaultObjectType type) {
+        switch (type) {
+            case OBJECT_TYPE:
+                return ObjectType.COMPLEX_TYPE;
+            case FOCUS_TYPE:
+                return FocusType.COMPLEX_TYPE;
+            case USER_TYPE:
+                return UserType.COMPLEX_TYPE;
+            case ROLE_TYPE:
+                return RoleType.COMPLEX_TYPE;
+            case ORG_TYPE:
+                return OrgType.COMPLEX_TYPE;
+            case SERVICE_TYPE:
+                return ServiceType.COMPLEX_TYPE;
+            case ASSIGNMENT_HOLDER_TYPE:
+                return AssignmentHolderType.COMPLEX_TYPE;
+        }
+        return null;
     }
 
     public static boolean isEmpty(PolyStringMessage message) {

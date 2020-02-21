@@ -186,12 +186,19 @@ message AssignmentMessage {
 
 message ReferenceMessage {
     string oid = 1;
-    QNameMessage relation = 2;
-    PolyStringMessage name = 3;
-    PolyStringMessage display_name = 4;
-    string description = 5;
-    repeated ReferenceMessage archetype_ref = 6;
-    QNameMessage type = 7;
+    oneof type_wrapper {
+        QNameMessage type = 2;
+        DefaultObjectType object_type = 3;
+    }
+    oneof relation_wrapper {
+        QNameMessage relation = 4;
+        DefaultRelationType relation_type = 5;
+    }
+
+    PolyStringMessage name = 6;
+    PolyStringMessage display_name = 7;
+    string description = 8;
+    repeated ReferenceMessage archetype_ref = 9;
 }
 
 message QNameMessage {
@@ -209,6 +216,28 @@ message UserItemDelta {
     string valuesToAdd = 4;
     string valuesToReplace = 5;
     string valuesToDelete = 6;
+}
+
+enum DefaultObjectType {
+    OBJECT_TYPE = 0;
+    FOCUS_TYPE = 1;
+    ASSIGNMENT_HOLDER_TYPE = 2;
+    USER_TYPE = 3;
+    ABSTRACT_ROLE_TYPE = 4;
+    ROLE_TYPE = 5;
+    ORG_TYPE = 6;
+    SERVICE_TYPE = 7;
+    // TODO more type
+}
+
+enum DefaultRelationType {
+    ORG_DEFAULT = 0;
+    ORG_MANAGER = 1;
+    ORG_META = 2;
+    ORG_DEPUTY = 3;
+    ORG_APPROVER = 4;
+    ORG_OWNER = 5;
+    ORG_CONSENT = 6;
 }
 
 enum UserItemPath {

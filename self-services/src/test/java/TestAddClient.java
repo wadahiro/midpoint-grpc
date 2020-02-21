@@ -38,26 +38,17 @@ public class TestAddClient {
                                                 .setTargetRef(
                                                         ReferenceMessage.newBuilder()
                                                                 .setName(PolyStringMessage.newBuilder().setOrig("ProjUser"))
-                                                                .setType(
-                                                                        QNameMessage.newBuilder()
-//                                                                                .setNamespaceURI(RoleType.COMPLEX_TYPE.getNamespaceURI())
-                                                                                .setLocalPart(RoleType.COMPLEX_TYPE.getLocalPart()))
-                                                                .setRelation(QNameMessage.newBuilder()
-//                                                                        .setNamespaceURI(SchemaConstants.ORG_MANAGER.getNamespaceURI())
-                                                                        .setLocalPart(SchemaConstants.ORG_MANAGER.getLocalPart()))
+                                                                .setObjectType(DefaultObjectType.ROLE_TYPE)
+//                                                                .setRelationType(DefaultRelationType.ORG_MANAGER)
                                                 )
                                                 .putExtension("manager",
                                                         ExtensionMessage.newBuilder()
-//                                                                .setNamespaceURI("http://test.aidaas.cloud/my")
                                                                 .setIsSingleValue(true)
                                                                 .addValue(
                                                                         ExtensionValue.newBuilder().setRef(
                                                                                 ReferenceMessage.newBuilder()
                                                                                         .setName(PolyStringMessage.newBuilder().setOrig("test"))
-                                                                                        .setType(
-                                                                                                QNameMessage.newBuilder()
-//                                                                                                        .setNamespaceURI(UserType.COMPLEX_TYPE.getNamespaceURI())
-                                                                                                        .setLocalPart(UserType.COMPLEX_TYPE.getLocalPart()))
+                                                                                        .setObjectType(DefaultObjectType.USER_TYPE)
                                                                         ).build()
                                                                 )
                                                                 .build()
@@ -65,7 +56,6 @@ public class TestAddClient {
                                 )
                                 .putExtension("singleString",
                                         ExtensionMessage.newBuilder()
-//                                                .setNamespaceURI("http://test.example.com/my")
                                                 .setIsSingleValue(true)
                                                 .addValue(
                                                         ExtensionValue.newBuilder().setString("ext1").build()
