@@ -4,6 +4,7 @@ import com.evolveum.midpoint.model.api.ModelExecuteOptions;
 import com.evolveum.midpoint.model.api.ModelInteractionService;
 import com.evolveum.midpoint.model.api.ModelService;
 import com.evolveum.midpoint.model.impl.ModelCrudService;
+import com.evolveum.midpoint.model.impl.util.ModelImplUtils;
 import com.evolveum.midpoint.prism.Containerable;
 import com.evolveum.midpoint.prism.PrismContext;
 import com.evolveum.midpoint.prism.PrismObject;
@@ -31,6 +32,7 @@ import com.evolveum.midpoint.util.logging.LoggingUtils;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
+import com.evolveum.prism.xml.ns._public.types_3.EvaluationTimeType;
 import com.evolveum.prism.xml.ns._public.types_3.ProtectedStringType;
 import io.grpc.Metadata;
 import io.grpc.Status;
@@ -380,6 +382,16 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
             UserTypeMessage message = request.getProfile();
             PrismObject<UserType> user = toPrismObject(prismContext, repositoryService, message);
+
+            // To handle error to resolve reference, call resolveReferences here.
+            try {
+                ModelImplUtils.resolveReferences(user, repositoryService, false, false, EvaluationTimeType.IMPORT, true, prismContext, parentResult);
+            } catch (SystemException e) {
+                StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                        .withDescription("invalid_reference")
+                        .asRuntimeException();
+                throw exception;
+            }
 
             String oid = modelCrudService.addObject(user, modelExecuteOptions, task, parentResult);
             LOGGER.debug("returned oid :  {}", oid);

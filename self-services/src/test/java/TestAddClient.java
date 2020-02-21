@@ -32,13 +32,13 @@ public class TestAddClient {
         AddUserRequest request = AddUserRequest.newBuilder()
                 .setProfile(
                         UserTypeMessage.newBuilder()
-                                .setName(PolyStringMessage.newBuilder().setOrig("fooa"))
+                                .setName(PolyStringMessage.newBuilder().setOrig("foo"))
                                 .addAssignment(
                                         AssignmentMessage.newBuilder()
                                                 .setTargetRef(
                                                         ReferenceMessage.newBuilder()
-                                                                .setName(PolyStringMessage.newBuilder().setOrig("ProjUser"))
                                                                 .setObjectType(DefaultObjectType.ROLE_TYPE)
+                                                                .setName(PolyStringMessage.newBuilder().setOrig("ProjUser"))
 //                                                                .setRelationType(DefaultRelationType.ORG_MANAGER)
                                                 )
                                                 .putExtension("manager",
@@ -47,8 +47,9 @@ public class TestAddClient {
                                                                 .addValue(
                                                                         ExtensionValue.newBuilder().setRef(
                                                                                 ReferenceMessage.newBuilder()
-                                                                                        .setName(PolyStringMessage.newBuilder().setOrig("test"))
                                                                                         .setObjectType(DefaultObjectType.USER_TYPE)
+//                                                                                        .setName(PolyStringMessage.newBuilder().setOrig("test"))
+                                                                                        .setEmailAddress("TEST@example.com")
                                                                         ).build()
                                                                 )
                                                                 .build()
@@ -58,8 +59,8 @@ public class TestAddClient {
                                         AssignmentMessage.newBuilder()
                                                 .setTargetRef(
                                                         ReferenceMessage.newBuilder()
-                                                                .setOid("00000000-0000-0000-0000-00000000000c")
                                                                 .setObjectType(DefaultObjectType.ROLE_TYPE)
+                                                                .setOid("00000000-0000-0000-0000-00000000000c")
                                                 )
                                 )
                                 .putExtension("singleString",

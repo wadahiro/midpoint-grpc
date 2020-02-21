@@ -76,6 +76,8 @@ public interface MidPointGrpcService {
                     .withDescription(e.getErrorTypeMessage())
                     .withCause(e)
                     .asRuntimeException();
+        } catch (StatusRuntimeException e) {
+            throw e;
         } catch (Exception e) {
             throw Status.INTERNAL
                     .withDescription(e.getMessage())

@@ -2,19 +2,11 @@ package jp.openstandia.midpoint.grpc;
 
 import com.evolveum.midpoint.prism.*;
 import com.evolveum.midpoint.prism.impl.query.builder.QueryBuilder;
-import com.evolveum.midpoint.prism.match.MatchingRule;
-import com.evolveum.midpoint.prism.match.MatchingRuleRegistry;
 import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.polystring.PolyString;
-import com.evolveum.midpoint.prism.query.FilterCreationUtil;
-import com.evolveum.midpoint.prism.query.FilterUtil;
 import com.evolveum.midpoint.prism.query.ObjectFilter;
-import com.evolveum.midpoint.prism.query.ObjectQuery;
-import com.evolveum.midpoint.prism.schema.PrismSchema;
-import com.evolveum.midpoint.prism.schema.SchemaRegistry;
 import com.evolveum.midpoint.repo.api.RepositoryService;
-import com.evolveum.midpoint.schema.SearchResultList;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import com.evolveum.midpoint.schema.util.ObjectTypeUtil;
 import com.evolveum.midpoint.util.LocalizableMessage;
@@ -24,7 +16,6 @@ import com.evolveum.midpoint.util.exception.PolicyViolationException;
 import com.evolveum.midpoint.util.exception.SchemaException;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
 import com.evolveum.prism.xml.ns._public.query_3.SearchFilterType;
-import com.evolveum.prism.xml.ns._public.types_3.ObjectDeltaType;
 import com.evolveum.prism.xml.ns._public.types_3.PolyStringType;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
@@ -32,16 +23,11 @@ import io.grpc.StatusRuntimeException;
 
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.namespace.QName;
-import java.awt.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.*;
-import java.util.List;
 import java.util.stream.Collectors;
-
-import static com.evolveum.midpoint.schema.constants.SchemaConstants.NS_MODEL_EXTENSION;
-import static com.sun.tools.xjc.reader.Ring.add;
 
 public class TypeConverter {
 
@@ -273,6 +259,7 @@ public class TypeConverter {
                     .nullSafe(toMessage(resolved.getName()), (b, v) -> b.setName(v))
                     .nullSafe(toMessage(resolved.getDisplayName()), (b, v) -> b.setDisplayName(v))
                     .nullSafe(toMessage(resolved.getDescription()), (b, v) -> b.setDescription(v))
+                    .nullSafe(toMessage(resolved.getEmailAddress()), (b, v) -> b.setEmailAddress(v))
                     .unwrap();
         }
 
@@ -379,28 +366,100 @@ public class TypeConverter {
         return assignment;
     }
 
-    private static ObjectReferenceType toRealValue(PrismContext prismContext, ReferenceMessage message) {
+    private static Class<? extends Containerable> toObjectClass(QName type) {
+        // TODO midpoint has utility method for this converting?
+        if (type == ObjectType.COMPLEX_TYPE) {
+            return ObjectType.class;
+        }
+        if (type == FocusType.COMPLEX_TYPE) {
+            return FocusType.class;
+        }
+        if (type == AssignmentHolderType.COMPLEX_TYPE) {
+            return AssignmentHolderType.class;
+        }
+        if (type == UserType.COMPLEX_TYPE) {
+            return UserType.class;
+        }
+        if (type == AbstractRoleType.COMPLEX_TYPE) {
+            return AbstractRoleType.class;
+        }
+        if (type == RoleType.COMPLEX_TYPE) {
+            return RoleType.class;
+        }
+        if (type == OrgType.COMPLEX_TYPE) {
+            return OrgType.class;
+        }
+        if (type == ServiceType.COMPLEX_TYPE) {
+            return ServiceType.class;
+        }
+        // TODO add more type converter
+
+        return ObjectType.class;
+    }
+
+    public static SearchFilterType toEqFilter(PrismContext prismContext, QName type, QName findKey, PolyStringMessage message) {
+        Class<? extends Containerable> queryClass = toObjectClass(type);
+
+        ObjectFilter filter = QueryBuilder.queryFor(queryClass, prismContext)
+                .item(findKey)
+                .eqPoly(message.getOrig())
+                .matchingOrig()
+                .build()
+                .getFilter();
+
+        try {
+            return prismContext.getQueryConverter().createSearchFilterType(filter);
+        } catch (SchemaException e) {
+            StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                    .withCause(e)
+                    .withDescription("invalid_filter")
+                    .asRuntimeException();
+            throw exception;
+        }
+    }
+
+    public static SearchFilterType toEqFilter(PrismContext prismContext, QName type, QName findKey, String message, QName matchingRule) {
+        Class<? extends Containerable> queryClass = toObjectClass(type);
+
+        ObjectFilter filter = QueryBuilder.queryFor(queryClass, prismContext)
+                .item(findKey)
+                .eq(message)
+                .matching(matchingRule)
+                .build()
+                .getFilter();
+
+        try {
+            return prismContext.getQueryConverter().createSearchFilterType(filter);
+        } catch (SchemaException e) {
+            StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                    .withCause(e)
+                    .withDescription("invalid_filter")
+                    .asRuntimeException();
+            throw exception;
+        }
+    }
+
+    public static ObjectReferenceType toRealValue(PrismContext prismContext, ReferenceMessage message) {
         ObjectReferenceType ref = new ObjectReferenceType();
 
-        // Find the target by name or oid
-        if (message.hasName()) {
-            ObjectFilter filter = QueryBuilder.queryFor(ObjectType.class, prismContext)
-                    .item(ObjectType.F_NAME)
-                    .eqPoly(message.getName().getOrig())
-                    .build()
-                    .getFilter();
+        if (message.hasType()) {
+            ref.setType(toRealValue(message.getType()));
+        } else if (message.getTypeWrapperCase() == ReferenceMessage.TypeWrapperCase.OBJECT_TYPE) {
+            ref.setType(toRealValue(message.getObjectType()));
+        } else {
+            StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                    .withDescription("invalid_relation")
+                    .asRuntimeException();
+            throw exception;
+        }
 
-            SearchFilterType searchFilterType = null;
-            try {
-                searchFilterType = prismContext.getQueryConverter().createSearchFilterType(filter);
-            } catch (SchemaException e) {
-                StatusRuntimeException exception = Status.INVALID_ARGUMENT
-                        .withCause(e)
-                        .withDescription("invalid_filter")
-                        .asRuntimeException();
-                throw exception;
-            }
-            ref.setFilter(searchFilterType);
+        QName type = ref.getType();
+
+        // Find the target by name, emailAddress or oid
+        if (message.hasName()) {
+            ref.setFilter(toEqFilter(prismContext, type, ObjectType.F_NAME, message.getName()));
+        } else if (!message.getEmailAddress().isEmpty()) {
+            ref.setFilter(toEqFilter(prismContext, type, FocusType.F_EMAIL_ADDRESS, message.getEmailAddress(), PrismConstants.STRING_IGNORE_CASE_MATCHING_RULE_NAME));
         } else if (!message.getOid().isEmpty()) {
             ref.setOid(message.getOid());
         } else {
@@ -414,17 +473,6 @@ public class TypeConverter {
         } else {
             // Use default relation if missing relation
             ref.setRelation(prismContext.getDefaultRelation());
-        }
-
-        if (message.hasType()) {
-            ref.setType(toRealValue(message.getType()));
-        } else if (message.getTypeWrapperCase() == ReferenceMessage.TypeWrapperCase.OBJECT_TYPE) {
-            ref.setType(toRealValue(message.getObjectType()));
-        } else {
-            StatusRuntimeException exception = Status.INVALID_ARGUMENT
-                    .withDescription("invalid_relation")
-                    .asRuntimeException();
-            throw exception;
         }
 
         return ref;
