@@ -32,7 +32,7 @@ public class TestAddClient {
         AddUserRequest request = AddUserRequest.newBuilder()
                 .setProfile(
                         UserTypeMessage.newBuilder()
-                                .setName(PolyStringMessage.newBuilder().setOrig("foo"))
+                                .setName(PolyStringMessage.newBuilder().setOrig("fooa"))
                                 .addAssignment(
                                         AssignmentMessage.newBuilder()
                                                 .setTargetRef(
@@ -52,6 +52,14 @@ public class TestAddClient {
                                                                         ).build()
                                                                 )
                                                                 .build()
+                                                )
+                                )
+                                .addAssignment(
+                                        AssignmentMessage.newBuilder()
+                                                .setTargetRef(
+                                                        ReferenceMessage.newBuilder()
+                                                                .setOid("00000000-0000-0000-0000-00000000000c")
+                                                                .setObjectType(DefaultObjectType.ROLE_TYPE)
                                                 )
                                 )
                                 .putExtension("singleString",
