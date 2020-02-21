@@ -213,10 +213,18 @@ message ModifyProfileRequest {
 }
 
 message UserItemDelta {
-    UserItemPath name = 1;
-    string valuesToAdd = 4;
-    string valuesToReplace = 5;
-    string valuesToDelete = 6;
+    oneof path_wrapper {
+        string path = 1;
+        ItemPathMessage item_path = 2;
+        DefaultUserTypePath user_type_path = 3;
+    }
+    string valuesToAdd = 20;
+    string valuesToReplace = 21;
+    string valuesToDelete = 22;
+}
+
+message ItemPathMessage {
+    repeated QNameMessage path = 1;
 }
 
 enum DefaultObjectType {
@@ -241,7 +249,7 @@ enum DefaultRelationType {
     ORG_CONSENT = 6;
 }
 
-enum UserItemPath {
+enum DefaultUserTypePath {
     // ObjectType
     F_NAME = 0;
     F_DESCRIPTION = 1;
@@ -319,7 +327,7 @@ message SingleMessage {
 }
 
 message Message {
-    oneof arg {
+    oneof message_wrapper {
          SingleMessage single = 3;
          MessageList list = 4;
          string string = 5;

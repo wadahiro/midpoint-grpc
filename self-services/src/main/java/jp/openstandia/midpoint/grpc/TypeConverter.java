@@ -7,6 +7,7 @@ import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.prism.query.ObjectFilter;
 import com.evolveum.midpoint.repo.api.RepositoryService;
+import com.evolveum.midpoint.schema.SchemaConstantsGenerated;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import com.evolveum.midpoint.schema.util.ObjectTypeUtil;
 import com.evolveum.midpoint.util.LocalizableMessage;
@@ -31,7 +32,7 @@ import java.util.stream.Collectors;
 
 public class TypeConverter {
 
-    private static Map<UserItemPath, ItemName> userTypeMap = new HashMap<>();
+    private static Map<DefaultUserTypePath, ItemName> userTypeMap = new HashMap<>();
     private static Map<ItemName, Class> userValueTypeMap = new HashMap<>();
 
     static {
@@ -43,7 +44,7 @@ public class TypeConverter {
                 .forEach(x -> {
                     String name = x.getName();
                     try {
-                        UserItemPath path = UserItemPath.valueOf(name);
+                        DefaultUserTypePath path = DefaultUserTypePath.valueOf(name);
                         ItemName itemName = (ItemName) x.get(null);
                         userTypeMap.put(path, itemName);
                         strToItemName.put(itemName.getLocalPart(), itemName);
@@ -79,7 +80,7 @@ public class TypeConverter {
                 });
     }
 
-    public static ItemName toItemName(UserItemPath path) {
+    public static ItemName toItemName(DefaultUserTypePath path) {
         ItemName itemName = userTypeMap.get(path);
         if (itemName == null) {
             throw new UnsupportedOperationException(path + " is not supported");
@@ -87,19 +88,22 @@ public class TypeConverter {
         return itemName;
     }
 
-    public static Object toValue(UserItemPath path, String value) {
-        ItemName itemName = toItemName(path);
-
-        Class clazz = userValueTypeMap.get(itemName);
-
+    public static Object toRealValue(String value, Class clazz) {
         if (clazz.isAssignableFrom(String.class)) {
             return value;
         }
-        if (clazz.isAssignableFrom(PolyStringType.class)) {
+        if (clazz.isAssignableFrom(PolyString.class)) {
             return PolyString.fromOrig((String) value);
         }
+        if (clazz.isAssignableFrom(Integer.class)) {
+            return Integer.parseInt(value);
+        }
+        if (clazz.isAssignableFrom(Long.class)) {
+            return Long.parseLong(value);
+        }
+        // TODO more type
 
-        throw new UnsupportedOperationException(path + " is not supported");
+        throw new UnsupportedOperationException(clazz + " is not supported");
     }
 
     public static PolicyError toPolicyError(PolicyViolationException e) {
@@ -761,4 +765,12 @@ public class TypeConverter {
         }
         extBuilder.addValue(entryValueBuilder);
     }
+
+    public static ItemPath toRealValue(ItemPathMessage itemPath) {
+        List<QName> qnames = itemPath.getPathList().stream()
+                .map(x -> toRealValue(x))
+                .collect(Collectors.toList());
+        return ItemPath.create(qnames);
+    }
+
 }

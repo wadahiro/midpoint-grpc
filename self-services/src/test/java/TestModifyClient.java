@@ -7,7 +7,7 @@ import jp.openstandia.midpoint.grpc.*;
 import java.io.UnsupportedEncodingException;
 import java.util.Base64;
 
-public class TestBasicAuthClient {
+public class TestModifyClient {
 
     public static void main(String[] args) throws UnsupportedEncodingException {
         ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", 6565)
@@ -20,19 +20,28 @@ public class TestBasicAuthClient {
 
         Metadata headers = new Metadata();
         headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
-        headers.put(Constant.SwitchToPrincipalByNameMetadataKey, "test");
+//        headers.put(Constant.SwitchToPrincipalByNameMetadataKey, "test");
 
         stub = MetadataUtils.attachHeaders(stub, headers);
 
         ModifyProfileRequest request = ModifyProfileRequest.newBuilder()
                 .addModifications(
                         UserItemDelta.newBuilder()
-                                .setUserTypePath(DefaultUserTypePath.F_FAMILY_NAME)
-                                .setValuesToReplace("Foo")
-                        .build()
+//                                .setUserTypePath(DefaultUserTypePath.F_FAMILY_NAME)
+//                                .setPath("singleString")
+//                                .setPath("familyName")
+                                .setItemPath(
+                                        ItemPathMessage.newBuilder()
+                                                .addPath(QNameMessage.newBuilder().setLocalPart("extension"))
+                                                .addPath(QNameMessage.newBuilder().setLocalPart("singleString"))
+                                )
+                                .setValuesToAdd("foobar")
                 )
                 .build();
 
-        stub.modifyProfile(request);
+        ModifyProfileResponse response = stub.modifyProfile(request);
+
+        System.out.println(response);
+
     }
 }

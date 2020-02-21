@@ -5,10 +5,7 @@ import com.evolveum.midpoint.model.api.ModelInteractionService;
 import com.evolveum.midpoint.model.api.ModelService;
 import com.evolveum.midpoint.model.impl.ModelCrudService;
 import com.evolveum.midpoint.model.impl.util.ModelImplUtils;
-import com.evolveum.midpoint.prism.Containerable;
-import com.evolveum.midpoint.prism.PrismContext;
-import com.evolveum.midpoint.prism.PrismObject;
-import com.evolveum.midpoint.prism.PrismObjectDefinition;
+import com.evolveum.midpoint.prism.*;
 import com.evolveum.midpoint.prism.crypto.EncryptionException;
 import com.evolveum.midpoint.prism.crypto.Protector;
 import com.evolveum.midpoint.prism.delta.ItemDelta;
@@ -279,28 +276,56 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             try {
                 Collection<ObjectDelta<? extends ObjectType>> modifications = new ArrayList<>();
 
+                PrismContainerDefinition<UserType> definition = prismContext.getSchemaRegistry()
+                        .findContainerDefinitionByCompileTimeClass(UserType.class);
+
                 S_ItemEntry i = prismContext.deltaFor(UserType.class);
 
                 // https://wiki.evolveum.com/display/midPoint/Using+Prism+Deltas
                 for (UserItemDelta m : request.getModificationsList()) {
-                    UserItemPath path = m.getName();
+                    ItemPath path;
+                    if (m.hasItemPath()) {
+                        path = TypeConverter.toRealValue(m.getItemPath());
 
-                    ItemName itemName = TypeConverter.toItemName(path);
-                    S_ValuesEntry v = i.item(itemName);
+                    } else if (m.getPathWrapperCase() == UserItemDelta.PathWrapperCase.PATH) {
+                        path = ItemPath.create(m.getPath());
+
+                    } else if (m.getPathWrapperCase() == UserItemDelta.PathWrapperCase.USER_TYPE_PATH) {
+                        path = TypeConverter.toItemName(m.getUserTypePath());
+
+                    } else {
+                        StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                                .withDescription("invalid_path")
+                                .asRuntimeException();
+                        throw exception;
+                    }
+
+                    ItemDefinition itemDef = definition.findItemDefinition(path);
+                    if (itemDef == null) {
+                        StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                                .withDescription("invalid_path")
+                                .asRuntimeException();
+                        throw exception;
+                    }
+
+                    Class itemClass = itemDef.getTypeClass();
+
+                    S_ValuesEntry v = i.item(path);
 
                     S_ItemEntry entry = null;
                     if (!m.getValuesToAdd().isEmpty()) {
-                        S_MaybeDelete av = v.add(TypeConverter.toValue(path, m.getValuesToAdd()));
+                        S_MaybeDelete av = v.add(TypeConverter.toRealValue(m.getValuesToAdd(), itemClass));
 
                         if (!m.getValuesToDelete().isEmpty()) {
-                            entry = av.delete(TypeConverter.toValue(path, m.getValuesToDelete()));
+                            entry = av.delete(TypeConverter.toRealValue(m.getValuesToDelete(), itemClass));
+                        } else {
+                            entry = av;
                         }
-
                     } else if (!m.getValuesToReplace().isEmpty()) {
-                        entry = v.replace(TypeConverter.toValue(path, m.getValuesToReplace()));
+                        entry = v.replace(TypeConverter.toRealValue(m.getValuesToReplace(), itemClass));
 
                     } else if (!m.getValuesToDelete().isEmpty()) {
-                        entry = v.delete(TypeConverter.toValue(path, m.getValuesToDelete()));
+                        entry = v.delete(TypeConverter.toRealValue(m.getValuesToDelete(), itemClass));
                     }
 
                     if (entry == null) {
