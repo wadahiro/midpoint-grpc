@@ -1,15 +1,9 @@
-import com.evolveum.midpoint.schema.constants.RelationTypes;
-import com.evolveum.midpoint.schema.constants.SchemaConstants;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.RoleType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import jp.openstandia.midpoint.grpc.*;
 
-import javax.management.relation.RelationType;
-import javax.management.relation.Role;
 import java.io.UnsupportedEncodingException;
 import java.util.Base64;
 

@@ -1,15 +1,12 @@
 package jp.openstandia.midpoint.grpc;
 
-import com.google.protobuf.Descriptors;
 import io.grpc.*;
-import io.grpc.protobuf.ProtoUtils;
 import io.grpc.stub.MetadataUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import java.io.UnsupportedEncodingException;
 import java.util.Base64;
 import java.util.List;
 

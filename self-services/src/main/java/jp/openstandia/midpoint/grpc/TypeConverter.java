@@ -5,11 +5,13 @@ import com.evolveum.midpoint.prism.impl.query.builder.QueryBuilder;
 import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.polystring.PolyString;
-import com.evolveum.midpoint.prism.query.ObjectFilter;
+import com.evolveum.midpoint.prism.query.*;
+import com.evolveum.midpoint.prism.query.builder.S_AtomicFilterExit;
+import com.evolveum.midpoint.prism.query.builder.S_FilterEntry;
+import com.evolveum.midpoint.prism.query.builder.S_FilterEntryOrEmpty;
+import com.evolveum.midpoint.prism.query.builder.S_MatchingRuleEntry;
 import com.evolveum.midpoint.repo.api.RepositoryService;
-import com.evolveum.midpoint.schema.SchemaConstantsGenerated;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
-import com.evolveum.midpoint.schema.util.ObjectTypeUtil;
 import com.evolveum.midpoint.util.LocalizableMessage;
 import com.evolveum.midpoint.util.LocalizableMessageList;
 import com.evolveum.midpoint.util.SingleLocalizableMessage;
@@ -401,6 +403,203 @@ public class TypeConverter {
         return ObjectType.class;
     }
 
+    public static ObjectQuery toObjectQuery(PrismContext prismContext, Class<? extends Containerable> queryClass,
+                                            QueryMessage message) {
+        S_FilterEntryOrEmpty builder = QueryBuilder.queryFor(queryClass, prismContext);
+        S_AtomicFilterExit exitFilter = toObjectFilter(builder, message.getFilter());
+
+        if (exitFilter != null) {
+            ObjectQuery query = exitFilter.build();
+            query.setPaging(toMessage(prismContext, message.getPaging()));
+            return query;
+        }
+
+        return null;
+    }
+
+    public static ObjectPaging toMessage(PrismContext prismContext, PagingMessage message) {
+        ObjectPaging paging = prismContext.queryFactory().createPaging();
+        paging.setOffset(message.getOffset());
+        if (message.getMaxSize() != 0) {
+            paging.setMaxSize(message.getMaxSize());
+        }
+        paging.setOrdering(toObjectOrdering(prismContext, message.getOrderingList()));
+        return paging;
+    }
+
+    public static Collection<? extends ObjectOrdering> toObjectOrdering(PrismContext prismContext, List<ObjectOrderingMessage> message) {
+        return message.stream().map(x -> {
+            OrderDirection direction = toRealValue(x.getOrderDirection());
+            String orderBy = x.getOrderBy();
+            ItemPath itemPath = ItemPath.create(orderBy);
+
+            return prismContext.queryFactory().createOrdering(itemPath, direction);
+        }).collect(Collectors.toList());
+    }
+
+    private static OrderDirection toRealValue(OrderDirectionType message) {
+        switch (message) {
+            case ASCEDING:
+                return OrderDirection.ASCENDING;
+            case DESCENDING:
+                return OrderDirection.DESCENDING;
+        }
+        return OrderDirection.ASCENDING;
+    }
+
+    public static S_AtomicFilterExit toObjectFilter(S_FilterEntryOrEmpty builder, ObjectFilterMessage message) {
+        if (message.hasAnd()) {
+            return toAndQuery(builder, message.getAnd());
+        } else if (message.hasOr()) {
+            return toOrQuery(builder, message.getOr());
+
+        } else if (message.hasEq()) {
+            return toEqFilter(builder, message.getEq());
+        } else if (message.hasStartsWith()) {
+            return toStartsWithFilter(builder, message.getStartsWith());
+        } else if (message.hasContains()) {
+            return toContainsFilter(builder, message.getContains());
+        } else if (message.hasEndsWith()) {
+            return toEndsWithFilter(builder, message.getEndsWith());
+
+        } else if (message.hasEqPolyString()) {
+            return toEqPolyFilter(builder, message.getEqPolyString());
+        } else if (message.hasStartsWithPolyString()) {
+            return toStartsWithPolyFilter(builder, message.getStartsWithPolyString());
+        } else if (message.hasContainsPolyString()) {
+            return toContainsPolyFilter(builder, message.getContainsPolyString());
+        } else if (message.hasEndsWithPolyString()) {
+            return toEndsWithPolyFilter(builder, message.getEndsWithPolyString());
+        }
+        return null;
+    }
+
+    public static S_AtomicFilterExit toObjectFilter(S_FilterEntry builder, ObjectFilterMessage message) {
+        if (message.hasAnd()) {
+            return toAndQuery(builder, message.getAnd());
+        } else if (message.hasOr()) {
+            return toOrQuery(builder, message.getOr());
+        }
+
+        if (builder instanceof S_FilterEntryOrEmpty) {
+            return toObjectFilter((S_FilterEntryOrEmpty) builder, message);
+        }
+
+        return null;
+    }
+
+    public static S_AtomicFilterExit toEqFilter(S_FilterEntryOrEmpty builder, FilterEntryMessage message) {
+        S_MatchingRuleEntry filter = builder.item(message.getFullPath())
+                .eq(message.getValue());
+
+        if (message.hasMatchingRule()) {
+            return filter.matching(toRealValue(message.getMatchingRule()));
+        }
+        return filter;
+    }
+
+    public static S_AtomicFilterExit toStartsWithFilter(S_FilterEntryOrEmpty builder, FilterEntryMessage message) {
+        S_MatchingRuleEntry filter = builder.item(message.getFullPath())
+                .startsWith(message.getValue());
+
+        if (message.hasMatchingRule()) {
+            return filter.matching(toRealValue(message.getMatchingRule()));
+        }
+        return filter;
+    }
+
+    private static S_AtomicFilterExit toContainsFilter(S_FilterEntryOrEmpty builder, FilterEntryMessage message) {
+        S_MatchingRuleEntry filter = builder.item(message.getFullPath())
+                .contains(message.getValue());
+
+        if (message.hasMatchingRule()) {
+            return filter.matching(toRealValue(message.getMatchingRule()));
+        }
+        return filter;
+    }
+
+    public static S_AtomicFilterExit toEndsWithFilter(S_FilterEntryOrEmpty builder, FilterEntryMessage message) {
+        S_MatchingRuleEntry filter = builder.item(message.getFullPath())
+                .endsWith(message.getValue());
+
+        if (message.hasMatchingRule()) {
+            return filter.matching(toRealValue(message.getMatchingRule()));
+        }
+        return filter;
+    }
+
+    public static S_AtomicFilterExit toEqPolyFilter(S_FilterEntryOrEmpty builder, FilterEntryMessage message) {
+        S_MatchingRuleEntry filter = builder.item(message.getFullPath())
+                .eqPoly(message.getValue());
+
+        if (message.hasMatchingRule()) {
+            return filter.matching(toRealValue(message.getMatchingRule()));
+        }
+        return filter;
+    }
+
+    public static S_AtomicFilterExit toStartsWithPolyFilter(S_FilterEntryOrEmpty builder, FilterEntryMessage message) {
+        S_MatchingRuleEntry filter = builder.item(message.getFullPath())
+                .startsWithPoly(message.getValue());
+
+        if (message.hasMatchingRule()) {
+            return filter.matching(toRealValue(message.getMatchingRule()));
+        }
+        return filter;
+    }
+
+    private static S_AtomicFilterExit toContainsPolyFilter(S_FilterEntryOrEmpty builder, FilterEntryMessage message) {
+        S_MatchingRuleEntry filter = builder.item(message.getFullPath())
+                .containsPoly(message.getValue());
+
+        if (message.hasMatchingRule()) {
+            return filter.matching(toRealValue(message.getMatchingRule()));
+        }
+        return filter;
+    }
+
+    public static S_AtomicFilterExit toEndsWithPolyFilter(S_FilterEntryOrEmpty builder, FilterEntryMessage message) {
+        S_MatchingRuleEntry filter = builder.item(message.getFullPath())
+                .endsWithPoly(message.getValue());
+
+        if (message.hasMatchingRule()) {
+            return filter.matching(toRealValue(message.getMatchingRule()));
+        }
+        return filter;
+    }
+
+    public static S_AtomicFilterExit toAndQuery(S_FilterEntry builder, AndFilterMessage message) {
+        List<ObjectFilterMessage> list = message.getConditionsList();
+
+        for (int i = 0; i < list.size(); i++) {
+            ObjectFilterMessage filter = list.get(i);
+            S_AtomicFilterExit f = toObjectFilter(builder, filter);
+
+            if (i < list.size() - 1) {
+                builder = f.and();
+            } else {
+                return f;
+            }
+        }
+        return null;
+    }
+
+    public static S_AtomicFilterExit toOrQuery(S_FilterEntry builder, OrFilterMessage message) {
+        List<ObjectFilterMessage> list = message.getConditionsList();
+
+        for (int i = 0; i < list.size(); i++) {
+            ObjectFilterMessage filter = list.get(i);
+            S_AtomicFilterExit f = toObjectFilter(builder, filter);
+
+            if (i < list.size() - 1) {
+                builder = f.or();
+            } else {
+                return f;
+            }
+        }
+        return null;
+    }
+
     public static SearchFilterType toEqFilter(PrismContext prismContext, QName type, QName findKey, PolyStringMessage message) {
         Class<? extends Containerable> queryClass = toObjectClass(type);
 
@@ -690,8 +889,7 @@ public class TypeConverter {
     }
 
 
-    public static UserTypeMessage toMessage(PrismObject<UserType> user) {
-        UserType u = user.getRealValue();
+    public static UserTypeMessage toMessage(UserType u) {
         return BuilderWrapper.wrap(UserTypeMessage.newBuilder())
                 // ObjectType
                 .nullSafe(toMessage(u.getName()), (b, v) -> b.setName(v))
@@ -720,7 +918,58 @@ public class TypeConverter {
                 .nullSafe(toMessage(u.getOrganization()), (b, v) -> b.addAllOrganization(v))
                 .nullSafe(toMessage(u.getOrganizationalUnit()), (b, v) -> b.addAllOrganizationalUnit(v))
                 // Extension
-                .nullSafe(toExtensionMessageMap(user), (b, v) -> b.putAllExtension(v))
+                .nullSafe(toExtensionMessageMap(u.asPrismObject()), (b, v) -> b.putAllExtension(v))
+                .unwrap()
+                .build();
+    }
+
+    public static RoleTypeMessage toMessage(RoleType u) {
+        return BuilderWrapper.wrap(RoleTypeMessage.newBuilder())
+                // ObjectType
+                .nullSafe(toMessage(u.getName()), (b, v) -> b.setName(v))
+                .nullSafe(u.getDescription(), (b, v) -> b.setDescription(v))
+                .nullSafe(u.getSubtype(), (b, v) -> b.addAllSubtype(v))
+                .nullSafe(u.getLifecycleState(), (b, v) -> b.setLifecycleState(v))
+                // FocusType
+                .nullSafe(toMessage(u.getJpegPhoto()), (b, v) -> b.setJpegPhoto(v))
+                .nullSafe(u.getCostCenter(), (b, v) -> b.setCostCenter(v))
+                .nullSafe(toMessage(u.getLocality()), (b, v) -> b.setLocality(v))
+                .nullSafe(u.getPreferredLanguage(), (b, v) -> b.setPreferredLanguage(v))
+                .nullSafe(u.getLocale(), (b, v) -> b.setLocale(v))
+                .nullSafe(u.getTimezone(), (b, v) -> b.setTimezone(v))
+                .nullSafe(u.getEmailAddress(), (b, v) -> b.setEmailAddress(v))
+                .nullSafe(u.getTelephoneNumber(), (b, v) -> b.setTelephoneNumber(v))
+                // RoleType
+                .nullSafe(u.getRoleType(), (b, v) -> b.setRoleType(v))
+                // Extension
+                .nullSafe(toExtensionMessageMap(u.asPrismObject()), (b, v) -> b.putAllExtension(v))
+                .unwrap()
+                .build();
+    }
+
+    public static OrgTypeMessage toMessage(OrgType u) {
+        return BuilderWrapper.wrap(OrgTypeMessage.newBuilder())
+                // ObjectType
+                .nullSafe(toMessage(u.getName()), (b, v) -> b.setName(v))
+                .nullSafe(u.getDescription(), (b, v) -> b.setDescription(v))
+                .nullSafe(u.getSubtype(), (b, v) -> b.addAllSubtype(v))
+                .nullSafe(u.getLifecycleState(), (b, v) -> b.setLifecycleState(v))
+                // FocusType
+                .nullSafe(toMessage(u.getJpegPhoto()), (b, v) -> b.setJpegPhoto(v))
+                .nullSafe(u.getCostCenter(), (b, v) -> b.setCostCenter(v))
+                .nullSafe(toMessage(u.getLocality()), (b, v) -> b.setLocality(v))
+                .nullSafe(u.getPreferredLanguage(), (b, v) -> b.setPreferredLanguage(v))
+                .nullSafe(u.getLocale(), (b, v) -> b.setLocale(v))
+                .nullSafe(u.getTimezone(), (b, v) -> b.setTimezone(v))
+                .nullSafe(u.getEmailAddress(), (b, v) -> b.setEmailAddress(v))
+                .nullSafe(u.getTelephoneNumber(), (b, v) -> b.setTelephoneNumber(v))
+                // OrgType
+                .nullSafe(u.getOrgType(), (b, v) -> b.addAllOrgType(v))
+                .nullSafe(u.isTenant(), (b, v) -> b.setTenant(v))
+                .nullSafe(u.getMailDomain(), (b, v) -> b.addAllMailDomain(v))
+                .nullSafe(u.getDisplayOrder(), (b, v) -> b.setDisplayOrder(v))
+                // Extension
+                .nullSafe(toExtensionMessageMap(u.asPrismObject()), (b, v) -> b.putAllExtension(v))
                 .unwrap()
                 .build();
     }
@@ -772,5 +1021,4 @@ public class TypeConverter {
                 .collect(Collectors.toList());
         return ItemPath.create(qnames);
     }
-
 }

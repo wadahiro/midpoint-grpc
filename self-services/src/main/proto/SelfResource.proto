@@ -47,7 +47,17 @@ service SelfServiceResource {
     /**
      * Search users.
      */
-    rpc searchUsers(SearchUsersRequest) returns (SearchUsersResponse);
+    rpc searchUsers(SearchRequest) returns (SearchUsersResponse);
+
+    /**
+     * Search roles.
+     */
+    rpc searchRoles(SearchRequest) returns (SearchRolesResponse);
+
+    /**
+     * Search orgs.
+     */
+    rpc searchOrgs(SearchRequest) returns (SearchOrgsResponse);
 }
 
 message GetSelfRequest {
@@ -162,6 +172,104 @@ message UserTypeMessage {
     repeated PolyStringMessage organization = 60;
     // organizational unit.
     repeated PolyStringMessage organizationalUnit = 61;
+
+    // extension. the key is "localPart" format of the QName.
+    map<string, ExtensionMessage> extension = 100;
+}
+
+message RoleTypeMessage {
+    // ObjectType
+
+    // name.
+    PolyStringMessage name = 1;
+    // description
+    string description = 2;
+    // subtype
+    repeated string subtype = 3;
+    // lifecycleState
+    string lifecycleState = 4;
+
+    // AssignmentHolderType
+
+    // assignment
+    repeated AssignmentMessage assignment = 10;
+    // archetypeRef
+    repeated ReferenceMessage archetype_ref = 11;
+
+    // FocusType
+    BytesMessage jpegPhoto = 20;
+    // cost center.
+    string costCenter = 21;
+    // locality.
+    PolyStringMessage locality = 22;
+    // preferredLanguage.
+    string preferredLanguage = 23;
+    // locale.
+    string locale = 24;
+    // timezone.
+    string timezone = 25;
+    // email address.
+    string emailAddress = 26;
+    // telephone number.
+    string telephoneNumber = 27;
+
+    // RoleType
+
+    // role type.
+    string roleType = 50;
+
+    // extension. the key is "localPart" format of the QName.
+    map<string, ExtensionMessage> extension = 100;
+}
+
+message OrgTypeMessage {
+    // ObjectType
+
+    // name.
+    PolyStringMessage name = 1;
+    // description
+    string description = 2;
+    // subtype
+    repeated string subtype = 3;
+    // lifecycleState
+    string lifecycleState = 4;
+
+    // AssignmentHolderType
+
+    // assignment
+    repeated AssignmentMessage assignment = 10;
+    // archetypeRef
+    repeated ReferenceMessage archetype_ref = 11;
+
+    // FocusType
+    BytesMessage jpegPhoto = 20;
+    // cost center.
+    string costCenter = 21;
+    // locality.
+    PolyStringMessage locality = 22;
+    // preferredLanguage.
+    string preferredLanguage = 23;
+    // locale.
+    string locale = 24;
+    // timezone.
+    string timezone = 25;
+    // email address.
+    string emailAddress = 26;
+    // telephone number.
+    string telephoneNumber = 27;
+
+    // OrgType
+
+    // org type.
+    repeated string orgType = 50;
+    // Is tenant.
+    bool tenant = 51;
+    // mail domain.
+    repeated string mail_domain = 52;
+    // display order.
+    int32 display_order = 53;
+    // security policy reference.
+    //ReferenceMessage security_policy_ref = 54;
 
     // extension. the key is "localPart" format of the QName.
     map<string, ExtensionMessage> extension = 100;
@@ -351,7 +459,7 @@ message AddUserResponse {
     string oid = 1;
 }
 
-message SearchUsersRequest {
+message SearchRequest {
     QueryMessage query = 1;
     repeated string options = 2;
     repeated string include = 3;
@@ -360,50 +468,75 @@ message SearchUsersRequest {
 }
 
 message SearchUsersResponse {
-    repeated UserTypeMessage users = 1;
+    repeated UserTypeMessage results = 1;
+    int32 number_of_all_results = 2;
+}
+
+message SearchRolesResponse {
+    repeated RoleTypeMessage results = 1;
+    int32 number_of_all_results = 2;
+}
+
+message SearchOrgsResponse {
+    repeated OrgTypeMessage results = 1;
+    int32 number_of_all_results = 2;
 }
 
 message QueryMessage {
     PagingMessage paging = 1;
-    ObjectFilter filter = 2;
+    ObjectFilterMessage filter = 2;
 }
 
 message PagingMessage {
     int32 offset = 1;
-    int32 max_size = 2;
+    int32 maxSize = 2;
+    repeated ObjectOrderingMessage ordering = 3;
 }
 
-message ObjectFilter {
+enum OrderDirectionType {
+    ASCEDING = 0;
+    DESCENDING = 1;
+}
+
+message ObjectOrderingMessage {
+    string order_by = 1;
+    OrderDirectionType orderDirection = 2;
+}
+
+message ObjectFilterMessage {
     oneof filter {
         AndFilterMessage and = 1;
         OrFilterMessage or = 2;
         NotFilterMessage not = 3;
-        EqualFilterMessage eq = 4;
-        SubStringFilterMessage sub_string = 5;
+        FilterEntryMessage eq = 4;
+        FilterEntryMessage starts_with = 5;
+        FilterEntryMessage contains = 6;
+        FilterEntryMessage ends_with = 7;
+
+        // PolyString
+
+        FilterEntryMessage eq_poly_string = 10;
+        FilterEntryMessage starts_with_poly_string = 11;
+        FilterEntryMessage contains_poly_string = 12;
+        FilterEntryMessage ends_with_poly_string = 13;
     }
 }
 
 message AndFilterMessage {
-    repeated ObjectFilter conditions = 1;
+    repeated ObjectFilterMessage conditions = 1;
 }
 
 message OrFilterMessage {
-    repeated ObjectFilter conditions = 1;
+    repeated ObjectFilterMessage conditions = 1;
 }
 
 message NotFilterMessage {
-    repeated ObjectFilter filter = 1;
+    repeated ObjectFilterMessage filter = 1;
 }
 
-message EqualFilterMessage {
+message FilterEntryMessage {
     string full_path = 1;
-    string matching_rule = 2;
-    string value = 3;
-}
-
-message SubStringFilterMessage {
-    string full_path = 1;
-    string matching_rule = 2;
+    QNameMessage matching_rule = 2;
     string value = 3;
 }
 

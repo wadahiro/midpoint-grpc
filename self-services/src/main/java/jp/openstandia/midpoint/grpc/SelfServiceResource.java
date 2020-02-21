@@ -14,14 +14,11 @@ import com.evolveum.midpoint.prism.delta.PropertyDelta;
 import com.evolveum.midpoint.prism.delta.builder.S_ItemEntry;
 import com.evolveum.midpoint.prism.delta.builder.S_MaybeDelete;
 import com.evolveum.midpoint.prism.delta.builder.S_ValuesEntry;
-import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
 import com.evolveum.midpoint.prism.schema.SchemaRegistry;
 import com.evolveum.midpoint.repo.api.RepositoryService;
-import com.evolveum.midpoint.schema.GetOperationOptions;
-import com.evolveum.midpoint.schema.SchemaConstantsGenerated;
-import com.evolveum.midpoint.schema.SelectorOptions;
+import com.evolveum.midpoint.schema.*;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.task.api.Task;
 import com.evolveum.midpoint.util.exception.*;
@@ -124,7 +121,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         });
 
         GetSelfResponse res = GetSelfResponse.newBuilder()
-                .setProfile(toMessage(self))
+                .setProfile(toMessage(self.asObjectable()))
                 .build();
 
         responseObserver.onNext(res);
@@ -489,6 +486,96 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         } finally {
             updateResult.computeStatusIfUnknown();
         }
+    }
+
+    private <T extends ObjectType> SearchResultList<PrismObject<T>> search(SearchRequest request, Class<T> clazz) {
+        SearchResultList<PrismObject<T>> result = runTask(ctx -> {
+            Task task = ctx.task;
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_SELF);
+
+            List<String> options = request.getOptionsList();
+            List<String> include = request.getIncludeList();
+            List<String> exclude = request.getExcludeList();
+            List<String> resolveNames = request.getResolveNamesList();
+
+            try {
+                Collection<SelectorOptions<GetOperationOptions>> searchOptions = GetOperationOptions.fromRestOptions(options, include,
+                        exclude, resolveNames, DefinitionProcessingOption.FULL, prismContext);
+
+                ObjectQuery query = TypeConverter.toObjectQuery(prismContext, clazz, request.getQuery());
+
+                SearchResultList<PrismObject<T>> foundObjects = modelService.searchObjects(clazz, query, searchOptions,
+                        task, parentResult);
+
+                parentResult.recordSuccessIfUnknown();
+                return foundObjects;
+            } finally {
+                parentResult.computeStatusIfUnknown();
+            }
+        });
+        return result;
+    }
+
+    @Override
+    public void searchUsers(SearchRequest request, StreamObserver<SearchUsersResponse> responseObserver) {
+        LOGGER.debug("Start searchUsers");
+
+        SearchResultList<PrismObject<UserType>> result = search(request, UserType.class);
+
+        // TODO get count
+//        Integer count = result.getMetadata().getApproxNumberOfAllResults();
+        List<UserTypeMessage> users = result.stream().map(x -> toMessage(x.asObjectable())).collect(Collectors.toList());
+
+        SearchUsersResponse res = SearchUsersResponse.newBuilder()
+//                .setNumberOfAllResults(count)
+                .addAllResults(users)
+                .build();
+
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End searchUsers");
+    }
+
+    @Override
+    public void searchRoles(SearchRequest request, StreamObserver<SearchRolesResponse> responseObserver) {
+        LOGGER.debug("Start searchRols");
+
+        SearchResultList<PrismObject<RoleType>> result = search(request, RoleType.class);
+
+//        Integer count = result.getMetadata().getApproxNumberOfAllResults();
+        List<RoleTypeMessage> users = result.stream().map(x -> toMessage(x.asObjectable())).collect(Collectors.toList());
+
+        SearchRolesResponse res = SearchRolesResponse.newBuilder()
+//                .setNumberOfAllResults(count)
+                .addAllResults(users)
+                .build();
+
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End searchRols");
+    }
+
+    @Override
+    public void searchOrgs(SearchRequest request, StreamObserver<SearchOrgsResponse> responseObserver) {
+        LOGGER.debug("Start searchOrgs");
+
+        SearchResultList<PrismObject<OrgType>> result = search(request, OrgType.class);
+
+//        Integer count = result.getMetadata().getApproxNumberOfAllResults();
+        List<OrgTypeMessage> orgs = result.stream().map(x -> toMessage(x.asObjectable())).collect(Collectors.toList());
+
+        SearchOrgsResponse res = SearchOrgsResponse.newBuilder()
+//                .setNumberOfAllResults(count)
+                .addAllResults(orgs)
+                .build();
+
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End searchOrgs");
     }
 
     private <T> List<PrismObject<UserType>> findUsers(QName propertyName, T email, QName matchingRule,
