@@ -73,6 +73,7 @@ message ExtensionValue {
         PolyStringMessage poly_string = 2;
         IntegerMessage integer = 3;
         LongMessage long = 4;
+        ReferenceMessage ref = 5;
     }
 }
 
@@ -162,7 +163,7 @@ message UserTypeMessage {
     // organizational unit.
     repeated PolyStringMessage organizationalUnit = 61;
 
-    // extension. the key is "prefix:localPart" format of the QName.
+    // extension. the key is "localPart" format of the QName.
     map<string, ExtensionMessage> extension = 100;
 }
 
@@ -179,6 +180,8 @@ message AssignmentMessage {
     oneof org_ref_holder {
         ReferenceMessage org_ref = 2;
     }
+    // extension. the key is "prefix:localPart" format of the QName.
+    map<string, ExtensionMessage> extension = 3;
 }
 
 message ReferenceMessage {

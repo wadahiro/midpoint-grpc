@@ -5,6 +5,7 @@ import com.evolveum.midpoint.prism.impl.query.builder.QueryBuilder;
 import com.evolveum.midpoint.prism.match.MatchingRule;
 import com.evolveum.midpoint.prism.match.MatchingRuleRegistry;
 import com.evolveum.midpoint.prism.path.ItemName;
+import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.prism.query.FilterCreationUtil;
 import com.evolveum.midpoint.prism.query.FilterUtil;
@@ -38,6 +39,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.evolveum.midpoint.schema.constants.SchemaConstants.NS_MODEL_EXTENSION;
+import static com.sun.tools.xjc.reader.Ring.add;
 
 public class TypeConverter {
 
@@ -275,16 +277,16 @@ public class TypeConverter {
         return builder.build();
     }
 
-    public static <T> List<T> toRealValue(Class<T> toClass, List<?> message) {
-        return message.stream().map(x -> toRealValue(toClass, x)).collect(Collectors.toList());
+    public static <T> List<T> toRealValue(PrismContext prismContext, Class<T> toClass, List<?> message) {
+        return message.stream().map(x -> toRealValue(prismContext, toClass, x)).collect(Collectors.toList());
     }
 
-    public static <T> T toRealValue(Class<T> toClass, Object message) {
+    public static <T> T toRealValue(PrismContext prismContext, Class<T> toClass, Object message) {
         if (message instanceof String) {
             return toRealValue((String) message);
         }
         if (message instanceof ExtensionValue) {
-            return toRealValue((ExtensionValue) message);
+            return toRealValue(prismContext, (ExtensionValue) message);
         }
         if (message instanceof PolyStringMessage) {
             return toRealValue((PolyStringMessage) message);
@@ -317,7 +319,7 @@ public class TypeConverter {
         return (T) new PolyStringType(new PolyString(message.getOrig(), message.getNorm()));
     }
 
-    public static <T> T toRealValue(ExtensionValue message) {
+    public static <T> T toRealValue(PrismContext prismContext, ExtensionValue message) {
         if (message.hasInteger()) {
             return (T) toRealValue(message.getInteger());
         }
@@ -326,6 +328,9 @@ public class TypeConverter {
         }
         if (message.hasPolyString()) {
             return (T) toRealValue(message.getPolyString());
+        }
+        if (message.hasRef()) {
+            return (T) toRealValue(prismContext, message.getRef());
         }
         // string case
         return (T) message.getString();
@@ -352,17 +357,30 @@ public class TypeConverter {
                 .collect(Collectors.toList());
     }
 
-    public static AssignmentType toRealValue(PrismContext prismContext, AssignmentMessage x) {
+    public static AssignmentType toRealValue(PrismContext prismContext, AssignmentMessage message) {
         AssignmentType assignment = new AssignmentType();
-            assignment.setTargetRef(toRealValue(prismContext, x.getTargetRef()));
-            if (x.hasOrgRef()) {
-                assignment.setOrgRef(toRealValue(prismContext, x.getOrgRef()));
+        assignment.setTargetRef(toRealValue(prismContext, message.getTargetRef()));
+        if (message.hasOrgRef()) {
+            assignment.setOrgRef(toRealValue(prismContext, message.getOrgRef()));
+        }
+        if (!message.getExtensionMap().isEmpty()) {
+            try {
+                addExtensionType(prismContext, assignment.asPrismContainerValue(), message.getExtensionMap());
+            } catch (SchemaException e) {
+                StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                        .withCause(e)
+                        .withDescription("invalid_assignment_extension")
+                        .asRuntimeException();
+                throw exception;
             }
-            return assignment;
+        }
+        return assignment;
     }
 
-    private static ObjectReferenceType toRealValue(PrismContext prismContext, ReferenceMessage message)  {
+    private static ObjectReferenceType toRealValue(PrismContext prismContext, ReferenceMessage message) {
         ObjectReferenceType ref = new ObjectReferenceType();
+
+        // Find the target by name or oid
         if (message.hasName()) {
             ObjectFilter filter = QueryBuilder.queryFor(ObjectType.class, prismContext)
                     .item(ObjectType.F_NAME)
@@ -381,12 +399,13 @@ public class TypeConverter {
                 throw exception;
             }
             ref.setFilter(searchFilterType);
-            ref.setType(toRealValue(message.getType()));
         } else if (!message.getOid().isEmpty()) {
             ref.setOid(message.getOid());
         } else {
             return null;
         }
+
+        ref.setType(toRealValue(message.getType()));
         ref.setRelation(toRealValue(message.getRelation()));
         return ref;
     }
@@ -410,18 +429,18 @@ public class TypeConverter {
 //        return null;
 //    }
 
-    private static QName toRealValue(QNameMessage relation) {
-        if (relation.getNamespaceURI().isEmpty()) {
+    private static QName toRealValue(QNameMessage message) {
+        if (message.getNamespaceURI().isEmpty() && message.getLocalPart().isEmpty()) {
             return SchemaConstants.ORG_DEFAULT;
         }
 
-        QName q;
-        if (relation.getLocalPart().isEmpty()) {
-            q = new QName(relation.getNamespaceURI(), relation.getLocalPart());
-        } else {
-            q = new QName(relation.getNamespaceURI(), relation.getLocalPart(), relation.getPrefix());
+        if (message.getNamespaceURI().isEmpty()) {
+            return new QName(message.getLocalPart());
         }
-        return q;
+        if (message.getPrefix().isEmpty()) {
+            return new QName(message.getNamespaceURI(), message.getLocalPart());
+        }
+        return new QName(message.getNamespaceURI(), message.getLocalPart(), message.getPrefix());
     }
 
     public static boolean isEmpty(PolyStringMessage message) {
@@ -431,51 +450,89 @@ public class TypeConverter {
         return false;
     }
 
-    public static <O extends Objectable> ExtensionType toExtensionType(PrismContext prismContext, Class<O> compileTimeClass, Map<String, ExtensionMessage> map) throws SchemaException {
+    public static void addExtensionType(PrismContext prismContext, ObjectType object, Map<String, ExtensionMessage> map) throws SchemaException {
         if (map.isEmpty()) {
-            return null;
+            return;
         }
 
-        PrismContainerDefinition<ExtensionType> extDef = prismContext.getSchemaRegistry()
-                .findObjectDefinitionByCompileTimeClass(compileTimeClass)
-                .findContainerDefinition(TaskType.F_EXTENSION);
-        PrismContainer<ExtensionType> ext = extDef.instantiate();
+        addExtensionType(prismContext, object.asPrismObject(), map);
+    }
+
+    public static void addExtensionType(PrismContext prismContext, PrismObject object, Map<String, ExtensionMessage> map) throws SchemaException {
+        if (map.isEmpty()) {
+            return;
+        }
+
+        PrismContainer extension = object.findOrCreateContainer(ObjectType.F_EXTENSION);
+        addExtensionType(prismContext, extension, map);
+    }
+
+    public static void addExtensionType(PrismContext prismContext, PrismContainerValue object, Map<String, ExtensionMessage> map) throws SchemaException {
+        if (map.isEmpty()) {
+            return;
+        }
+
+        PrismContainer extension = object.findOrCreateContainer(ObjectType.F_EXTENSION);
+        addExtensionType(prismContext, extension, map);
+    }
+
+    public static void addExtensionType(PrismContext prismContext, PrismContainer extension, Map<String, ExtensionMessage> map) throws SchemaException {
+        if (map.isEmpty()) {
+            return;
+        }
 
         for (Map.Entry<String, ExtensionMessage> entry : map.entrySet()) {
             String k = entry.getKey();
             ExtensionMessage v = entry.getValue();
 
-            ItemName itemName = new ItemName(v.getNamespaceURI(), k);
-            PrismPropertyDefinition<Object> definition = extDef.findItemDefinition(itemName);
-            if (definition == null) {
-                throw new SchemaException("Cannot find definition for extension. namespaceURI: " + v.getNamespaceURI() + ", localPart: " + k);
+            QName qname = toRealValue(v, k);
+
+            List<Object> realValue = null;
+            if (!v.getValueList().isEmpty()) {
+                List<ExtensionValue> ev = v.getValueList();
+                realValue = toRealValue(prismContext, Object.class, ev);
             }
 
-            PrismProperty<Object> property = definition.instantiate();
+            if (realValue == null || realValue.isEmpty()) {
+                continue;
+            }
 
-            if (property.isSingleValue()) {
-                if (!v.getIsSingleValue()) {
-                    throw new SchemaException("Cannot set as multiple value. namespaceURI: " + v.getNamespaceURI() + ", localPart: " + k);
+            Object o = realValue.get(0);
+
+            if (o instanceof ObjectReferenceType) {
+                PrismReference reference = extension.findOrCreateReference(ItemPath.create(qname));
+
+                if (reference.isSingleValue()) {
+                    reference.add(((ObjectReferenceType) o).asReferenceValue());
+                } else {
+                    for (Object val : realValue) {
+                        reference.add(((ObjectReferenceType) val).asReferenceValue());
+                    }
                 }
-                if (!v.getValueList().isEmpty()) {
-                    ExtensionValue ev = v.getValueList().get(0);
-                    Object realValue = toRealValue(ev);
-                    property.setRealValue(realValue);
-                }
+
             } else {
-                if (v.getIsSingleValue()) {
-                    throw new SchemaException("Cannot set as single value. namespaceURI: " + v.getNamespaceURI() + ", localPart: " + k);
-                }
-                if (!v.getValueList().isEmpty()) {
-                    List<ExtensionValue> ev = v.getValueList();
-                    Object realValue = toRealValue(Object.class, ev);
+                PrismProperty property = extension.findOrCreateProperty(ItemPath.create(qname));
+
+                if (property.isSingleValue()) {
+                    if (!v.getIsSingleValue()) {
+                        throw new SchemaException("Cannot set as multiple value. namespaceURI: " + v.getNamespaceURI() + ", localPart: " + k);
+                    }
+                    property.setRealValue(o);
+                } else {
+                    if (v.getIsSingleValue()) {
+                        throw new SchemaException("Cannot set as single value. namespaceURI: " + v.getNamespaceURI() + ", localPart: " + k);
+                    }
                     property.setRealValue(realValue);
                 }
             }
-            ext.add(property);
         }
+    }
 
-        return ext.getRealValue();
+    public static QName toRealValue(ExtensionMessage message, String localPart) {
+        if (message.getNamespaceURI().isEmpty()) {
+            return new QName(localPart);
+        }
+        return new QName(message.getNamespaceURI(), localPart);
     }
 
     public static PrismObject<UserType> toPrismObject(PrismContext prismContext, RepositoryService repo, UserTypeMessage message) throws SchemaException {
@@ -484,7 +541,7 @@ public class TypeConverter {
         // ObjectType
         user.setName(toRealValue(message.getName()));
         user.setDescription(toRealValue(message.getDescription()));
-        user.createSubtypeList().addAll(toRealValue(String.class, message.getSubtypeList()));
+        user.createSubtypeList().addAll(toRealValue(prismContext, String.class, message.getSubtypeList()));
         user.setLifecycleState(toRealValue(message.getLifecycleState()));
 
         // AssignmentHolderType
@@ -511,13 +568,11 @@ public class TypeConverter {
         user.setHonorificSuffix(toRealValue(message.getHonorificSuffix()));
         user.setTitle(toRealValue(message.getTitle()));
         user.setEmployeeNumber(toRealValue(message.getEmployeeNumber()));
-        user.createOrganizationList().addAll(toRealValue(PolyStringType.class, message.getOrganizationList()));
-        user.createOrganizationalUnitList().addAll(toRealValue(PolyStringType.class, message.getOrganizationalUnitList()));
+        user.createOrganizationList().addAll(toRealValue(prismContext, PolyStringType.class, message.getOrganizationList()));
+        user.createOrganizationalUnitList().addAll(toRealValue(prismContext, PolyStringType.class, message.getOrganizationalUnitList()));
 
         // Extension
-        user.setExtension(toExtensionType(prismContext, UserType.class, message.getExtensionMap()));
-
-        PrismObject<UserType> object = user.asPrismObject();
+        addExtensionType(prismContext, user, message.getExtensionMap());
 
         return user.asPrismObject();
     }
