@@ -35,8 +35,8 @@ public class TestSearchUserClient {
 //                                                )
                                                 .setContains(
                                                         FilterEntryMessage.newBuilder()
-                                                                .setFullPath("name")
-                                                                .setValue("foo")
+                                                                .setFullPath("extension/singleString")
+                                                                .setValue("foobar")
                                                 )
                                 )
                 )

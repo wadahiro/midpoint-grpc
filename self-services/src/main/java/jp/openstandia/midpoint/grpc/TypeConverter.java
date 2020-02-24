@@ -488,8 +488,16 @@ public class TypeConverter {
         return null;
     }
 
+    public static ItemPath toItemPath(FilterEntryMessage message) {
+        return toItemPath(message.getFullPath());
+    }
+
+    public static ItemPath toItemPath(String message) {
+        return ItemPath.create(message.split("/"));
+    }
+
     public static S_AtomicFilterExit toEqFilter(S_FilterEntryOrEmpty builder, FilterEntryMessage message) {
-        S_MatchingRuleEntry filter = builder.item(message.getFullPath())
+        S_MatchingRuleEntry filter = builder.item(toItemPath(message))
                 .eq(message.getValue());
 
         if (message.hasMatchingRule()) {
@@ -499,7 +507,7 @@ public class TypeConverter {
     }
 
     public static S_AtomicFilterExit toStartsWithFilter(S_FilterEntryOrEmpty builder, FilterEntryMessage message) {
-        S_MatchingRuleEntry filter = builder.item(message.getFullPath())
+        S_MatchingRuleEntry filter = builder.item(toItemPath(message))
                 .startsWith(message.getValue());
 
         if (message.hasMatchingRule()) {
@@ -509,7 +517,7 @@ public class TypeConverter {
     }
 
     private static S_AtomicFilterExit toContainsFilter(S_FilterEntryOrEmpty builder, FilterEntryMessage message) {
-        S_MatchingRuleEntry filter = builder.item(message.getFullPath())
+        S_MatchingRuleEntry filter = builder.item(toItemPath(message))
                 .contains(message.getValue());
 
         if (message.hasMatchingRule()) {
@@ -519,7 +527,7 @@ public class TypeConverter {
     }
 
     public static S_AtomicFilterExit toEndsWithFilter(S_FilterEntryOrEmpty builder, FilterEntryMessage message) {
-        S_MatchingRuleEntry filter = builder.item(message.getFullPath())
+        S_MatchingRuleEntry filter = builder.item(toItemPath(message))
                 .endsWith(message.getValue());
 
         if (message.hasMatchingRule()) {
@@ -529,7 +537,7 @@ public class TypeConverter {
     }
 
     public static S_AtomicFilterExit toEqPolyFilter(S_FilterEntryOrEmpty builder, FilterEntryMessage message) {
-        S_MatchingRuleEntry filter = builder.item(message.getFullPath())
+        S_MatchingRuleEntry filter = builder.item(toItemPath(message))
                 .eqPoly(message.getValue());
 
         if (message.hasMatchingRule()) {
@@ -539,7 +547,7 @@ public class TypeConverter {
     }
 
     public static S_AtomicFilterExit toStartsWithPolyFilter(S_FilterEntryOrEmpty builder, FilterEntryMessage message) {
-        S_MatchingRuleEntry filter = builder.item(message.getFullPath())
+        S_MatchingRuleEntry filter = builder.item(toItemPath(message))
                 .startsWithPoly(message.getValue());
 
         if (message.hasMatchingRule()) {
@@ -549,7 +557,7 @@ public class TypeConverter {
     }
 
     private static S_AtomicFilterExit toContainsPolyFilter(S_FilterEntryOrEmpty builder, FilterEntryMessage message) {
-        S_MatchingRuleEntry filter = builder.item(message.getFullPath())
+        S_MatchingRuleEntry filter = builder.item(toItemPath(message))
                 .containsPoly(message.getValue());
 
         if (message.hasMatchingRule()) {
@@ -559,7 +567,7 @@ public class TypeConverter {
     }
 
     public static S_AtomicFilterExit toEndsWithPolyFilter(S_FilterEntryOrEmpty builder, FilterEntryMessage message) {
-        S_MatchingRuleEntry filter = builder.item(message.getFullPath())
+        S_MatchingRuleEntry filter = builder.item(toItemPath(message))
                 .endsWithPoly(message.getValue());
 
         if (message.hasMatchingRule()) {
