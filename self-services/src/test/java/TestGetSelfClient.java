@@ -7,7 +7,7 @@ import jp.openstandia.midpoint.grpc.*;
 import java.io.UnsupportedEncodingException;
 import java.util.Base64;
 
-public class TestBasicAuthClient {
+public class TestGetSelfClient {
 
     public static void main(String[] args) throws UnsupportedEncodingException {
         ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", 6565)
@@ -24,15 +24,13 @@ public class TestBasicAuthClient {
 
         stub = MetadataUtils.attachHeaders(stub, headers);
 
-        ModifyProfileRequest request = ModifyProfileRequest.newBuilder()
-                .addModifications(
-                        UserItemDelta.newBuilder()
-                                .setUserTypePath(DefaultUserTypePath.F_FAMILY_NAME)
-                                .setValuesToReplace("Foo")
-                        .build()
-                )
+        GetSelfRequest req = GetSelfRequest.newBuilder()
+                .addInclude("jpegPhoto")
                 .build();
 
-        stub.modifyProfile(request);
+        GetSelfResponse self = stub.getSelf(req);
+
+        UserTypeMessage profile = self.getProfile();
+        System.out.println(profile);
     }
 }

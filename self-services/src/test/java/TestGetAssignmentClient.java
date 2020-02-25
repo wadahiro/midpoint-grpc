@@ -6,8 +6,9 @@ import jp.openstandia.midpoint.grpc.*;
 
 import java.io.UnsupportedEncodingException;
 import java.util.Base64;
+import java.util.List;
 
-public class TestBasicAuthClient {
+public class TestGetAssignmentClient {
 
     public static void main(String[] args) throws UnsupportedEncodingException {
         ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", 6565)
@@ -24,15 +25,13 @@ public class TestBasicAuthClient {
 
         stub = MetadataUtils.attachHeaders(stub, headers);
 
-        ModifyProfileRequest request = ModifyProfileRequest.newBuilder()
-                .addModifications(
-                        UserItemDelta.newBuilder()
-                                .setUserTypePath(DefaultUserTypePath.F_FAMILY_NAME)
-                                .setValuesToReplace("Foo")
-                        .build()
-                )
+        GetSelfAssignmentRequest req = GetSelfAssignmentRequest.newBuilder()
+                .setIncludeOrgRefDetail(true)
                 .build();
 
-        stub.modifyProfile(request);
+        GetSelfAssignmentResponse self = stub.getSelfAssignment(req);
+
+        List<AssignmentMessage> assignments = self.getAssignmentList();
+        System.out.println(assignments);
     }
 }

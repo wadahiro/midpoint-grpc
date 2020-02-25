@@ -12,12 +12,12 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 
 import java.io.UnsupportedEncodingException;
-import java.util.Base64;
 import java.util.Map;
 
 import static org.springframework.http.HttpMethod.POST;
 
 public class TestJWTAuthClient {
+
     public static void main(String[] args) throws UnsupportedEncodingException {
         ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", 6565)
                 .usePlaintext()
@@ -37,7 +37,7 @@ public class TestJWTAuthClient {
         ModifyProfileRequest request = ModifyProfileRequest.newBuilder()
                 .addModifications(
                         UserItemDelta.newBuilder()
-                                .setName(UserItemPath.F_FAMILY_NAME)
+                                .setUserTypePath(DefaultUserTypePath.F_FAMILY_NAME)
                                 .setValuesToReplace("Bar")
                         .build()
                 )

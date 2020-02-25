@@ -1,15 +1,12 @@
 package jp.openstandia.midpoint.grpc;
 
-import com.google.protobuf.Descriptors;
 import io.grpc.*;
-import io.grpc.protobuf.ProtoUtils;
 import io.grpc.stub.MetadataUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import java.io.UnsupportedEncodingException;
 import java.util.Base64;
 import java.util.List;
 
@@ -32,6 +29,27 @@ class SelfServiceResourceITest {
     }
 
     @Test
+    void getSelf() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        GetSelfRequest request = GetSelfRequest.newBuilder()
+                .build();
+
+        GetSelfResponse response = stub.getSelf(request);
+        UserTypeMessage user  = response.getProfile();
+
+        assertEquals("Administrator", user.getFamilyName().getOrig());
+        assertEquals("administrator", user.getFamilyName().getNorm());
+    }
+
+    @Test
     void modifyProfile() throws Exception {
         SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
 
@@ -46,7 +64,7 @@ class SelfServiceResourceITest {
         ModifyProfileRequest request = ModifyProfileRequest.newBuilder()
                 .addModifications(
                         UserItemDelta.newBuilder()
-                                .setName(UserItemPath.F_FAMILY_NAME)
+                                .setUserTypePath(DefaultUserTypePath.F_ADDITIONAL_NAME)
                                 .setValuesToReplace("Foo")
                                 .build()
                 )
@@ -202,5 +220,26 @@ class SelfServiceResourceITest {
 
     @Test
     void requestRole() {
+    }
+
+    @Test
+    void addUser() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        AddUserRequest request = AddUserRequest.newBuilder()
+                .setProfile(UserTypeMessage.newBuilder()
+                .setName(PolyStringMessage.newBuilder().setOrig("foo")))
+                .build();
+
+        AddUserResponse response = stub.addUser(request);
+
+        assertNotNull(response.getOid());
     }
 }

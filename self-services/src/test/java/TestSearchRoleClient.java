@@ -2,12 +2,15 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
-import jp.openstandia.midpoint.grpc.*;
+import jp.openstandia.midpoint.grpc.Constant;
+import jp.openstandia.midpoint.grpc.SearchRequest;
+import jp.openstandia.midpoint.grpc.SearchRolesResponse;
+import jp.openstandia.midpoint.grpc.SelfServiceResourceGrpc;
 
 import java.io.UnsupportedEncodingException;
 import java.util.Base64;
 
-public class TestBasicAuthClient {
+public class TestSearchRoleClient {
 
     public static void main(String[] args) throws UnsupportedEncodingException {
         ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", 6565)
@@ -20,19 +23,14 @@ public class TestBasicAuthClient {
 
         Metadata headers = new Metadata();
         headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
-        headers.put(Constant.SwitchToPrincipalByNameMetadataKey, "test");
 
         stub = MetadataUtils.attachHeaders(stub, headers);
 
-        ModifyProfileRequest request = ModifyProfileRequest.newBuilder()
-                .addModifications(
-                        UserItemDelta.newBuilder()
-                                .setUserTypePath(DefaultUserTypePath.F_FAMILY_NAME)
-                                .setValuesToReplace("Foo")
-                        .build()
-                )
+        SearchRequest req = SearchRequest.newBuilder()
                 .build();
 
-        stub.modifyProfile(request);
+        SearchRolesResponse res = stub.searchRoles(req);
+
+        System.out.println(res);
     }
 }
