@@ -20,7 +20,7 @@
     </licenses>
 
     <properties>
-        <version.midpoint>4.0.1</version.midpoint>
+        <version.midpoint>4.0.2</version.midpoint>
         <version.spring-boot>2.1.8.RELEASE</version.spring-boot>
         <version.grpc-java>1.25.0</version.grpc-java>
         <version.protoc>3.10.0</version.protoc>

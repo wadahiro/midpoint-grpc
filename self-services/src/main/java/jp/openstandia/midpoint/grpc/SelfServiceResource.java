@@ -1,13 +1,17 @@
 package jp.openstandia.midpoint.grpc;
 
+import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
 import com.evolveum.midpoint.model.api.ModelExecuteOptions;
 import com.evolveum.midpoint.model.api.ModelInteractionService;
 import com.evolveum.midpoint.model.api.ModelService;
+import com.evolveum.midpoint.model.api.TaskService;
+import com.evolveum.midpoint.model.api.context.ModelContext;
 import com.evolveum.midpoint.model.impl.ModelCrudService;
 import com.evolveum.midpoint.model.impl.util.ModelImplUtils;
 import com.evolveum.midpoint.prism.*;
 import com.evolveum.midpoint.prism.crypto.EncryptionException;
 import com.evolveum.midpoint.prism.crypto.Protector;
+import com.evolveum.midpoint.prism.delta.DeltaFactory;
 import com.evolveum.midpoint.prism.delta.ItemDelta;
 import com.evolveum.midpoint.prism.delta.ObjectDelta;
 import com.evolveum.midpoint.prism.delta.PropertyDelta;
@@ -16,17 +20,27 @@ import com.evolveum.midpoint.prism.delta.builder.S_MaybeDelete;
 import com.evolveum.midpoint.prism.delta.builder.S_ValuesEntry;
 import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
+import com.evolveum.midpoint.prism.query.QueryFactory;
 import com.evolveum.midpoint.prism.schema.SchemaRegistry;
 import com.evolveum.midpoint.repo.api.RepositoryService;
 import com.evolveum.midpoint.schema.*;
+import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import com.evolveum.midpoint.schema.result.OperationResult;
+import com.evolveum.midpoint.schema.util.LocalizationUtil;
 import com.evolveum.midpoint.task.api.Task;
+import com.evolveum.midpoint.task.api.TaskCategory;
+import com.evolveum.midpoint.util.LocalizableMessage;
+import com.evolveum.midpoint.util.LocalizableMessageList;
+import com.evolveum.midpoint.util.LocalizableMessageListBuilder;
 import com.evolveum.midpoint.util.exception.*;
 import com.evolveum.midpoint.util.logging.LoggingUtils;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
+import com.evolveum.prism.xml.ns._public.query_3.QueryType;
 import com.evolveum.prism.xml.ns._public.types_3.EvaluationTimeType;
+import com.evolveum.prism.xml.ns._public.types_3.ObjectDeltaType;
+import com.evolveum.prism.xml.ns._public.types_3.PolyStringType;
 import com.evolveum.prism.xml.ns._public.types_3.ProtectedStringType;
 import io.grpc.Metadata;
 import io.grpc.Status;
@@ -40,6 +54,7 @@ import javax.xml.namespace.QName;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.evolveum.midpoint.xml.ns._public.common.common_3.PartialProcessingTypeType.SKIP;
 import static jp.openstandia.midpoint.grpc.TypeConverter.toMessage;
 import static jp.openstandia.midpoint.grpc.TypeConverter.toPrismObject;
 
@@ -60,6 +75,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     public static final String OPERATION_EXECUTE_USER_UPDATE = CLASS_DOT + "executeUserUpdate";
     public static final String OPERATION_EXECUTE_CREDENTIAL_CHECK = CLASS_DOT + "executeCredentialCheck";
     public static final String OPERATION_EXECUTE_CREDENTIAL_UPDATE = CLASS_DOT + "executeCredentialUpdate";
+    public static final String OPERATION_REQUEST_ASSIGNMENTS = CLASS_DOT + "requestAssignments";
+
 
     @Autowired
     protected ModelService modelService;
@@ -73,6 +90,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     protected PrismContext prismContext;
     @Autowired
     protected Protector protector;
+    @Autowired
+    protected TaskService taskService;
 
     public static final Metadata.Key<PolicyError> PolicyErrorMetadataKey = ProtoUtils.keyForProto(PolicyError.getDefaultInstance());
 
@@ -267,7 +286,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
         runTask(ctx -> {
             Task task = ctx.task;
-            UserType user = ctx.principal.getUser();
+            UserType loggedInUser = ctx.principal.getUser();
 
             OperationResult updateResult = task.getResult().createSubresult(OPERATION_EXECUTE_USER_UPDATE);
             try {
@@ -336,7 +355,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
                 List<ItemDelta<?, ?>> deltas = i.asItemDeltas();
 
-                modelCrudService.modifyObject(UserType.class, user.getOid(), deltas, options, task, updateResult);
+                modelCrudService.modifyObject(UserType.class, loggedInUser.getOid(), deltas, options, task, updateResult);
 
                 updateResult.computeStatus();
             } finally {
@@ -384,12 +403,202 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         LOGGER.debug("End forceUpdateCredential");
     }
 
+    private void resolveReference(ObjectDelta delta, OperationResult result) {
+        try {
+            ModelImplUtils.resolveReferences(delta, repositoryService, false, false, EvaluationTimeType.IMPORT, true, prismContext, result);
+        } catch (SystemException e) {
+            StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                    .withDescription("invalid_reference")
+                    .asRuntimeException();
+            throw exception;
+        }
+    }
+
     @Override
-    public void requestRole(RequestRoleRequest request, StreamObserver<RequestRoleResponse> responseObserver) {
-        LOGGER.debug("Start requestRole");
+    public void requestAssignments(RequestAssignmentsRequest request, StreamObserver<RequestAssignmentsResponse> responseObserver) {
+        LOGGER.debug("Start requestAssignments");
 
+        String result = runTask(ctx -> {
+            Task task = ctx.task;
+            UserType loggedInUser = ctx.principal.getUser();
 
-        LOGGER.debug("End requestRole");
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_REQUEST_ASSIGNMENTS);
+
+            // TODO Support async mode
+            List<PrismContainerValue> assignmentTypes = request.getAssignmentsList().stream()
+                    .map(x -> TypeConverter.toRealValue(prismContext, x).asPrismContainerValue())
+                    .collect(Collectors.toList());
+
+            String taskOid = null;
+
+            // Self assignment
+            if (request.getOidsList().size() < 2) {
+                String targetOid;
+                if (request.getOidsList().isEmpty()) {
+                    targetOid = loggedInUser.getOid();
+                } else {
+                    targetOid = request.getOids(0);
+                }
+                ObjectDelta delta = prismContext.deltaFactory().object()
+                        .createModificationAddContainer(UserType.class, targetOid,
+                                FocusType.F_ASSIGNMENT, assignmentTypes.toArray(new PrismContainerValue[assignmentTypes.size()]));
+                resolveReference(delta, parentResult);
+
+                ModelExecuteOptions options = createOptions(request.getComment());
+                options.setInitialPartialProcessing(new PartialProcessingOptionsType().inbound(SKIP).projection(SKIP)); // TODO make this configurable?
+                modelCrudService.modifyObject(UserType.class, delta.getOid(), delta.getModifications(), options, task, parentResult);
+            } else {
+                // Assign to specified target users
+
+                // Do preview changes due to get the result of the policy check
+                LocalizableMessageListBuilder builder = new LocalizableMessageListBuilder();
+                for (String oid : request.getOidsList()) {
+                    ObjectDelta previewDelta = prismContext.deltaFactory().object()
+                            .createModificationAddContainer(UserType.class, oid,
+                                    FocusType.F_ASSIGNMENT,
+                                    assignmentTypes.stream()
+                                            .map(x -> x.clone())
+                                            .toArray(PrismContainerValue[]::new));
+                    resolveReference(previewDelta, parentResult);
+
+                    Collection<ObjectDelta<? extends ObjectType>> previewDeltas = new ArrayList<>();
+                    previewDeltas.add(previewDelta);
+
+                    ModelExecuteOptions options = createOptions(request.getComment());
+                    options.getOrCreatePartialProcessing().setApprovals(PartialProcessingTypeType.PROCESS);
+                    ModelContext<ObjectType> previewResult = modelInteraction.previewChanges(previewDeltas, options, task, parentResult);
+
+                    // Policy error check
+                    PolicyRuleEnforcerHookPreviewOutputType enforcements = previewResult.getHookPreviewResult(PolicyRuleEnforcerHookPreviewOutputType.class);
+                    List<EvaluatedPolicyRuleType> rule = enforcements.getRule();
+
+                    for (EvaluatedPolicyRuleType r : rule) {
+                        for (EvaluatedPolicyRuleTriggerType g : r.getTrigger()) {
+                            LocalizableMessage message = LocalizationUtil.toLocalizableMessage(g.getMessage());
+                            builder.addMessage(message);
+                        }
+                    }
+                }
+                LocalizableMessage allMessages = builder.separator(LocalizableMessageList.SEMICOLON)
+                        .buildOptimized();
+                if (!allMessages.isEmpty()) {
+                    throw new PolicyViolationException(allMessages);
+                }
+
+                // Now, submit a task to change all target user's assignments
+                ObjectDelta delta = prismContext.deltaFactory().object()
+                        .createModificationAddContainer(UserType.class, "fakeOid",
+                                FocusType.F_ASSIGNMENT,
+                                assignmentTypes.stream()
+                                        .map(x -> x.clone())
+                                        .toArray(PrismContainerValue[]::new));
+                resolveReference(delta, parentResult);
+
+                QueryFactory queryFactory = prismContext.queryFactory();
+                ObjectQuery query = queryFactory.createQuery(queryFactory.createInOid(request.getOidsList()));
+
+                // TODO Need to localize taskName?
+                TaskType reqTask = createSingleRecurrenceTask(loggedInUser, "Request assignments - " + UUID.randomUUID().toString(),
+                        UserType.COMPLEX_TYPE,
+                        query, delta, createOptions(request.getComment()), TaskCategory.EXECUTE_CHANGES);
+                taskOid = runTask(reqTask, task, parentResult);
+            }
+
+            parentResult.recordSuccess();
+            return taskOid;
+        });
+
+        RequestAssignmentsResponse.Builder builder = RequestAssignmentsResponse.newBuilder();
+        if (result != null) {
+            builder.setTaskOid(result);
+        }
+
+        responseObserver.onNext(builder.build());
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End requestAssignments");
+    }
+
+    protected TaskType createSingleRecurrenceTask(UserType owner, String taskName, QName applicableType, ObjectQuery query,
+                                                  ObjectDelta delta, ModelExecuteOptions options, String category) throws SchemaException {
+        TaskType task = new TaskType(prismContext);
+
+        ObjectReferenceType ownerRef = new ObjectReferenceType();
+        ownerRef.setOid(owner.getOid());
+        ownerRef.setType(owner.COMPLEX_TYPE);
+        task.setOwnerRef(ownerRef);
+
+        task.setBinding(TaskBindingType.LOOSE);
+        task.setCategory(category);
+        task.setExecutionStatus(TaskExecutionStatusType.RUNNABLE);
+        task.setRecurrence(TaskRecurrenceType.SINGLE);
+        task.setThreadStopAction(ThreadStopActionType.RESTART);
+        task.setHandlerUri(taskService.getHandlerUriForCategory(category));
+        ScheduleType schedule = new ScheduleType();
+        schedule.setMisfireAction(MisfireActionType.EXECUTE_IMMEDIATELY);
+        task.setSchedule(schedule);
+
+        task.setName(PolyStringType.fromOrig(taskName));
+
+        PrismObject<TaskType> prismTask = task.asPrismObject();
+        QueryType queryType = prismContext.getQueryConverter().createQueryType(query);
+        prismTask.findOrCreateProperty(SchemaConstants.PATH_MODEL_EXTENSION_OBJECT_QUERY).addRealValue(queryType);
+
+        if (applicableType != null) {
+            prismTask.findOrCreateProperty(SchemaConstants.PATH_MODEL_EXTENSION_OBJECT_TYPE).setRealValue(applicableType);
+        }
+
+        if (delta != null) {
+            ObjectDeltaType deltaBean = DeltaConvertor.toObjectDeltaType(delta);
+            prismTask.findOrCreateProperty(SchemaConstants.PATH_MODEL_EXTENSION_OBJECT_DELTA).setRealValue(deltaBean);
+        }
+
+        if (options != null) {
+            prismTask.findOrCreateProperty(SchemaConstants.PATH_MODEL_EXTENSION_EXECUTE_OPTIONS)
+                    .setRealValue(options.toModelExecutionOptionsType());
+        }
+        return task;
+    }
+
+    protected String runTask(TaskType taskToRun, Task operationalTask, OperationResult parentResult) {
+        try {
+            ObjectDelta<TaskType> delta = DeltaFactory.Object.createAddDelta(taskToRun.asPrismObject());
+            prismContext.adopt(delta);
+
+            Collection<ObjectDeltaOperation<? extends ObjectType>> results = modelService.executeChanges(WebComponentUtil.createDeltaCollection(delta), null,
+                    operationalTask, parentResult);
+
+            ObjectDeltaOperation<? extends ObjectType> result = results.iterator().next();
+            String taskOid = result.getObjectDelta().getOid();
+
+            parentResult.recordInProgress();
+            parentResult.setBackgroundTaskOid(taskOid);
+            return taskOid;
+
+        } catch (CommonException e) {
+            LoggingUtils.logUnexpectedException(LOGGER, "Couldn't run task " + e.getMessage(), e);
+            StatusRuntimeException exception = Status.INTERNAL
+                    .withDescription("Couldn't run task " + e.getMessage())
+                    .asRuntimeException();
+            throw exception;
+        }
+    }
+
+    private ModelExecuteOptions createOptions(String comment) {
+        OperationBusinessContextType businessContextType;
+        if (comment != null && !comment.isEmpty()) {
+            businessContextType = new OperationBusinessContextType();
+            businessContextType.setComment(comment);
+        } else {
+            businessContextType = null;
+        }
+        // ModelExecuteOptions options = ExecuteChangeOptionsDto.createFromSystemConfiguration().createOptions();
+        ModelExecuteOptions options = ModelExecuteOptions.fromRestOptions(Collections.EMPTY_LIST);
+        if (options == null) {
+            options = new ModelExecuteOptions();
+        }
+        options.setRequestBusinessContext(businessContextType);
+        return options;
     }
 
     @Override

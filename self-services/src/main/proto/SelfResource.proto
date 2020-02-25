@@ -35,9 +35,9 @@ service SelfServiceResource {
     rpc forceUpdateCredential(ForceUpdateCredentialRequest) returns (UpdateCredentialResponse);
 
     /**
-     * Request role.
+     * Request assignments.
      */
-    rpc requestRole(RequestRoleRequest) returns (RequestRoleResponse);
+    rpc requestAssignments(RequestAssignmentsRequest) returns (RequestAssignmentsResponse);
 
     /**
      * Add new user.
@@ -288,7 +288,7 @@ message AssignmentMessage {
     oneof org_ref_holder {
         ReferenceMessage org_ref = 2;
     }
-    // extension. the key is "prefix:localPart" format of the QName.
+    // extension. the key is "localPart" format of the QName.
     map<string, ExtensionMessage> extension = 3;
 }
 
@@ -407,26 +407,18 @@ message ForceUpdateCredentialRequest {
 message UpdateCredentialResponse {
 }
 
-message RequestRoleRequest {
-    // Assign requests.
-    repeated AssignRequest assignRequest = 2;
+message RequestAssignmentsRequest {
+    // Oid list of the users who want to be assigned.
+    repeated string oids = 1;
+    // Request assignments.
+    repeated AssignmentMessage assignments = 2;
+    // Comment
+    string comment = 3;
 }
 
-message AssignRequest {
-    // Oid of target user.
-    string assignTargetOid = 1;
-    // Oid of request role/organization/service.
-    string requestObjectOid = 2;
-    // Assign option
-    AssignOption option = 3;
-}
-
-message AssignOption {
-    // Oid of organization reference.
-    string orgRef = 1;
-}
-
-message RequestRoleResponse {
+message RequestAssignmentsResponse {
+    // If the request was executed as background task, the task's oid is set.
+    string task_oid = 1;
 }
 
 message SingleMessage {
