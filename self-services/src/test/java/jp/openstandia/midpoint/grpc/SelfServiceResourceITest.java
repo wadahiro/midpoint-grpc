@@ -64,7 +64,7 @@ class SelfServiceResourceITest {
         ModifyProfileRequest request = ModifyProfileRequest.newBuilder()
                 .addModifications(
                         UserItemDelta.newBuilder()
-                                .setUserTypePath(DefaultUserTypePath.F_FAMILY_NAME)
+                                .setUserTypePath(DefaultUserTypePath.F_ADDITIONAL_NAME)
                                 .setValuesToReplace("Foo")
                                 .build()
                 )

@@ -27,7 +27,7 @@ class TypeConverterTest {
         Object foo = TypeConverter.toRealValue("foo", String.class);
         assertEquals(String.class, foo.getClass());
 
-        Object hoge = TypeConverter.toRealValue("hoge", PolyStringType.class);
+        Object hoge = TypeConverter.toRealValue("hoge", PolyString.class);
         assertEquals(PolyString.class, hoge.getClass());
     }
 }
