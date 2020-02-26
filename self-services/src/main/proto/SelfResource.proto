@@ -507,6 +507,9 @@ message ObjectFilterMessage {
         AndFilterMessage and = 1;
         OrFilterMessage or = 2;
         NotFilterMessage not = 3;
+
+        // String
+
         FilterEntryMessage eq = 4;
         FilterEntryMessage starts_with = 5;
         FilterEntryMessage contains = 6;
@@ -530,7 +533,7 @@ message OrFilterMessage {
 }
 
 message NotFilterMessage {
-    repeated ObjectFilterMessage filter = 1;
+    ObjectFilterMessage filter = 1;
 }
 
 message FilterEntryMessage {

@@ -1,15 +1,13 @@
 package jp.openstandia.midpoint.grpc;
 
 import com.evolveum.midpoint.prism.*;
+import com.evolveum.midpoint.prism.impl.query.NotFilterImpl;
 import com.evolveum.midpoint.prism.impl.query.builder.QueryBuilder;
 import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.prism.query.*;
-import com.evolveum.midpoint.prism.query.builder.S_AtomicFilterExit;
-import com.evolveum.midpoint.prism.query.builder.S_FilterEntry;
-import com.evolveum.midpoint.prism.query.builder.S_FilterEntryOrEmpty;
-import com.evolveum.midpoint.prism.query.builder.S_MatchingRuleEntry;
+import com.evolveum.midpoint.prism.query.builder.*;
 import com.evolveum.midpoint.repo.api.RepositoryService;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import com.evolveum.midpoint.util.LocalizableMessage;
@@ -453,6 +451,8 @@ public class TypeConverter {
             return toAndQuery(builder, message.getAnd());
         } else if (message.hasOr()) {
             return toOrQuery(builder, message.getOr());
+        } else if (message.hasNot()) {
+            return toNotQuery(builder, message.getNot());
 
         } else if (message.hasEq()) {
             return toEqFilter(builder, message.getEq());
@@ -474,6 +474,7 @@ public class TypeConverter {
         }
         return null;
     }
+
 
     public static S_AtomicFilterExit toObjectFilter(S_FilterEntry builder, ObjectFilterMessage message) {
         if (message.hasAnd()) {
@@ -607,6 +608,13 @@ public class TypeConverter {
             }
         }
         return null;
+    }
+
+    public static S_AtomicFilterExit toNotQuery(S_FilterEntryOrEmpty builder, NotFilterMessage message) {
+        S_AtomicFilterEntry not = builder.not();
+        S_FilterEntryOrEmpty block = not.block();
+        S_AtomicFilterExit q = toObjectFilter(block, message.getFilter());
+        return q.endBlock();
     }
 
     public static SearchFilterType toEqFilter(PrismContext prismContext, QName type, QName findKey, PolyStringMessage message) {
