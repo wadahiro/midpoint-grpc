@@ -1,15 +1,13 @@
 package jp.openstandia.midpoint.grpc;
 
 import com.evolveum.midpoint.prism.*;
+import com.evolveum.midpoint.prism.impl.query.NotFilterImpl;
 import com.evolveum.midpoint.prism.impl.query.builder.QueryBuilder;
 import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.path.ItemPath;
 import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.prism.query.*;
-import com.evolveum.midpoint.prism.query.builder.S_AtomicFilterExit;
-import com.evolveum.midpoint.prism.query.builder.S_FilterEntry;
-import com.evolveum.midpoint.prism.query.builder.S_FilterEntryOrEmpty;
-import com.evolveum.midpoint.prism.query.builder.S_MatchingRuleEntry;
+import com.evolveum.midpoint.prism.query.builder.*;
 import com.evolveum.midpoint.repo.api.RepositoryService;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import com.evolveum.midpoint.util.LocalizableMessage;
@@ -360,6 +358,7 @@ public class TypeConverter {
         }
         if (!message.getExtensionMap().isEmpty()) {
             try {
+                prismContext.adopt(assignment);
                 addExtensionType(prismContext, assignment.asPrismContainerValue(), message.getExtensionMap());
             } catch (SchemaException e) {
                 StatusRuntimeException exception = Status.INVALID_ARGUMENT
@@ -452,6 +451,8 @@ public class TypeConverter {
             return toAndQuery(builder, message.getAnd());
         } else if (message.hasOr()) {
             return toOrQuery(builder, message.getOr());
+        } else if (message.hasNot()) {
+            return toNotQuery(builder, message.getNot());
 
         } else if (message.hasEq()) {
             return toEqFilter(builder, message.getEq());
@@ -473,6 +474,7 @@ public class TypeConverter {
         }
         return null;
     }
+
 
     public static S_AtomicFilterExit toObjectFilter(S_FilterEntry builder, ObjectFilterMessage message) {
         if (message.hasAnd()) {
@@ -606,6 +608,13 @@ public class TypeConverter {
             }
         }
         return null;
+    }
+
+    public static S_AtomicFilterExit toNotQuery(S_FilterEntryOrEmpty builder, NotFilterMessage message) {
+        S_AtomicFilterEntry not = builder.not();
+        S_FilterEntryOrEmpty block = not.block();
+        S_AtomicFilterExit q = toObjectFilter(block, message.getFilter());
+        return q.endBlock();
     }
 
     public static SearchFilterType toEqFilter(PrismContext prismContext, QName type, QName findKey, PolyStringMessage message) {
@@ -805,45 +814,51 @@ public class TypeConverter {
             ExtensionMessage v = entry.getValue();
 
             QName qname = toRealValue(v, k);
+            ItemPath path = ItemPath.create(qname);
 
-            List<Object> realValue = null;
-            if (!v.getValueList().isEmpty()) {
-                List<ExtensionValue> ev = v.getValueList();
-                realValue = toRealValue(prismContext, Object.class, ev);
+            // No value case
+            if (!v.hasSingle() && !v.hasMultiple()) {
+                throw new SchemaException("No value for " + qname);
             }
 
-            if (realValue == null || realValue.isEmpty()) {
-                continue;
+            ItemDefinition definition = extension.getDefinition().findItemDefinition(path);
+            if (definition == null) {
+                throw new SchemaException("No schema: " + qname);
             }
 
-            Object o = realValue.get(0);
-
-            if (o instanceof ObjectReferenceType) {
-                PrismReference reference = extension.findOrCreateReference(ItemPath.create(qname));
-
-                if (reference.isSingleValue()) {
-                    reference.add(((ObjectReferenceType) o).asReferenceValue());
-                } else {
-                    for (Object val : realValue) {
-                        reference.add(((ObjectReferenceType) val).asReferenceValue());
-                    }
+            if (definition.isSingleValue()) {
+                if (v.hasMultiple()) {
+                    throw new SchemaException("Multiple value is used for single value: " + qname);
                 }
-
+                addExtensionValue(prismContext, extension, definition, path, v.getSingle());
             } else {
-                PrismProperty property = extension.findOrCreateProperty(ItemPath.create(qname));
-
-                if (property.isSingleValue()) {
-                    if (!v.getIsSingleValue()) {
-                        throw new SchemaException("Cannot set as multiple value. namespaceURI: " + v.getNamespaceURI() + ", localPart: " + k);
-                    }
-                    property.setRealValue(o);
-                } else {
-                    if (v.getIsSingleValue()) {
-                        throw new SchemaException("Cannot set as single value. namespaceURI: " + v.getNamespaceURI() + ", localPart: " + k);
-                    }
-                    property.setRealValue(realValue);
+                if (v.hasSingle()) {
+                    throw new SchemaException("Single value is used for multiple value: " + qname);
                 }
+                addExtensionValue(prismContext, extension, definition, path, v.getMultiple());
             }
+        }
+    }
+
+    public static void addExtensionValue(PrismContext prismContext, PrismContainer extension, ItemDefinition definition, ItemPath path, ExtensionValueList values) throws SchemaException {
+        for (ExtensionValue value : values.getValuesList()) {
+            addExtensionValue(prismContext, extension, definition, path, value);
+        }
+    }
+
+    public static void addExtensionValue(PrismContext prismContext, PrismContainer extension, ItemDefinition definition, ItemPath path, ExtensionValue value) throws SchemaException {
+        // For ObjectReferenceType, we need to use PrismReference to hold it.
+        // For other types, we need to use PrismProperty to hold it.
+        if (definition.getTypeClass() == com.evolveum.prism.xml.ns._public.types_3.ObjectReferenceType.class) {
+            PrismReference reference = extension.findOrCreateReference(path);
+            Object o = toRealValue(prismContext, value);
+            if (!(o instanceof ObjectReferenceType)) {
+                throw new SchemaException("The value must be ObjectReferenceType but it's " + o.getClass());
+            }
+            reference.add(((ObjectReferenceType)o).asReferenceValue());
+        } else {
+            PrismProperty property = extension.findOrCreateProperty(path);
+            property.addRealValue(toRealValue(prismContext, value));
         }
     }
 
@@ -997,13 +1012,9 @@ public class TypeConverter {
             ExtensionMessage.Builder extBuilder = ExtensionMessage.newBuilder();
 
             if (item.isSingleValue()) {
-                extBuilder.setIsSingleValue(true);
                 addExtensionEntryValue(extBuilder, definition, item.getRealValue());
             } else {
-                extBuilder.setIsSingleValue(false);
-                for (Object val : item.getRealValues()) {
-                    addExtensionEntryValue(extBuilder, definition, val);
-                }
+                addExtensionEntryValue(extBuilder, definition, item.getRealValues());
             }
             // Currently, it doesn't use namespaceURI as the key
             String key = definition.getItemName().getLocalPart();
@@ -1013,14 +1024,27 @@ public class TypeConverter {
         return map;
     }
 
+    private static void addExtensionEntryValue(ExtensionMessage.Builder extBuilder, ItemDefinition definition, Collection<?> valuess) {
+        ExtensionValueList.Builder listBuilder = ExtensionValueList.newBuilder();
+        List<ExtensionValue> extensionValues = valuess.stream()
+                .map(x -> toMessage(definition, x)).collect(Collectors.toList());
+        listBuilder.addAllValues(extensionValues);
+        extBuilder.setMultiple(listBuilder);
+    }
+
     private static void addExtensionEntryValue(ExtensionMessage.Builder extBuilder, ItemDefinition definition, Object value) {
+        ExtensionValue extensionValue = toMessage(definition, value);
+        extBuilder.setSingle(extensionValue);
+    }
+
+    private static ExtensionValue toMessage(ItemDefinition definition, Object value) {
         ExtensionValue.Builder entryValueBuilder = ExtensionValue.newBuilder();
         if (definition.getTypeClass() == String.class) {
             entryValueBuilder.setString((String) value);
         } else if (definition.getTypeClass() == PolyString.class) {
             entryValueBuilder.setPolyString(toMessage((PolyString) value));
         }
-        extBuilder.addValue(entryValueBuilder);
+        return entryValueBuilder.build();
     }
 
     public static ItemPath toRealValue(ItemPathMessage itemPath) {

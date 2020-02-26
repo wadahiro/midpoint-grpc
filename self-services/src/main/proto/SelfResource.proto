@@ -64,7 +64,7 @@ message GetSelfRequest {
     repeated string options = 1;
     repeated string include = 2;
     repeated string exclude = 3;
-    repeated string resolveNames = 4;
+    repeated string resolve_names = 4;
 }
 
 message GetSelfResponse {
@@ -72,9 +72,15 @@ message GetSelfResponse {
 }
 
 message ExtensionMessage {
-    string namespaceURI = 1;
-    repeated ExtensionValue value = 2;
-    bool is_single_value = 3;
+    string namespace_URI = 1;
+    oneof value_wrapper {
+        ExtensionValue single = 2;
+        ExtensionValueList multiple = 3;
+    }
+}
+
+message ExtensionValueList {
+    repeated ExtensionValue values = 1;
 }
 
 message ExtensionValue {
@@ -120,7 +126,7 @@ message UserTypeMessage {
     // subtype
     repeated string subtype = 3;
     // lifecycleState
-    string lifecycleState = 4;
+    string lifecycle_state = 4;
 
     // AssignmentHolderType
 
@@ -130,48 +136,48 @@ message UserTypeMessage {
     repeated ReferenceMessage archetype_ref = 11;
 
     // FocusType
-    BytesMessage jpegPhoto = 20;
+    BytesMessage jpeg_photo = 20;
     // cost center.
-    string costCenter = 21;
+    string cost_center = 21;
     // locality.
     PolyStringMessage locality = 22;
     // preferredLanguage.
-    string preferredLanguage = 23;
+    string preferred_language = 23;
     // locale.
     string locale = 24;
     // timezone.
     string timezone = 25;
     // email address.
-    string emailAddress = 26;
+    string email_address = 26;
     // telephone number.
-    string telephoneNumber = 27;
+    string telephone_number = 27;
 
     // UserType
 
     // full name.
-    PolyStringMessage fullName = 50;
+    PolyStringMessage full_name = 50;
     // given name.
-    PolyStringMessage givenName = 51;
+    PolyStringMessage given_name = 51;
     // family name.
-    PolyStringMessage familyName = 52;
+    PolyStringMessage family_name = 52;
     // additional name.
-    PolyStringMessage additionalName = 53;
+    PolyStringMessage additional_name = 53;
     // nick name.
-    PolyStringMessage nickName = 54;
+    PolyStringMessage nick_name = 54;
     // honorific prefix.
-    PolyStringMessage honorificPrefix = 55;
+    PolyStringMessage honorific_prefix = 55;
     // honorific suffix.
-    PolyStringMessage honorificSuffix = 56;
+    PolyStringMessage honorific_suffix = 56;
     // title.
     PolyStringMessage title = 57;
     // employee number.
-    string employeeNumber = 58;
+    string employee_number = 58;
     // employee type.
-    repeated string employeeType = 59;
+    repeated string employee_type = 59;
     // organization.
     repeated PolyStringMessage organization = 60;
     // organizational unit.
-    repeated PolyStringMessage organizationalUnit = 61;
+    repeated PolyStringMessage organizational_unit = 61;
 
     // extension. the key is "localPart" format of the QName.
     map<string, ExtensionMessage> extension = 100;
@@ -187,7 +193,7 @@ message RoleTypeMessage {
     // subtype
     repeated string subtype = 3;
     // lifecycleState
-    string lifecycleState = 4;
+    string lifecycle_state = 4;
 
     // AssignmentHolderType
 
@@ -197,26 +203,26 @@ message RoleTypeMessage {
     repeated ReferenceMessage archetype_ref = 11;
 
     // FocusType
-    BytesMessage jpegPhoto = 20;
+    BytesMessage jpeg_photo = 20;
     // cost center.
     string costCenter = 21;
     // locality.
     PolyStringMessage locality = 22;
     // preferredLanguage.
-    string preferredLanguage = 23;
+    string preferred_language = 23;
     // locale.
     string locale = 24;
     // timezone.
     string timezone = 25;
     // email address.
-    string emailAddress = 26;
+    string email_address = 26;
     // telephone number.
-    string telephoneNumber = 27;
+    string telephone_number = 27;
 
     // RoleType
 
     // role type.
-    string roleType = 50;
+    string role_type = 50;
 
     // extension. the key is "localPart" format of the QName.
     map<string, ExtensionMessage> extension = 100;
@@ -232,7 +238,7 @@ message OrgTypeMessage {
     // subtype
     repeated string subtype = 3;
     // lifecycleState
-    string lifecycleState = 4;
+    string lifecycle_state = 4;
 
     // AssignmentHolderType
 
@@ -242,26 +248,26 @@ message OrgTypeMessage {
     repeated ReferenceMessage archetype_ref = 11;
 
     // FocusType
-    BytesMessage jpegPhoto = 20;
+    BytesMessage jpeg_photo = 20;
     // cost center.
     string costCenter = 21;
     // locality.
     PolyStringMessage locality = 22;
     // preferredLanguage.
-    string preferredLanguage = 23;
+    string preferred_language = 23;
     // locale.
     string locale = 24;
     // timezone.
     string timezone = 25;
     // email address.
-    string emailAddress = 26;
+    string email_address = 26;
     // telephone number.
-    string telephoneNumber = 27;
+    string telephone_number = 27;
 
     // OrgType
 
     // org type.
-    repeated string orgType = 50;
+    repeated string org_type = 50;
     // Is tenant.
     bool tenant = 51;
     // mail domain.
@@ -269,6 +275,7 @@ message OrgTypeMessage {
     // display order.
     int32 display_order = 53;
     // security policy reference.
+    // TODO need to support this?
     //ReferenceMessage security_policy_ref = 54;
 
     // extension. the key is "localPart" format of the QName.
@@ -307,7 +314,7 @@ message ReferenceMessage {
     PolyStringMessage display_name = 7;
     string description = 8;
     repeated ReferenceMessage archetype_ref = 9;
-    string emailAddress = 10;
+    string email_address = 10;
 }
 
 message QNameMessage {
@@ -326,9 +333,9 @@ message UserItemDelta {
         ItemPathMessage item_path = 2;
         DefaultUserTypePath user_type_path = 3;
     }
-    string valuesToAdd = 20;
-    string valuesToReplace = 21;
-    string valuesToDelete = 22;
+    string values_to_add = 20;
+    string values_to_replace = 21;
+    string values_to_delete = 22;
 }
 
 message ItemPathMessage {
@@ -456,7 +463,7 @@ message SearchRequest {
     repeated string options = 2;
     repeated string include = 3;
     repeated string exclude = 4;
-    repeated string resolveNames = 5;
+    repeated string resolve_names = 5;
 }
 
 message SearchUsersResponse {
@@ -492,7 +499,7 @@ enum OrderDirectionType {
 
 message ObjectOrderingMessage {
     string order_by = 1;
-    OrderDirectionType orderDirection = 2;
+    OrderDirectionType order_direction = 2;
 }
 
 message ObjectFilterMessage {
@@ -500,6 +507,9 @@ message ObjectFilterMessage {
         AndFilterMessage and = 1;
         OrFilterMessage or = 2;
         NotFilterMessage not = 3;
+
+        // String
+
         FilterEntryMessage eq = 4;
         FilterEntryMessage starts_with = 5;
         FilterEntryMessage contains = 6;
@@ -523,7 +533,7 @@ message OrFilterMessage {
 }
 
 message NotFilterMessage {
-    repeated ObjectFilterMessage filter = 1;
+    ObjectFilterMessage filter = 1;
 }
 
 message FilterEntryMessage {

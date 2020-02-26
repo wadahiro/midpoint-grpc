@@ -37,8 +37,7 @@ public class TestAddClient {
                                                 )
                                                 .putExtension("manager",
                                                         ExtensionMessage.newBuilder()
-                                                                .setIsSingleValue(true)
-                                                                .addValue(
+                                                                .setSingle(
                                                                         ExtensionValue.newBuilder().setRef(
                                                                                 ReferenceMessage.newBuilder()
                                                                                         .setObjectType(DefaultObjectType.USER_TYPE)
@@ -59,9 +58,21 @@ public class TestAddClient {
                                 )
                                 .putExtension("singleString",
                                         ExtensionMessage.newBuilder()
-                                                .setIsSingleValue(true)
-                                                .addValue(
+                                                .setSingle(
                                                         ExtensionValue.newBuilder().setString("ext1").build()
+                                                )
+                                                .build()
+                                )
+                                .putExtension("multipleString",
+                                        ExtensionMessage.newBuilder()
+                                                .setMultiple(
+                                                        ExtensionValueList.newBuilder()
+                                                                .addValues(
+                                                                        ExtensionValue.newBuilder().setString("ext1").build()
+                                                                )
+                                                                .addValues(
+                                                                        ExtensionValue.newBuilder().setString("ext2").build()
+                                                                )
                                                 )
                                                 .build()
                                 )
