@@ -73,8 +73,14 @@ message GetSelfResponse {
 
 message ExtensionMessage {
     string namespaceURI = 1;
-    repeated ExtensionValue value = 2;
-    bool is_single_value = 3;
+    oneof value_wrapper {
+        ExtensionValue single = 2;
+        ExtensionValueList multiple = 3;
+    }
+}
+
+message ExtensionValueList {
+    repeated ExtensionValue values = 1;
 }
 
 message ExtensionValue {
