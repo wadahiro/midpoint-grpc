@@ -424,7 +424,6 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
             OperationResult parentResult = task.getResult().createSubresult(OPERATION_REQUEST_ASSIGNMENTS);
 
-            // TODO Support async mode
             List<PrismContainerValue> assignmentTypes = request.getAssignmentsList().stream()
                     .map(x -> TypeConverter.toRealValue(prismContext, x).asPrismContainerValue())
                     .collect(Collectors.toList());

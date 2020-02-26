@@ -33,6 +33,17 @@ public class TestSearchUserClient {
 //                                                        .setFullPath("name")
 //                                                        .setValue("test")
 //                                                )
+//                                                .setNot(
+//                                                        NotFilterMessage.newBuilder()
+//                                                                .setFilter(
+//                                                                        ObjectFilterMessage.newBuilder()
+//                                                                                .setContains(
+//                                                                                        FilterEntryMessage.newBuilder()
+//                                                                                                .setFullPath("name")
+//                                                                                                .setValue("foo")
+//                                                                                )
+//                                                                )
+//                                                )
                                                 .setContains(
                                                         FilterEntryMessage.newBuilder()
                                                                 .setFullPath("extension/singleString")
