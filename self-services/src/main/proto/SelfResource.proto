@@ -119,14 +119,18 @@ message PolyStringMessage {
 message UserTypeMessage {
     // ObjectType
 
+    // oid.
+    string oid = 1;
+    // version.
+    string version = 2;
     // name.
-    PolyStringMessage name = 1;
+    PolyStringMessage name = 3;
     // description
-    string description = 2;
+    string description = 4;
     // subtype
-    repeated string subtype = 3;
+    repeated string subtype = 5;
     // lifecycleState
-    string lifecycle_state = 4;
+    string lifecycle_state = 6;
 
     // AssignmentHolderType
 
@@ -186,14 +190,18 @@ message UserTypeMessage {
 message RoleTypeMessage {
     // ObjectType
 
+    // oid.
+    string oid = 1;
+    // version.
+    string version = 2;
     // name.
-    PolyStringMessage name = 1;
+    PolyStringMessage name = 3;
     // description
-    string description = 2;
+    string description = 4;
     // subtype
-    repeated string subtype = 3;
+    repeated string subtype = 5;
     // lifecycleState
-    string lifecycle_state = 4;
+    string lifecycle_state = 6;
 
     // AssignmentHolderType
 
@@ -203,6 +211,8 @@ message RoleTypeMessage {
     repeated ReferenceMessage archetype_ref = 11;
 
     // FocusType
+
+    // jpeg photo
     BytesMessage jpeg_photo = 20;
     // cost center.
     string costCenter = 21;
@@ -219,10 +229,23 @@ message RoleTypeMessage {
     // telephone number.
     string telephone_number = 27;
 
+    // AbstractRoleType
+
+    // display name.
+    PolyStringMessage display_name = 50;
+    // identifier.
+    string identifier = 51;
+    // requestable.
+    bool requestable = 52;
+    // delegable.
+    bool delegable = 53;
+    // risk level.
+    string risk_level = 54;
+
     // RoleType
 
     // role type.
-    string role_type = 50;
+    string role_type = 70;
 
     // extension. the key is "localPart" format of the QName.
     map<string, ExtensionMessage> extension = 100;
@@ -231,14 +254,18 @@ message RoleTypeMessage {
 message OrgTypeMessage {
     // ObjectType
 
+    // oid.
+    string oid = 1;
+    // version.
+    string version = 2;
     // name.
-    PolyStringMessage name = 1;
+    PolyStringMessage name = 3;
     // description
-    string description = 2;
+    string description = 4;
     // subtype
-    repeated string subtype = 3;
+    repeated string subtype = 5;
     // lifecycleState
-    string lifecycle_state = 4;
+    string lifecycle_state = 6;
 
     // AssignmentHolderType
 
@@ -248,6 +275,8 @@ message OrgTypeMessage {
     repeated ReferenceMessage archetype_ref = 11;
 
     // FocusType
+
+    // jpeg photo.
     BytesMessage jpeg_photo = 20;
     // cost center.
     string costCenter = 21;
@@ -264,19 +293,32 @@ message OrgTypeMessage {
     // telephone number.
     string telephone_number = 27;
 
+    // AbstractRoleType
+
+    // display name.
+    PolyStringMessage display_name = 50;
+    // identifier.
+    string identifier = 51;
+    // requetable.
+    bool requestable = 52;
+    // delegable.
+    bool delegable = 53;
+    // risk level.
+    string risk_level = 54;
+
     // OrgType
 
     // org type.
-    repeated string org_type = 50;
+    repeated string org_type = 70;
     // Is tenant.
-    bool tenant = 51;
+    bool tenant = 71;
     // mail domain.
-    repeated string mail_domain = 52;
+    repeated string mail_domain = 72;
     // display order.
-    int32 display_order = 53;
+    int32 display_order = 73;
     // security policy reference.
     // TODO need to support this?
-    //ReferenceMessage security_policy_ref = 54;
+    //ReferenceMessage security_policy_ref = 74;
 
     // extension. the key is "localPart" format of the QName.
     map<string, ExtensionMessage> extension = 100;

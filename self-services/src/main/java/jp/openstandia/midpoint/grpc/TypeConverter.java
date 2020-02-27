@@ -915,6 +915,8 @@ public class TypeConverter {
     public static UserTypeMessage toMessage(UserType u) {
         return BuilderWrapper.wrap(UserTypeMessage.newBuilder())
                 // ObjectType
+                .nullSafe(u.getOid(), (b, v) -> b.setOid(v))
+                .nullSafe(u.getVersion(), (b, v) -> b.setVersion(v))
                 .nullSafe(toMessage(u.getName()), (b, v) -> b.setName(v))
                 .nullSafe(u.getDescription(), (b, v) -> b.setDescription(v))
                 .nullSafe(u.getSubtype(), (b, v) -> b.addAllSubtype(v))
@@ -949,6 +951,8 @@ public class TypeConverter {
     public static RoleTypeMessage toMessage(RoleType u) {
         return BuilderWrapper.wrap(RoleTypeMessage.newBuilder())
                 // ObjectType
+                .nullSafe(u.getOid(), (b, v) -> b.setOid(v))
+                .nullSafe(u.getVersion(), (b, v) -> b.setVersion(v))
                 .nullSafe(toMessage(u.getName()), (b, v) -> b.setName(v))
                 .nullSafe(u.getDescription(), (b, v) -> b.setDescription(v))
                 .nullSafe(u.getSubtype(), (b, v) -> b.addAllSubtype(v))
@@ -962,6 +966,12 @@ public class TypeConverter {
                 .nullSafe(u.getTimezone(), (b, v) -> b.setTimezone(v))
                 .nullSafe(u.getEmailAddress(), (b, v) -> b.setEmailAddress(v))
                 .nullSafe(u.getTelephoneNumber(), (b, v) -> b.setTelephoneNumber(v))
+                // AbstractRoleType
+                .nullSafe(toMessage(u.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                .nullSafe(u.getIdentifier(), (b, v) -> b.setIdentifier(v))
+                .nullSafe(u.isRequestable(), (b, v) -> b.setRequestable(v))
+                .nullSafe(u.isDelegable(), (b, v) -> b.setDelegable(v))
+                .nullSafe(u.getRiskLevel(), (b, v) -> b.setRiskLevel(v))
                 // RoleType
                 .nullSafe(u.getRoleType(), (b, v) -> b.setRoleType(v))
                 // Extension
@@ -973,6 +983,8 @@ public class TypeConverter {
     public static OrgTypeMessage toMessage(OrgType u) {
         return BuilderWrapper.wrap(OrgTypeMessage.newBuilder())
                 // ObjectType
+                .nullSafe(u.getOid(), (b, v) -> b.setOid(v))
+                .nullSafe(u.getVersion(), (b, v) -> b.setVersion(v))
                 .nullSafe(toMessage(u.getName()), (b, v) -> b.setName(v))
                 .nullSafe(u.getDescription(), (b, v) -> b.setDescription(v))
                 .nullSafe(u.getSubtype(), (b, v) -> b.addAllSubtype(v))
@@ -986,6 +998,12 @@ public class TypeConverter {
                 .nullSafe(u.getTimezone(), (b, v) -> b.setTimezone(v))
                 .nullSafe(u.getEmailAddress(), (b, v) -> b.setEmailAddress(v))
                 .nullSafe(u.getTelephoneNumber(), (b, v) -> b.setTelephoneNumber(v))
+                // AbstractRoleType
+                .nullSafe(toMessage(u.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                .nullSafe(u.getIdentifier(), (b, v) -> b.setIdentifier(v))
+                .nullSafe(u.isRequestable(), (b, v) -> b.setRequestable(v))
+                .nullSafe(u.isDelegable(), (b, v) -> b.setDelegable(v))
+                .nullSafe(u.getRiskLevel(), (b, v) -> b.setRiskLevel(v))
                 // OrgType
                 .nullSafe(u.getOrgType(), (b, v) -> b.addAllOrgType(v))
                 .nullSafe(u.isTenant(), (b, v) -> b.setTenant(v))
