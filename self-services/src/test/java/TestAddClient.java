@@ -33,17 +33,18 @@ public class TestAddClient {
                                                         ReferenceMessage.newBuilder()
                                                                 .setObjectType(DefaultObjectType.ROLE_TYPE)
                                                                 .setName(PolyStringMessage.newBuilder().setOrig("ProjUser"))
-//                                                                .setRelationType(DefaultRelationType.ORG_MANAGER)
                                                 )
                                                 .putExtension("manager",
                                                         ExtensionMessage.newBuilder()
-                                                                .setSingle(
-                                                                        ExtensionValue.newBuilder().setRef(
-                                                                                ReferenceMessage.newBuilder()
-                                                                                        .setObjectType(DefaultObjectType.USER_TYPE)
-//                                                                                        .setName(PolyStringMessage.newBuilder().setOrig("test"))
-                                                                                        .setEmailAddress("TEST@example.com")
-                                                                        ).build()
+                                                                .setMultiple(
+                                                                        ExtensionValueList.newBuilder()
+                                                                                .addValues(
+                                                                                        ExtensionValue.newBuilder().setRef(
+                                                                                                ReferenceMessage.newBuilder()
+                                                                                                        .setObjectType(DefaultObjectType.USER_TYPE)
+                                                                                                        .setEmailAddress("TEST@example.com")
+                                                                                        )
+                                                                                )
                                                                 )
                                                                 .build()
                                                 )
