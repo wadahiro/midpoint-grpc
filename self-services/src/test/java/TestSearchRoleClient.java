@@ -2,11 +2,9 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
-import jp.openstandia.midpoint.grpc.Constant;
-import jp.openstandia.midpoint.grpc.SearchRequest;
-import jp.openstandia.midpoint.grpc.SearchRolesResponse;
-import jp.openstandia.midpoint.grpc.SelfServiceResourceGrpc;
+import jp.openstandia.midpoint.grpc.*;
 
+import javax.management.Query;
 import java.io.UnsupportedEncodingException;
 import java.util.Base64;
 
@@ -27,6 +25,12 @@ public class TestSearchRoleClient {
         stub = MetadataUtils.attachHeaders(stub, headers);
 
         SearchRequest req = SearchRequest.newBuilder()
+                .setQuery(QueryMessage.newBuilder()
+                        .setPaging(PagingMessage.newBuilder()
+                                .setMaxSize(2)
+                                .setOffset(2)
+                        )
+                )
                 .build();
 
         SearchRolesResponse res = stub.searchRoles(req);

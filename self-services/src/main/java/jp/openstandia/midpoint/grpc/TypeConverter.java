@@ -407,13 +407,16 @@ public class TypeConverter {
         S_FilterEntryOrEmpty builder = QueryBuilder.queryFor(queryClass, prismContext);
         S_AtomicFilterExit exitFilter = toObjectFilter(builder, message.getFilter());
 
+        S_QueryExit exitBuilder;
         if (exitFilter != null) {
-            ObjectQuery query = exitFilter.build();
-            query.setPaging(toMessage(prismContext, message.getPaging()));
-            return query;
+            exitBuilder = exitFilter;
+        } else {
+            exitBuilder = builder;
         }
 
-        return null;
+        ObjectQuery query = exitBuilder.build();
+        query.setPaging(toMessage(prismContext, message.getPaging()));
+        return query;
     }
 
     public static ObjectPaging toMessage(PrismContext prismContext, PagingMessage message) {
