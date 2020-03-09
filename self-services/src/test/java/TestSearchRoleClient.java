@@ -25,11 +25,13 @@ public class TestSearchRoleClient {
         stub = MetadataUtils.attachHeaders(stub, headers);
 
         SearchRequest req = SearchRequest.newBuilder()
-                .setQuery(QueryMessage.newBuilder()
-                        .setPaging(PagingMessage.newBuilder()
-                                .setMaxSize(2)
-                                .setOffset(2)
-                        )
+                .setQuery(
+                        QueryMessage.newBuilder()
+                                .setPaging(
+                                        PagingMessage.newBuilder()
+                                                .setMaxSize(2)
+                                                .setOffset(2)
+                                )
                 )
                 .build();
 

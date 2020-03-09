@@ -50,6 +50,13 @@ public class TestSearchUserClient {
                                                                 .setValue("foobar")
                                                 )
                                 )
+                                .setPaging(
+                                        PagingMessage.newBuilder()
+                                                .addOrdering(ObjectOrderingMessage.newBuilder()
+                                                        .setOrderBy("fullName")
+                                                        .setOrderDirection(OrderDirectionType.DESCENDING)
+                                                )
+                                )
                 )
                 .build();
 

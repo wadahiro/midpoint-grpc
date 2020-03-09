@@ -1,7 +1,6 @@
 package jp.openstandia.midpoint.grpc;
 
 import com.evolveum.midpoint.prism.*;
-import com.evolveum.midpoint.prism.impl.query.NotFilterImpl;
 import com.evolveum.midpoint.prism.impl.query.builder.QueryBuilder;
 import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.path.ItemPath;
@@ -433,7 +432,7 @@ public class TypeConverter {
         return message.stream().map(x -> {
             OrderDirection direction = toRealValue(x.getOrderDirection());
             String orderBy = x.getOrderBy();
-            ItemPath itemPath = ItemPath.create(orderBy);
+            ItemPath itemPath = toItemPath(orderBy);
 
             return prismContext.queryFactory().createOrdering(itemPath, direction);
         }).collect(Collectors.toList());
