@@ -76,7 +76,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     public static final String OPERATION_EXECUTE_CREDENTIAL_CHECK = CLASS_DOT + "executeCredentialCheck";
     public static final String OPERATION_EXECUTE_CREDENTIAL_UPDATE = CLASS_DOT + "executeCredentialUpdate";
     public static final String OPERATION_REQUEST_ASSIGNMENTS = CLASS_DOT + "requestAssignments";
-
+    public static final String OPERATION_SEARCH_OBJECTS = CLASS_DOT + "searchObjects";
 
     @Autowired
     protected ModelService modelService;
@@ -167,7 +167,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             Task task = ctx.task;
             UserType loggedInUser = ctx.principal.getUser();
 
-            OperationResult parentResult = task.getResult().createSubresult(OPERATION_SELF);
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_SELF_ASSIGNMENT);
 
             try {
                 PrismObject<UserType> user = modelCrudService.getObject(UserType.class, loggedInUser.getOid(), null, task, parentResult);
@@ -700,7 +700,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         SearchResultList<PrismObject<T>> result = runTask(ctx -> {
             Task task = ctx.task;
 
-            OperationResult parentResult = task.getResult().createSubresult(OPERATION_SELF);
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_SEARCH_OBJECTS);
 
             List<String> options = request.getOptionsList();
             List<String> include = request.getIncludeList();
@@ -713,8 +713,18 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
                 ObjectQuery query = TypeConverter.toObjectQuery(prismContext, clazz, request.getQuery());
 
+                Integer total = modelService.countObjects(clazz, query, searchOptions,
+                        task, parentResult);
+
                 SearchResultList<PrismObject<T>> foundObjects = modelService.searchObjects(clazz, query, searchOptions,
                         task, parentResult);
+
+                SearchResultMetadata metadata = foundObjects.getMetadata();
+                if (metadata == null) {
+                    metadata = new SearchResultMetadata();
+                    foundObjects.setMetadata(metadata);
+                }
+                foundObjects.getMetadata().setApproxNumberOfAllResults(total);
 
                 parentResult.recordSuccessIfUnknown();
                 return foundObjects;
@@ -731,12 +741,11 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
         SearchResultList<PrismObject<UserType>> result = search(request, UserType.class);
 
-        // TODO get count
-//        Integer count = result.getMetadata().getApproxNumberOfAllResults();
+        Integer total = result.getMetadata().getApproxNumberOfAllResults();
         List<UserTypeMessage> users = result.stream().map(x -> toMessage(x.asObjectable())).collect(Collectors.toList());
 
         SearchUsersResponse res = SearchUsersResponse.newBuilder()
-//                .setNumberOfAllResults(count)
+                .setNumberOfAllResults(total)
                 .addAllResults(users)
                 .build();
 
@@ -752,12 +761,12 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
         SearchResultList<PrismObject<RoleType>> result = search(request, RoleType.class);
 
-//        Integer count = result.getMetadata().getApproxNumberOfAllResults();
-        List<RoleTypeMessage> users = result.stream().map(x -> toMessage(x.asObjectable())).collect(Collectors.toList());
+        Integer total = result.getMetadata().getApproxNumberOfAllResults();
+        List<RoleTypeMessage> roles = result.stream().map(x -> toMessage(x.asObjectable())).collect(Collectors.toList());
 
         SearchRolesResponse res = SearchRolesResponse.newBuilder()
-//                .setNumberOfAllResults(count)
-                .addAllResults(users)
+                .setNumberOfAllResults(total)
+                .addAllResults(roles)
                 .build();
 
         responseObserver.onNext(res);
@@ -772,11 +781,11 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
         SearchResultList<PrismObject<OrgType>> result = search(request, OrgType.class);
 
-//        Integer count = result.getMetadata().getApproxNumberOfAllResults();
+        Integer total = result.getMetadata().getApproxNumberOfAllResults();
         List<OrgTypeMessage> orgs = result.stream().map(x -> toMessage(x.asObjectable())).collect(Collectors.toList());
 
         SearchOrgsResponse res = SearchOrgsResponse.newBuilder()
-//                .setNumberOfAllResults(count)
+                .setNumberOfAllResults(total)
                 .addAllResults(orgs)
                 .build();
 
