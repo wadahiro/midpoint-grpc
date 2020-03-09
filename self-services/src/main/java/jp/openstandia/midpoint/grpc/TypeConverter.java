@@ -21,18 +21,14 @@ import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 
-import javax.xml.bind.annotation.XmlElement;
 import javax.xml.namespace.QName;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Type;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class TypeConverter {
 
     private static Map<DefaultUserTypePath, ItemName> userTypeMap = new HashMap<>();
-    private static Map<ItemName, Class> userValueTypeMap = new HashMap<>();
 
     static {
         Map<String, ItemName> strToItemName = new HashMap<>();
@@ -48,33 +44,6 @@ public class TypeConverter {
                         userTypeMap.put(path, itemName);
                         strToItemName.put(itemName.getLocalPart(), itemName);
                     } catch (IllegalArgumentException | IllegalAccessException ignore) {
-                    }
-                });
-
-        Method[] methods = UserType.class.getMethods();
-        Arrays.stream(methods)
-                .filter(x -> x.isAnnotationPresent(XmlElement.class))
-                .forEach(x -> {
-                    XmlElement ele = x.getAnnotation(XmlElement.class);
-
-                    ItemName itemName = strToItemName.get(ele.name());
-                    if (itemName == null) {
-                        return;
-                    }
-                    Class<?> returnType = x.getReturnType();
-
-                    if (returnType.isAssignableFrom(List.class)) {
-                        Type genericReturnType = x.getGenericReturnType();
-                        String typeName = genericReturnType.getTypeName();
-                        if (typeName.contains(String.class.getName())) {
-                            userValueTypeMap.put(itemName, String.class);
-                        } else if (typeName.contains(PolyStringType.class.getName())) {
-                            userValueTypeMap.put(itemName, PolyStringType.class);
-                        } else {
-                            throw new UnsupportedOperationException(itemName + " is not supported");
-                        }
-                    } else {
-                        userValueTypeMap.put(itemName, returnType);
                     }
                 });
     }
