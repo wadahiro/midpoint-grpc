@@ -668,7 +668,7 @@ public class TypeConverter {
             ref.setType(toRealValue(message.getObjectType()));
         } else {
             StatusRuntimeException exception = Status.INVALID_ARGUMENT
-                    .withDescription("invalid_relation")
+                    .withDescription("invalid_type_of_object_reference_type")
                     .asRuntimeException();
             throw exception;
         }
