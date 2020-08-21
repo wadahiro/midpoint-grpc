@@ -393,6 +393,7 @@ enum DefaultObjectType {
     ROLE_TYPE = 5;
     ORG_TYPE = 6;
     SERVICE_TYPE = 7;
+    ARCHETYPE_TYPE = 8;
     // TODO more type
 }
 
