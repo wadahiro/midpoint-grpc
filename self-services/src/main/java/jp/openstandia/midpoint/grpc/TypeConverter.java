@@ -738,6 +738,8 @@ public class TypeConverter {
                 return ServiceType.COMPLEX_TYPE;
             case ASSIGNMENT_HOLDER_TYPE:
                 return AssignmentHolderType.COMPLEX_TYPE;
+            case ARCHETYPE_TYPE:
+                return ArchetypeType.COMPLEX_TYPE;
         }
         return null;
     }
