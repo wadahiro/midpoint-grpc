@@ -1,6 +1,8 @@
 package jp.openstandia.midpoint.grpc;
 
 import com.evolveum.midpoint.prism.*;
+import com.evolveum.midpoint.prism.impl.PrismContainerValueImpl;
+import com.evolveum.midpoint.prism.impl.PrismPropertyValueImpl;
 import com.evolveum.midpoint.prism.impl.query.builder.QueryBuilder;
 import com.evolveum.midpoint.prism.path.ItemName;
 import com.evolveum.midpoint.prism.path.ItemPath;
@@ -786,7 +788,7 @@ public class TypeConverter {
             String k = entry.getKey();
             ExtensionMessage v = entry.getValue();
 
-            QName qname = toRealValue(v, k);
+            QName qname = toQName(v, k);
             ItemPath path = ItemPath.create(qname);
 
             // No value case
@@ -828,14 +830,14 @@ public class TypeConverter {
             if (!(o instanceof ObjectReferenceType)) {
                 throw new SchemaException("The value must be ObjectReferenceType but it's " + o.getClass());
             }
-            reference.add(((ObjectReferenceType)o).asReferenceValue());
+            reference.add(((ObjectReferenceType) o).asReferenceValue());
         } else {
             PrismProperty property = extension.findOrCreateProperty(path);
             property.addRealValue(toRealValue(prismContext, value));
         }
     }
 
-    public static QName toRealValue(ExtensionMessage message, String localPart) {
+    public static QName toQName(ExtensionMessage message, String localPart) {
         if (message.getNamespaceURI().isEmpty()) {
             return new QName(localPart);
         }
@@ -1043,5 +1045,111 @@ public class TypeConverter {
                 .map(x -> toRealValue(x))
                 .collect(Collectors.toList());
         return ItemPath.create(qnames);
+    }
+
+    public static List<PrismValue> toPrismValue(PrismContext prismContext, ItemDefinition definition, List<PrismValueMessage> prismValueMessageList, Class itemClass) throws SchemaException {
+        List<PrismValue> values = new ArrayList<>();
+        for (PrismValueMessage value : prismValueMessageList) {
+            values.add(toPrismValue(prismContext, definition, value));
+        }
+        return values;
+    }
+
+    private static PrismValue toPrismValue(PrismContext prismContext, ItemDefinition definition, PrismValueMessage prismValue) throws SchemaException {
+        if (prismValue.hasContainer()) {
+            return toPrismContainerValue(prismContext, definition, prismValue.getContainer());
+        } else if (prismValue.hasProperty()) {
+            return toPrismPropertyValue(prismContext, prismValue.getProperty());
+        } else {
+            return toPrismReferenceValue(prismContext, prismValue.getRef());
+        }
+    }
+
+    private static PrismContainerValue toPrismContainerValue(PrismContext prismContext, ItemDefinition definition, PrismContainerValueMessage container) throws SchemaException {
+        PrismContainerValue impl = new PrismContainerValueImpl(prismContext);
+
+        if (definition instanceof PrismContainerDefinition) {
+            PrismContainerDefinition containerDefinition = (PrismContainerDefinition) definition;
+            impl.applyDefinition(containerDefinition);
+        }
+
+        Map<String, PrismValueMessage> valueMap = container.getValueMap();
+        for (Map.Entry<String, PrismValueMessage> entry : valueMap.entrySet()) {
+            QName qname = toQName(entry.getValue(), entry.getKey());
+
+            ItemDefinition entryDefinition = definition.findItemDefinition(ItemPath.create(qname), ItemDefinition.class);
+
+            // TODO Schema check
+            if (entryDefinition == null) {
+            }
+
+            PrismValue realValue = toPrismValue(prismContext, entryDefinition, entry.getValue());
+
+            if (realValue instanceof PrismContainerValue) {
+                PrismContainer childContainer = impl.findOrCreateContainer(qname);
+                childContainer.setValue((PrismContainerValue) realValue);
+
+            } else if (realValue instanceof PrismPropertyValue) {
+                PrismProperty property = impl.createProperty(qname);
+
+                Object realPropertyValue = realValue.getRealValue();
+
+                if (realPropertyValue instanceof List) {
+                    property.setRealValues(((List) realPropertyValue).toArray());
+                } else {
+                    property.setRealValue(realPropertyValue);
+                }
+            } else if (realValue instanceof PrismReferenceValue) {
+                PrismReference ref = impl.findOrCreateReference(qname);
+                ref.add(realValue.getRealValue());
+            }
+        }
+
+        return impl;
+    }
+
+    private static QName toQName(PrismValueMessage message, String localPart) {
+        if (message.getNamespaceURI().isEmpty()) {
+            return new QName(localPart);
+        }
+        return new QName(message.getNamespaceURI(), localPart);
+    }
+
+    private static PrismPropertyValue toPrismPropertyValue(PrismContext prismContext, PrismPropertyMessage property) {
+        if (property.hasSingle()) {
+            return new PrismPropertyValueImpl(toPrismValue(prismContext, property.getSingle()));
+        } else {
+            return new PrismPropertyValueImpl(toPrismValue(prismContext, property.getMultiple()));
+        }
+    }
+
+    private static Object toPrismValue(PrismContext prismContext, PrismPropertyValueMessageList multiple) {
+        return multiple.getValuesList().stream().map(x -> toPrismValue(prismContext, x)).collect(Collectors.toList());
+    }
+
+    private static Object toPrismValue(PrismContext prismContext, PrismPropertyValueMessage message) {
+        if (message.hasInteger()) {
+            return toRealValue(message.getInteger());
+        }
+        if (message.hasLong()) {
+            return toRealValue(message.getLong());
+        }
+        if (message.hasPolyString()) {
+            // Need to return PolyString in PrismValue
+            return toPolyString(message.getPolyString());
+        }
+        // string case
+        return message.getString();
+    }
+
+    private static PolyString toPolyString(PolyStringMessage message) {
+        if (isEmpty(message)) {
+            return null;
+        }
+        return new PolyString(message.getOrig(), message.getNorm());
+    }
+
+    private static PrismReferenceValue toPrismReferenceValue(PrismContext prismContext, ReferenceMessage ref) {
+        return toRealValue(prismContext, ref).asReferenceValue();
     }
 }

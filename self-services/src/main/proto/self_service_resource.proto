@@ -378,6 +378,44 @@ message UserItemDelta {
     string values_to_add = 20;
     string values_to_replace = 21;
     string values_to_delete = 22;
+
+    repeated PrismValueMessage prism_values_to_add = 23;
+    repeated PrismValueMessage prism_values_to_replace = 24;
+    repeated PrismValueMessage prism_values_to_delete = 25;
+}
+
+message PrismValueMessage {
+    string namespace_URI = 1;
+    oneof value_wrapper {
+        PrismContainerValueMessage container = 2;
+        PrismPropertyMessage property = 3;
+        ReferenceMessage ref = 4;
+    }
+}
+
+message PrismContainerValueMessage {
+    // extension. the key is "localPart" format of the QName.
+    map<string, PrismValueMessage> value = 1;
+}
+
+message PrismPropertyMessage {
+    oneof value_wrapper {
+        PrismPropertyValueMessage single = 2;
+        PrismPropertyValueMessageList multiple = 3;
+    }
+}
+
+message PrismPropertyValueMessage {
+    oneof value {
+        string string = 1;
+        PolyStringMessage poly_string = 2;
+        IntegerMessage integer = 3;
+        LongMessage long = 4;
+    }
+}
+
+message PrismPropertyValueMessageList {
+    repeated PrismPropertyValueMessage values = 1;
 }
 
 message ItemPathMessage {

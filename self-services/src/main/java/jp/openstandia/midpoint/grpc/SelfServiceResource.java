@@ -329,6 +329,9 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                     S_ValuesEntry v = i.item(path);
 
                     S_ItemEntry entry = null;
+
+                    // Plain string
+                    // TODO Remove this API
                     if (!m.getValuesToAdd().isEmpty()) {
                         S_MaybeDelete av = v.add(TypeConverter.toRealValue(m.getValuesToAdd(), itemClass));
 
@@ -342,6 +345,22 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
                     } else if (!m.getValuesToDelete().isEmpty()) {
                         entry = v.delete(TypeConverter.toRealValue(m.getValuesToDelete(), itemClass));
+                    }
+
+                    // PrismValue
+                    if (!m.getPrismValuesToAddList().isEmpty()) {
+                        S_MaybeDelete av = v.add(TypeConverter.toPrismValue(prismContext, itemDef, m.getPrismValuesToAddList(), itemClass));
+
+                        if (!m.getPrismValuesToDeleteList().isEmpty()) {
+                            entry = av.delete(TypeConverter.toPrismValue(prismContext, itemDef, m.getPrismValuesToDeleteList(), itemClass));
+                        } else {
+                            entry = av;
+                        }
+                    } else if (!m.getPrismValuesToReplaceList().isEmpty()) {
+                        entry = v.replace(TypeConverter.toPrismValue(prismContext, itemDef, m.getPrismValuesToReplaceList(), itemClass));
+
+                    } else if (!m.getPrismValuesToDeleteList().isEmpty()) {
+                        entry = v.delete(TypeConverter.toPrismValue(prismContext, itemDef, m.getPrismValuesToDeleteList(), itemClass));
                     }
 
                     if (entry == null) {
