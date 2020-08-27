@@ -43,7 +43,7 @@ class SelfServiceResourceITest {
                 .build();
 
         GetSelfResponse response = stub.getSelf(request);
-        UserTypeMessage user  = response.getProfile();
+        UserTypeMessage user = response.getProfile();
 
         assertEquals("Administrator", user.getFamilyName().getOrig());
         assertEquals("administrator", user.getFamilyName().getNorm());
@@ -153,7 +153,7 @@ class SelfServiceResourceITest {
             assertFalse(subMsgArg1.hasList());
             assertEquals("5", subMsgArg1.getString());
 
-            Message subMsgArg2= subMsgArgsList.get(1);
+            Message subMsgArg2 = subMsgArgsList.get(1);
             assertFalse(subMsgArg2.hasSingle());
             assertFalse(subMsgArg2.hasList());
             assertEquals("3", subMsgArg2.getString());
@@ -235,7 +235,7 @@ class SelfServiceResourceITest {
 
         AddUserRequest request = AddUserRequest.newBuilder()
                 .setProfile(UserTypeMessage.newBuilder()
-                .setName(PolyStringMessage.newBuilder().setOrig("foo")))
+                        .setName(PolyStringMessage.newBuilder().setOrig("foo")))
                 .build();
 
         AddUserResponse response = stub.addUser(request);

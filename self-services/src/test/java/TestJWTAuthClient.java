@@ -39,7 +39,7 @@ public class TestJWTAuthClient {
                         UserItemDelta.newBuilder()
                                 .setUserTypePath(DefaultUserTypePath.F_FAMILY_NAME)
                                 .setValuesToReplace("Bar")
-                        .build()
+                                .build()
                 )
                 .build();
 

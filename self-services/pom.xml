@@ -10,10 +10,10 @@
 
     <artifactId>midpoint-grpc-self-services</artifactId>
     <packaging>jar</packaging>
-    
+
     <name>midPoint gRPC Self Services</name>
     <description/>
-    
+
     <dependencies>
         <dependency>
             <groupId>jp.openstandia.midpoint.grpc</groupId>

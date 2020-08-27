@@ -29,7 +29,7 @@ public class TestBasicAuthClient {
                         UserItemDelta.newBuilder()
                                 .setUserTypePath(DefaultUserTypePath.F_FAMILY_NAME)
                                 .setValuesToReplace("Foo")
-                        .build()
+                                .build()
                 )
                 .build();
 

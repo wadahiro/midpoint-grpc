@@ -10,7 +10,7 @@
 
     <artifactId>midpoint-grpc-server</artifactId>
     <packaging>jar</packaging>
-    
+
     <name>midPoint gRPC Server</name>
     <description/>
 

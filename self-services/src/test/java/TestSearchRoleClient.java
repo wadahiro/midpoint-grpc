@@ -4,7 +4,6 @@ import io.grpc.Metadata;
 import io.grpc.stub.MetadataUtils;
 import jp.openstandia.midpoint.grpc.*;
 
-import javax.management.Query;
 import java.io.UnsupportedEncodingException;
 import java.util.Base64;
 
