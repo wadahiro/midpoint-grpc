@@ -12,52 +12,52 @@ service SelfServiceResource {
     /**
      * Get self profile.
      */
-    rpc getSelf(GetSelfRequest) returns (GetSelfResponse);
+    rpc getSelf (GetSelfRequest) returns (GetSelfResponse);
 
     /**
      * Get self assignments.
      */
-    rpc getSelfAssignment(GetSelfAssignmentRequest) returns (GetSelfAssignmentResponse);
+    rpc getSelfAssignment (GetSelfAssignmentRequest) returns (GetSelfAssignmentResponse);
 
     /**
      * Modify self profile by deltas.
      */
-    rpc modifyProfile(ModifyProfileRequest) returns (ModifyProfileResponse);
+    rpc modifyProfile (ModifyProfileRequest) returns (ModifyProfileResponse);
 
     /**
      * Update self credential with current password validating.
      */
-    rpc updateCredential(UpdateCredentialRequest) returns (UpdateCredentialResponse);
+    rpc updateCredential (UpdateCredentialRequest) returns (UpdateCredentialResponse);
 
     /**
      * Force update self credential.
      */
-    rpc forceUpdateCredential(ForceUpdateCredentialRequest) returns (UpdateCredentialResponse);
+    rpc forceUpdateCredential (ForceUpdateCredentialRequest) returns (UpdateCredentialResponse);
 
     /**
      * Request assignments.
      */
-    rpc requestAssignments(RequestAssignmentsRequest) returns (RequestAssignmentsResponse);
+    rpc requestAssignments (RequestAssignmentsRequest) returns (RequestAssignmentsResponse);
 
     /**
      * Add new user.
      */
-    rpc addUser(AddUserRequest) returns (AddUserResponse);
+    rpc addUser (AddUserRequest) returns (AddUserResponse);
 
     /**
      * Search users.
      */
-    rpc searchUsers(SearchRequest) returns (SearchUsersResponse);
+    rpc searchUsers (SearchRequest) returns (SearchUsersResponse);
 
     /**
      * Search roles.
      */
-    rpc searchRoles(SearchRequest) returns (SearchRolesResponse);
+    rpc searchRoles (SearchRequest) returns (SearchRolesResponse);
 
     /**
      * Search orgs.
      */
-    rpc searchOrgs(SearchRequest) returns (SearchOrgsResponse);
+    rpc searchOrgs (SearchRequest) returns (SearchOrgsResponse);
 }
 
 message GetSelfRequest {
@@ -367,6 +367,7 @@ message QNameMessage {
 
 message ModifyProfileRequest {
     repeated UserItemDelta modifications = 1;
+    repeated string options = 2;
 }
 
 message UserItemDelta {
@@ -516,9 +517,9 @@ message SingleMessage {
 
 message Message {
     oneof message_wrapper {
-         SingleMessage single = 3;
-         MessageList list = 4;
-         string string = 5;
+        SingleMessage single = 3;
+        MessageList list = 4;
+        string string = 5;
     }
 }
 

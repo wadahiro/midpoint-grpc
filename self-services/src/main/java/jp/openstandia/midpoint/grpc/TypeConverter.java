@@ -1057,32 +1057,45 @@ public class TypeConverter {
 
     private static PrismValue toPrismValue(PrismContext prismContext, ItemDefinition definition, PrismValueMessage prismValue) throws SchemaException {
         if (prismValue.hasContainer()) {
-            return toPrismContainerValue(prismContext, definition, prismValue.getContainer());
+            if (!(definition instanceof PrismContainerDefinition)) {
+                StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                        .withDescription("invalid_prism_container_schema")
+                        .asRuntimeException();
+                throw exception;
+            }
+            return toPrismContainerValue(prismContext, (PrismContainerDefinition) definition, prismValue.getContainer());
+
         } else if (prismValue.hasProperty()) {
-            return toPrismPropertyValue(prismContext, prismValue.getProperty());
+            if (!(definition instanceof PrismPropertyDefinition)) {
+                StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                        .withDescription("invalid_prism_property_schema")
+                        .asRuntimeException();
+                throw exception;
+            }
+            return toPrismPropertyValue(prismContext, (PrismPropertyDefinition) definition, prismValue.getProperty());
+
         } else {
-            return toPrismReferenceValue(prismContext, prismValue.getRef());
+            // Reference case
+            if (!(definition instanceof PrismReferenceDefinition)) {
+                StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                        .withDescription("invalid_prism_reference_schema")
+                        .asRuntimeException();
+                throw exception;
+            }
+            return toPrismReferenceValue(prismContext, (PrismReferenceDefinition) definition, prismValue.getRef());
         }
     }
 
-    private static PrismContainerValue toPrismContainerValue(PrismContext prismContext, ItemDefinition definition, PrismContainerValueMessage container) throws SchemaException {
+    private static PrismContainerValue toPrismContainerValue(PrismContext prismContext, PrismContainerDefinition definition, PrismContainerValueMessage container) throws SchemaException {
         PrismContainerValue impl = new PrismContainerValueImpl(prismContext);
-
-        if (definition instanceof PrismContainerDefinition) {
-            PrismContainerDefinition containerDefinition = (PrismContainerDefinition) definition;
-            impl.applyDefinition(containerDefinition);
-        }
+        // Need to apply here
+        impl.applyDefinition(definition);
 
         Map<String, PrismValueMessage> valueMap = container.getValueMap();
         for (Map.Entry<String, PrismValueMessage> entry : valueMap.entrySet()) {
             QName qname = toQName(entry.getValue(), entry.getKey());
 
             ItemDefinition entryDefinition = definition.findItemDefinition(ItemPath.create(qname), ItemDefinition.class);
-
-            // TODO Schema check
-            if (entryDefinition == null) {
-            }
-
             PrismValue realValue = toPrismValue(prismContext, entryDefinition, entry.getValue());
 
             if (realValue instanceof PrismContainerValue) {
@@ -1115,7 +1128,7 @@ public class TypeConverter {
         return new QName(message.getNamespaceURI(), localPart);
     }
 
-    private static PrismPropertyValue toPrismPropertyValue(PrismContext prismContext, PrismPropertyMessage property) {
+    private static PrismPropertyValue toPrismPropertyValue(PrismContext prismContext, PrismPropertyDefinition definition, PrismPropertyMessage property) {
         if (property.hasSingle()) {
             return new PrismPropertyValueImpl(toPrismValue(prismContext, property.getSingle()));
         } else {
@@ -1149,7 +1162,7 @@ public class TypeConverter {
         return new PolyString(message.getOrig(), message.getNorm());
     }
 
-    private static PrismReferenceValue toPrismReferenceValue(PrismContext prismContext, ReferenceMessage ref) {
+    private static PrismReferenceValue toPrismReferenceValue(PrismContext prismContext, PrismReferenceDefinition definition, ReferenceMessage ref) throws SchemaException {
         return toRealValue(prismContext, ref).asReferenceValue();
     }
 }

@@ -290,8 +290,6 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
             OperationResult updateResult = task.getResult().createSubresult(OPERATION_EXECUTE_USER_UPDATE);
             try {
-                Collection<ObjectDelta<? extends ObjectType>> modifications = new ArrayList<>();
-
                 PrismContainerDefinition<UserType> definition = prismContext.getSchemaRegistry()
                         .findContainerDefinitionByCompileTimeClass(UserType.class);
 
@@ -369,12 +367,11 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                     }
                     i = entry;
                 }
-                // TODO implement options
-                ModelExecuteOptions options = new ModelExecuteOptions();
+                Collection<? extends ItemDelta<?, ?>> modifications = i.asItemDeltas();
 
-                List<ItemDelta<?, ?>> deltas = i.asItemDeltas();
+                ModelExecuteOptions modelExecuteOptions = ModelExecuteOptions.fromRestOptions(request.getOptionsList());
 
-                modelCrudService.modifyObject(UserType.class, loggedInUser.getOid(), deltas, options, task, updateResult);
+                modelCrudService.modifyObject(UserType.class, loggedInUser.getOid(), modifications, modelExecuteOptions, task, updateResult);
 
                 updateResult.computeStatus();
             } finally {
