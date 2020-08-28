@@ -25,20 +25,54 @@ public class TestModifyComplexClient {
         stub = MetadataUtils.attachHeaders(stub, headers);
 
         ModifyProfileRequest request = ModifyProfileRequest.newBuilder()
-                // Need when updating reference without oid
-                .addOptions("reevaluateSearchFilters")
                 .addModifications(
-                        UserItemDelta.newBuilder()
-                                .setPath("extension/singleRef")
+                        UserItemDeltaMessage.newBuilder()
+                                .setPath("extension/multipleComplex/[1]/name")
                                 .addPrismValuesToReplace(PrismValueMessage.newBuilder()
-                                                .setRef(ReferenceMessage.newBuilder()
-                                                                .setObjectType(DefaultObjectType.ORG_TYPE)
-//                                                                .setOid("eaf1451f-465f-4b46-b0f8-74b925a4082b")
-                                                                .setName(PolyStringMessage.newBuilder()
-                                                                        .setOrig("Tenant1"))
-                                                )
+                                        .setProperty(
+                                                PrismPropertyValueMessage.newBuilder()
+                                                .setString("hogehoge")
+                                        )
                                 )
-//                )
+
+//                                .setPath("extension/multipleComplex")
+//                                .addPrismValuesToAdd(PrismValueMessage.newBuilder()
+//                                                .setContainer(PrismContainerValueMessage.newBuilder()
+//                                                                .putValue("name", PrismValueMessage.newBuilder()
+//                                                                        .setNamespaceURI("http://test.example.com/my")
+//                                                                        .setProperty(
+//                                                                                PrismPropertyMessage.newBuilder()
+//                                                                                        .setSingle(PrismPropertyValueMessage.newBuilder()
+//                                                                                                .setString("hogee")
+//                                                                                        )
+//                                                                        )
+//                                                                        .build()
+//                                                                )
+
+//                                                .putValue("description", PrismValueMessage.newBuilder()
+//                                                        .setNamespaceURI("http://test.example.com/my")
+//                                                        .setProperty(
+//                                                                PrismPropertyMessage.newBuilder()
+//                                                                        .setSingle(PrismPropertyValueMessage.newBuilder()
+//                                                                                .setString("descdesc")
+//                                                                        )
+//                                                        )
+//                                                        .build()
+//                                                )
+                        // Need when updating reference without oid
+//                .addOptions("reevaluateSearchFilters")
+//                .addModifications(
+//                        UserItemDelta.newBuilder()
+//                                .setPath("extension/singleRef")
+//                                .addPrismValuesToReplace(PrismValueMessage.newBuilder()
+//                                                .setRef(ReferenceMessage.newBuilder()
+//                                                                .setObjectType(DefaultObjectType.ORG_TYPE)
+////                                                                .setOid("eaf1451f-465f-4b46-b0f8-74b925a4082b")
+//                                                                .setName(PolyStringMessage.newBuilder()
+//                                                                        .setOrig("Tenant1"))
+//                                                )
+//                                )
+////                )
 //                .addModifications(
 //                        UserItemDelta.newBuilder()
 //                                .setPath("familyName")

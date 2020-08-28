@@ -55,8 +55,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.evolveum.midpoint.xml.ns._public.common.common_3.PartialProcessingTypeType.SKIP;
-import static jp.openstandia.midpoint.grpc.TypeConverter.toMessage;
 import static jp.openstandia.midpoint.grpc.TypeConverter.toPrismObject;
+import static jp.openstandia.midpoint.grpc.TypeConverter.toReferenceMessage;
 
 @GRpcService
 public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceResourceImplBase implements MidPointGrpcService {
@@ -140,7 +140,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         });
 
         GetSelfResponse res = GetSelfResponse.newBuilder()
-                .setProfile(toMessage(self.asObjectable()))
+                .setProfile(TypeConverter.toUserTypeMessage(self.asObjectable()))
                 .build();
 
         responseObserver.onNext(res);
@@ -242,15 +242,15 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                             QName relation = x.getTargetRef().getRelation();
 
                             return BuilderWrapper.wrap(AssignmentMessage.newBuilder())
-                                    .nullSafe(toMessage(orgRef, resolvedOrgRef), (b, v) -> b.setOrgRef(v))
+                                    .nullSafe(toReferenceMessage(orgRef, resolvedOrgRef), (b, v) -> b.setOrgRef(v))
                                     .unwrap()
                                     .setTargetRef(
                                             BuilderWrapper.wrap(ReferenceMessage.newBuilder())
                                                     .nullSafe(o.getOid(), (b, v) -> b.setOid(v))
-                                                    .nullSafe(toMessage(o.getName()), (b, v) -> b.setName(v))
-                                                    .nullSafe(toMessage(o.getDescription()), (b, v) -> b.setDescription(v))
-                                                    .nullSafe(toMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
-                                                    .nullSafe(toMessage(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
+                                                    .nullSafe(TypeConverter.toPolyStringMessage(o.getName()), (b, v) -> b.setName(v))
+                                                    .nullSafe(TypeConverter.toStringMessage(o.getDescription()), (b, v) -> b.setDescription(v))
+                                                    .nullSafe(TypeConverter.toPolyStringMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                                                    .nullSafe(TypeConverter.toReferenceMessageList(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
                                                     .unwrap()
                                                     .setRelation(
                                                             QNameMessage.newBuilder()
@@ -296,15 +296,15 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 S_ItemEntry i = prismContext.deltaFor(UserType.class);
 
                 // https://wiki.evolveum.com/display/midPoint/Using+Prism+Deltas
-                for (UserItemDelta m : request.getModificationsList()) {
+                for (UserItemDeltaMessage m : request.getModificationsList()) {
                     ItemPath path;
                     if (m.hasItemPath()) {
-                        path = TypeConverter.toRealValue(m.getItemPath());
+                        path = TypeConverter.toItemPathValue(m.getItemPath());
 
-                    } else if (m.getPathWrapperCase() == UserItemDelta.PathWrapperCase.PATH) {
+                    } else if (m.getPathWrapperCase() == UserItemDeltaMessage.PathWrapperCase.PATH) {
                         path = TypeConverter.toItemPath(m.getPath());
 
-                    } else if (m.getPathWrapperCase() == UserItemDelta.PathWrapperCase.USER_TYPE_PATH) {
+                    } else if (m.getPathWrapperCase() == UserItemDeltaMessage.PathWrapperCase.USER_TYPE_PATH) {
                         path = TypeConverter.toItemName(m.getUserTypePath());
 
                     } else {
@@ -330,35 +330,35 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
                     // Plain string
                     // TODO Remove this API
-                    if (!m.getValuesToAdd().isEmpty()) {
-                        S_MaybeDelete av = v.add(TypeConverter.toRealValue(m.getValuesToAdd(), itemClass));
+                    if (!m.getValuesToAddList().isEmpty()) {
+                        S_MaybeDelete av = v.add(TypeConverter.toRealValue(m.getValuesToAddList(), itemClass));
 
-                        if (!m.getValuesToDelete().isEmpty()) {
-                            entry = av.delete(TypeConverter.toRealValue(m.getValuesToDelete(), itemClass));
+                        if (!m.getValuesToDeleteList().isEmpty()) {
+                            entry = av.delete(TypeConverter.toRealValue(m.getValuesToDeleteList(), itemClass));
                         } else {
                             entry = av;
                         }
-                    } else if (!m.getValuesToReplace().isEmpty()) {
-                        entry = v.replace(TypeConverter.toRealValue(m.getValuesToReplace(), itemClass));
+                    } else if (!m.getValuesToReplaceList().isEmpty()) {
+                        entry = v.replace(TypeConverter.toRealValue(m.getValuesToReplaceList(), itemClass));
 
-                    } else if (!m.getValuesToDelete().isEmpty()) {
-                        entry = v.delete(TypeConverter.toRealValue(m.getValuesToDelete(), itemClass));
+                    } else if (!m.getValuesToDeleteList().isEmpty()) {
+                        entry = v.delete(TypeConverter.toRealValue(m.getValuesToDeleteList(), itemClass));
                     }
 
                     // PrismValue
                     if (!m.getPrismValuesToAddList().isEmpty()) {
-                        S_MaybeDelete av = v.add(TypeConverter.toPrismValue(prismContext, itemDef, m.getPrismValuesToAddList(), itemClass));
+                        S_MaybeDelete av = v.add(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToAddList()));
 
                         if (!m.getPrismValuesToDeleteList().isEmpty()) {
-                            entry = av.delete(TypeConverter.toPrismValue(prismContext, itemDef, m.getPrismValuesToDeleteList(), itemClass));
+                            entry = av.delete(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToDeleteList()));
                         } else {
                             entry = av;
                         }
                     } else if (!m.getPrismValuesToReplaceList().isEmpty()) {
-                        entry = v.replace(TypeConverter.toPrismValue(prismContext, itemDef, m.getPrismValuesToReplaceList(), itemClass));
+                        entry = v.replace(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToReplaceList()));
 
                     } else if (!m.getPrismValuesToDeleteList().isEmpty()) {
-                        entry = v.delete(TypeConverter.toPrismValue(prismContext, itemDef, m.getPrismValuesToDeleteList(), itemClass));
+                        entry = v.delete(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToDeleteList()));
                     }
 
                     if (entry == null) {
@@ -441,7 +441,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             OperationResult parentResult = task.getResult().createSubresult(OPERATION_REQUEST_ASSIGNMENTS);
 
             List<PrismContainerValue> assignmentTypes = request.getAssignmentsList().stream()
-                    .map(x -> TypeConverter.toRealValue(prismContext, x).asPrismContainerValue())
+                    .map(x -> TypeConverter.toAssignmentTypeValue(prismContext, x).asPrismContainerValue())
                     .collect(Collectors.toList());
 
             String taskOid = null;
@@ -645,9 +645,12 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             return oid;
         });
 
-        AddUserResponse res = AddUserResponse.newBuilder()
-                .setOid(resultOid)
-                .build();
+        AddUserResponse.Builder builder = AddUserResponse.newBuilder();
+        // If the create process is suspended by workflow, oid is null
+        if (resultOid != null) {
+            builder.setOid(resultOid);
+        }
+        AddUserResponse res = builder.build();
 
         responseObserver.onNext(res);
         responseObserver.onCompleted();
@@ -758,7 +761,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         SearchResultList<PrismObject<UserType>> result = search(request, UserType.class);
 
         Integer total = result.getMetadata().getApproxNumberOfAllResults();
-        List<UserTypeMessage> users = result.stream().map(x -> toMessage(x.asObjectable())).collect(Collectors.toList());
+        List<UserTypeMessage> users = result.stream().map(x -> TypeConverter.toUserTypeMessage(x.asObjectable())).collect(Collectors.toList());
 
         SearchUsersResponse res = SearchUsersResponse.newBuilder()
                 .setNumberOfAllResults(total)
@@ -778,7 +781,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         SearchResultList<PrismObject<RoleType>> result = search(request, RoleType.class);
 
         Integer total = result.getMetadata().getApproxNumberOfAllResults();
-        List<RoleTypeMessage> roles = result.stream().map(x -> toMessage(x.asObjectable())).collect(Collectors.toList());
+        List<RoleTypeMessage> roles = result.stream().map(x -> TypeConverter.toRoleTypeMessage(x.asObjectable())).collect(Collectors.toList());
 
         SearchRolesResponse res = SearchRolesResponse.newBuilder()
                 .setNumberOfAllResults(total)
@@ -798,7 +801,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         SearchResultList<PrismObject<OrgType>> result = search(request, OrgType.class);
 
         Integer total = result.getMetadata().getApproxNumberOfAllResults();
-        List<OrgTypeMessage> orgs = result.stream().map(x -> toMessage(x.asObjectable())).collect(Collectors.toList());
+        List<OrgTypeMessage> orgs = result.stream().map(x -> TypeConverter.toOrgTypeMessage(x.asObjectable())).collect(Collectors.toList());
 
         SearchOrgsResponse res = SearchOrgsResponse.newBuilder()
                 .setNumberOfAllResults(total)

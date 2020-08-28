@@ -26,9 +26,9 @@ public class TestBasicAuthClient {
 
         ModifyProfileRequest request = ModifyProfileRequest.newBuilder()
                 .addModifications(
-                        UserItemDelta.newBuilder()
+                        UserItemDeltaMessage.newBuilder()
                                 .setUserTypePath(DefaultUserTypePath.F_FAMILY_NAME)
-                                .setValuesToReplace("Foo")
+                                .addValuesToReplace("Foo")
                                 .build()
                 )
                 .build();

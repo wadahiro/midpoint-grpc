@@ -1,7 +1,6 @@
 package jp.openstandia.midpoint.grpc;
 
 import com.evolveum.midpoint.prism.*;
-import com.evolveum.midpoint.prism.impl.PrismContainerValueImpl;
 import com.evolveum.midpoint.prism.impl.PrismPropertyValueImpl;
 import com.evolveum.midpoint.prism.impl.query.builder.QueryBuilder;
 import com.evolveum.midpoint.prism.path.ItemName;
@@ -58,6 +57,10 @@ public class TypeConverter {
         return itemName;
     }
 
+    public static List toRealValue(List<String> values, Class clazz) {
+        return values.stream().map(x -> toRealValue(x, clazz)).collect(Collectors.toList());
+    }
+
     public static Object toRealValue(String value, Class clazz) {
         if (clazz.isAssignableFrom(String.class)) {
             return value;
@@ -87,7 +90,7 @@ public class TypeConverter {
         } else if (msg instanceof LocalizableMessageList) {
             wrapper = toMessage((LocalizableMessageList) msg);
         } else if (msg == null) {
-            wrapper = toMessages(new Object[]{e.getMessage()}).iterator().next();
+            wrapper = toIterableMessages(new Object[]{e.getMessage()}).iterator().next();
         }
 
         if (wrapper == null) {
@@ -137,11 +140,11 @@ public class TypeConverter {
     private static SingleMessage toSingleMessage(SingleLocalizableMessage msg) {
         return SingleMessage.newBuilder()
                 .setKey(msg.getKey())
-                .addAllArgs(toMessages(msg.getArgs()))
+                .addAllArgs(toIterableMessages(msg.getArgs()))
                 .build();
     }
 
-    private static Iterable<? extends Message> toMessages(Object[] args) {
+    private static Iterable<? extends Message> toIterableMessages(Object[] args) {
         List<Message> list = new ArrayList<>();
 
         for (Object arg : args) {
@@ -163,14 +166,14 @@ public class TypeConverter {
         return list;
     }
 
-    public static String toMessage(String string) {
+    public static String toStringMessage(String string) {
         if (string == null) {
             return null;
         }
         return string;
     }
 
-    public static BytesMessage toMessage(byte[] bytes) {
+    public static BytesMessage toBytesMessage(byte[] bytes) {
         if (bytes == null) {
             return null;
         }
@@ -179,7 +182,7 @@ public class TypeConverter {
                 .build();
     }
 
-    public static PolyStringMessage toMessage(PolyString polyString) {
+    public static PolyStringMessage toPolyStringMessage(PolyString polyString) {
         if (polyString == null) {
             return null;
         }
@@ -189,7 +192,25 @@ public class TypeConverter {
                 .build();
     }
 
-    public static PolyStringMessage toMessage(PolyStringType polyStringType) {
+    public static IntegerMessage toIntegerMessage(Integer value) {
+        if (value == null) {
+            return null;
+        }
+        return IntegerMessage.newBuilder()
+                .setValue(value)
+                .build();
+    }
+
+    public static LongMessage toLongMessage(Long value) {
+        if (value == null) {
+            return null;
+        }
+        return LongMessage.newBuilder()
+                .setValue(value)
+                .build();
+    }
+
+    public static PolyStringMessage toPolyStringMessage(PolyStringType polyStringType) {
         if (polyStringType == null) {
             return null;
         }
@@ -199,27 +220,32 @@ public class TypeConverter {
                 .build();
     }
 
-    public static List<PolyStringMessage> toMessage(List<PolyStringType> polyStringType) {
+    public static List<PolyStringMessage> toPolyStringMessageList(List<PolyStringType> polyStringType) {
         return polyStringType.stream()
-                .map(x -> toMessage(x))
+                .map(x -> toPolyStringMessage(x))
                 .collect(Collectors.toList());
     }
 
 
-    public static List<ReferenceMessage> toMessage(List<ObjectReferenceType> ref, Map<String, AbstractRoleType> resolved) {
+    public static List<ReferenceMessage> toReferenceMessageList(List<ObjectReferenceType> ref, Map<String, AbstractRoleType> resolved) {
         return ref.stream()
-                .map(x -> toMessage(x, resolved.get(x.getOid())))
+                .map(x -> toReferenceMessage(x, resolved.get(x.getOid())))
                 .collect(Collectors.toList());
     }
 
-    public static ReferenceMessage toMessage(ObjectReferenceType ref, AbstractRoleType resolved) {
+
+    private static ReferenceMessage toReferenceMessage(ItemDefinition definition, PrismReferenceValue value) {
+        return toReferenceMessage((ObjectReferenceType) value.getRealValue(), null);
+    }
+
+    public static ReferenceMessage toReferenceMessage(ObjectReferenceType ref, AbstractRoleType resolved) {
         if (ref == null) {
             return null;
         }
 
         QName relation = ref.getRelation();
         ReferenceMessage.Builder builder = BuilderWrapper.wrap(ReferenceMessage.newBuilder())
-                .nullSafe(toMessage(ref.getTargetName()), (b, v) -> b.setName(v))
+                .nullSafe(toPolyStringMessage(ref.getTargetName()), (b, v) -> b.setName(v))
                 .unwrap()
                 .setOid(ref.getOid())
                 .setRelation(
@@ -230,101 +256,63 @@ public class TypeConverter {
                 );
         if (resolved != null) {
             builder = BuilderWrapper.wrap(builder)
-                    .nullSafe(toMessage(resolved.getName()), (b, v) -> b.setName(v))
-                    .nullSafe(toMessage(resolved.getDisplayName()), (b, v) -> b.setDisplayName(v))
-                    .nullSafe(toMessage(resolved.getDescription()), (b, v) -> b.setDescription(v))
-                    .nullSafe(toMessage(resolved.getEmailAddress()), (b, v) -> b.setEmailAddress(v))
+                    .nullSafe(toPolyStringMessage(resolved.getName()), (b, v) -> b.setName(v))
+                    .nullSafe(toPolyStringMessage(resolved.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                    .nullSafe(toStringMessage(resolved.getDescription()), (b, v) -> b.setDescription(v))
+                    .nullSafe(toStringMessage(resolved.getEmailAddress()), (b, v) -> b.setEmailAddress(v))
                     .unwrap();
         }
 
         return builder.build();
     }
 
-    public static <T> List<T> toRealValue(PrismContext prismContext, Class<T> toClass, List<?> message) {
-        return message.stream().map(x -> toRealValue(prismContext, toClass, x)).collect(Collectors.toList());
-    }
-
-    public static <T> T toRealValue(PrismContext prismContext, Class<T> toClass, Object message) {
-        if (message instanceof String) {
-            return toRealValue((String) message);
-        }
-        if (message instanceof ExtensionValue) {
-            return toRealValue(prismContext, (ExtensionValue) message);
-        }
-        if (message instanceof PolyStringMessage) {
-            return toRealValue((PolyStringMessage) message);
-        }
-        if (message instanceof BytesMessage) {
-            return toRealValue((BytesMessage) message);
-        }
-
-        return null;
-    }
-
-    public static <T> T toRealValue(String message) {
+    public static String toStringValue(String message) {
         if (message == null || message.isEmpty()) {
             return null;
         }
-        return (T) message;
+        return message;
     }
 
-    public static <T> T toRealValue(BytesMessage message) {
+    public static byte[] toByteArrayValue(BytesMessage message) {
         if (message.getBytesOptionalCase() == BytesMessage.BytesOptionalCase.BYTESOPTIONAL_NOT_SET) {
             return null;
         }
-        return (T) message.getValue().toByteArray();
+        return message.getValue().toByteArray();
     }
 
-    public static <T> T toRealValue(PolyStringMessage message) {
+    public static PolyStringType toPolyStringTypeValue(PolyStringMessage message) {
         if (isEmpty(message)) {
             return null;
         }
-        return (T) new PolyStringType(new PolyString(message.getOrig(), message.getNorm()));
+        return new PolyStringType(new PolyString(message.getOrig(), message.getNorm()));
     }
 
-    public static <T> T toRealValue(PrismContext prismContext, ExtensionValue message) {
-        if (message.hasInteger()) {
-            return (T) toRealValue(message.getInteger());
-        }
-        if (message.hasLong()) {
-            return (T) toRealValue(message.getLong());
-        }
-        if (message.hasPolyString()) {
-            return (T) toRealValue(message.getPolyString());
-        }
-        if (message.hasRef()) {
-            return (T) toRealValue(prismContext, message.getRef());
-        }
-        // string case
-        return (T) message.getString();
-    }
-
-    public static Object toRealValue(IntegerMessage message) {
+    public static Integer toIntegerValue(IntegerMessage message) {
         if (message.getIntOptionalCase() == IntegerMessage.IntOptionalCase.INTOPTIONAL_NOT_SET) {
             return null;
         }
         return message.getValue();
     }
 
-    public static Object toRealValue(LongMessage message) {
+    public static Long toLongValue(LongMessage message) {
         if (message.getLongOptionalCase() == LongMessage.LongOptionalCase.LONGOPTIONAL_NOT_SET) {
             return null;
         }
         return message.getValue();
     }
 
-    public static Collection<? extends AssignmentType> toRealValue(PrismContext prismContext, List<AssignmentMessage> assignmentList) {
+    public static List<? extends AssignmentType> toAssignmentTypeListValue(PrismContext prismContext, List<AssignmentMessage> assignmentList) {
         return assignmentList.stream()
-                .map(x -> toRealValue(prismContext, x))
+                .map(x -> toAssignmentTypeValue(prismContext, x))
                 .filter(x -> x != null)
                 .collect(Collectors.toList());
     }
 
-    public static AssignmentType toRealValue(PrismContext prismContext, AssignmentMessage message) {
+    public static AssignmentType toAssignmentTypeValue(PrismContext prismContext, AssignmentMessage message) {
         AssignmentType assignment = new AssignmentType();
-        assignment.setTargetRef(toRealValue(prismContext, message.getTargetRef()));
+        assignment.setTargetRef(toObjectReferenceTypeValue(prismContext, message.getTargetRef()));
         if (message.hasOrgRef()) {
-            assignment.setOrgRef(toRealValue(prismContext, message.getOrgRef()));
+            assignment.setOrgRef(toObjectReferenceTypeValue(prismContext, message.getOrgRef()));
         }
         if (!message.getExtensionMap().isEmpty()) {
             try {
@@ -385,11 +373,11 @@ public class TypeConverter {
         }
 
         ObjectQuery query = exitBuilder.build();
-        query.setPaging(toMessage(prismContext, message.getPaging()));
+        query.setPaging(toObjectPaging(prismContext, message.getPaging()));
         return query;
     }
 
-    public static ObjectPaging toMessage(PrismContext prismContext, PagingMessage message) {
+    public static ObjectPaging toObjectPaging(PrismContext prismContext, PagingMessage message) {
         ObjectPaging paging = prismContext.queryFactory().createPaging();
         paging.setOffset(message.getOffset());
         if (message.getMaxSize() != 0) {
@@ -401,7 +389,7 @@ public class TypeConverter {
 
     public static Collection<? extends ObjectOrdering> toObjectOrdering(PrismContext prismContext, List<ObjectOrderingMessage> message) {
         return message.stream().map(x -> {
-            OrderDirection direction = toRealValue(x.getOrderDirection());
+            OrderDirection direction = toOrderDirectionValue(x.getOrderDirection());
             String orderBy = x.getOrderBy();
             ItemPath itemPath = toItemPath(orderBy);
 
@@ -409,7 +397,7 @@ public class TypeConverter {
         }).collect(Collectors.toList());
     }
 
-    private static OrderDirection toRealValue(OrderDirectionType message) {
+    private static OrderDirection toOrderDirectionValue(OrderDirectionType message) {
         switch (message) {
             case ASCEDING:
                 return OrderDirection.ASCENDING;
@@ -468,7 +456,16 @@ public class TypeConverter {
     }
 
     public static ItemPath toItemPath(String message) {
-        return ItemPath.create(message.split("/"));
+        return ItemPath.create(Arrays.stream(message.split("/")).map(x -> {
+            try {
+                if (x.startsWith("[") && x.endsWith("]")) {
+                    return Long.parseLong(x.substring(1, x.length() - 1));
+                }
+                return x;
+            } catch (NumberFormatException e) {
+                return x;
+            }
+        }).collect(Collectors.toList()));
     }
 
     public static S_AtomicFilterExit toEqFilter(S_FilterEntryOrEmpty builder, FilterEntryMessage message) {
@@ -476,7 +473,7 @@ public class TypeConverter {
                 .eq(message.getValue());
 
         if (message.hasMatchingRule()) {
-            return filter.matching(toRealValue(message.getMatchingRule()));
+            return filter.matching(toQNameValue(message.getMatchingRule()));
         }
         return filter;
     }
@@ -486,7 +483,7 @@ public class TypeConverter {
                 .startsWith(message.getValue());
 
         if (message.hasMatchingRule()) {
-            return filter.matching(toRealValue(message.getMatchingRule()));
+            return filter.matching(toQNameValue(message.getMatchingRule()));
         }
         return filter;
     }
@@ -496,7 +493,7 @@ public class TypeConverter {
                 .contains(message.getValue());
 
         if (message.hasMatchingRule()) {
-            return filter.matching(toRealValue(message.getMatchingRule()));
+            return filter.matching(toQNameValue(message.getMatchingRule()));
         }
         return filter;
     }
@@ -506,7 +503,7 @@ public class TypeConverter {
                 .endsWith(message.getValue());
 
         if (message.hasMatchingRule()) {
-            return filter.matching(toRealValue(message.getMatchingRule()));
+            return filter.matching(toQNameValue(message.getMatchingRule()));
         }
         return filter;
     }
@@ -516,7 +513,7 @@ public class TypeConverter {
                 .eqPoly(message.getValue());
 
         if (message.hasMatchingRule()) {
-            return filter.matching(toRealValue(message.getMatchingRule()));
+            return filter.matching(toQNameValue(message.getMatchingRule()));
         }
         return filter;
     }
@@ -526,7 +523,7 @@ public class TypeConverter {
                 .startsWithPoly(message.getValue());
 
         if (message.hasMatchingRule()) {
-            return filter.matching(toRealValue(message.getMatchingRule()));
+            return filter.matching(toQNameValue(message.getMatchingRule()));
         }
         return filter;
     }
@@ -536,7 +533,7 @@ public class TypeConverter {
                 .containsPoly(message.getValue());
 
         if (message.hasMatchingRule()) {
-            return filter.matching(toRealValue(message.getMatchingRule()));
+            return filter.matching(toQNameValue(message.getMatchingRule()));
         }
         return filter;
     }
@@ -546,7 +543,7 @@ public class TypeConverter {
                 .endsWithPoly(message.getValue());
 
         if (message.hasMatchingRule()) {
-            return filter.matching(toRealValue(message.getMatchingRule()));
+            return filter.matching(toQNameValue(message.getMatchingRule()));
         }
         return filter;
     }
@@ -632,13 +629,13 @@ public class TypeConverter {
         }
     }
 
-    public static ObjectReferenceType toRealValue(PrismContext prismContext, ReferenceMessage message) {
+    public static ObjectReferenceType toObjectReferenceTypeValue(PrismContext prismContext, ReferenceMessage message) {
         ObjectReferenceType ref = new ObjectReferenceType();
 
         if (message.hasType()) {
-            ref.setType(toRealValue(message.getType()));
+            ref.setType(toQNameValue(message.getType()));
         } else if (message.getTypeWrapperCase() == ReferenceMessage.TypeWrapperCase.OBJECT_TYPE) {
-            ref.setType(toRealValue(message.getObjectType()));
+            ref.setType(toQNameValue(message.getObjectType()));
         } else {
             StatusRuntimeException exception = Status.INVALID_ARGUMENT
                     .withDescription("invalid_type_of_object_reference_type")
@@ -660,9 +657,9 @@ public class TypeConverter {
         }
 
         if (message.hasRelation()) {
-            ref.setRelation(toRealValue(message.getRelation()));
+            ref.setRelation(toQNameValue(message.getRelation()));
         } else if (message.getRelationWrapperCase() == ReferenceMessage.RelationWrapperCase.RELATION_TYPE) {
-            ref.setRelation(toRealValue(message.getRelationType()));
+            ref.setRelation(toQNameValue(message.getRelationType()));
         } else {
             // Use default relation if missing relation
             ref.setRelation(prismContext.getDefaultRelation());
@@ -690,7 +687,7 @@ public class TypeConverter {
 //        return null;
 //    }
 
-    public static QName toRealValue(QNameMessage message) {
+    public static QName toQNameValue(QNameMessage message) {
         if (message.getNamespaceURI().isEmpty() && message.getLocalPart().isEmpty()) {
             return SchemaConstants.ORG_DEFAULT;
         }
@@ -704,7 +701,7 @@ public class TypeConverter {
         return new QName(message.getNamespaceURI(), message.getLocalPart(), message.getPrefix());
     }
 
-    public static QName toRealValue(DefaultRelationType type) {
+    public static QName toQNameValue(DefaultRelationType type) {
         switch (type) {
             case ORG_DEFAULT:
                 return SchemaConstants.ORG_DEFAULT;
@@ -724,7 +721,7 @@ public class TypeConverter {
         return null;
     }
 
-    public static QName toRealValue(DefaultObjectType type) {
+    public static QName toQNameValue(DefaultObjectType type) {
         switch (type) {
             case OBJECT_TYPE:
                 return ObjectType.COMPLEX_TYPE;
@@ -753,7 +750,7 @@ public class TypeConverter {
         return false;
     }
 
-    public static void addExtensionType(PrismContext prismContext, ObjectType object, Map<String, ExtensionMessage> map) throws SchemaException {
+    public static void addExtensionType(PrismContext prismContext, ObjectType object, Map<String, ItemMessage> map) throws SchemaException {
         if (map.isEmpty()) {
             return;
         }
@@ -761,7 +758,7 @@ public class TypeConverter {
         addExtensionType(prismContext, object.asPrismObject(), map);
     }
 
-    public static void addExtensionType(PrismContext prismContext, PrismObject object, Map<String, ExtensionMessage> map) throws SchemaException {
+    public static void addExtensionType(PrismContext prismContext, PrismObject object, Map<String, ItemMessage> map) throws SchemaException {
         if (map.isEmpty()) {
             return;
         }
@@ -770,7 +767,7 @@ public class TypeConverter {
         addExtensionType(prismContext, extension, map);
     }
 
-    public static void addExtensionType(PrismContext prismContext, PrismContainerValue object, Map<String, ExtensionMessage> map) throws SchemaException {
+    public static void addExtensionType(PrismContext prismContext, PrismContainerValue object, Map<String, ItemMessage> map) throws SchemaException {
         if (map.isEmpty()) {
             return;
         }
@@ -779,65 +776,100 @@ public class TypeConverter {
         addExtensionType(prismContext, extension, map);
     }
 
-    public static void addExtensionType(PrismContext prismContext, PrismContainer extension, Map<String, ExtensionMessage> map) throws SchemaException {
+    public static void addExtensionType(PrismContext prismContext, PrismContainer extension, Map<String, ItemMessage> map) throws SchemaException {
         if (map.isEmpty()) {
             return;
         }
 
-        for (Map.Entry<String, ExtensionMessage> entry : map.entrySet()) {
+        for (Map.Entry<String, ItemMessage> entry : map.entrySet()) {
             String k = entry.getKey();
-            ExtensionMessage v = entry.getValue();
+            ItemMessage v = entry.getValue();
 
             QName qname = toQName(v, k);
             ItemPath path = ItemPath.create(qname);
-
-            // No value case
-            if (!v.hasSingle() && !v.hasMultiple()) {
-                throw new SchemaException("No value for " + qname);
-            }
 
             ItemDefinition definition = extension.getDefinition().findItemDefinition(path);
             if (definition == null) {
                 throw new SchemaException("No schema: " + qname);
             }
 
-            if (definition.isSingleValue()) {
-                if (v.hasMultiple()) {
-                    throw new SchemaException("Multiple value is used for single value: " + qname);
-                }
-                addExtensionValue(prismContext, extension, definition, path, v.getSingle());
+            if (definition instanceof PrismPropertyDefinition) {
+                addExtensionValue(prismContext, extension, (PrismPropertyDefinition) definition, path, v.getProperty());
+
+            } else if (definition instanceof PrismContainerDefinition) {
+                addExtensionValue(prismContext, extension, (PrismContainerDefinition) definition, path, v.getContainer());
+
+            } else if (definition instanceof PrismReferenceDefinition) {
+                addExtensionValue(prismContext, extension, (PrismReferenceDefinition) definition, path, v.getRef());
+
             } else {
-                if (v.hasSingle()) {
-                    throw new SchemaException("Single value is used for multiple value: " + qname);
-                }
-                addExtensionValue(prismContext, extension, definition, path, v.getMultiple());
+                throw new UnsupportedOperationException(definition.getClass() + " is not supported");
             }
         }
     }
 
-    public static void addExtensionValue(PrismContext prismContext, PrismContainer extension, ItemDefinition definition, ItemPath path, ExtensionValueList values) throws SchemaException {
-        for (ExtensionValue value : values.getValuesList()) {
-            addExtensionValue(prismContext, extension, definition, path, value);
+    private static void addExtensionValue(PrismContext prismContext, PrismContainer extension, PrismReferenceDefinition definition,
+                                          ItemPath path, PrismReferenceMessage ref) throws SchemaException {
+        // Empty, do nothing
+        if (ref == null) {
+            return;
+        }
+
+        PrismReference holder = extension.findOrCreateReference(path);
+
+        if (definition.isSingleValue() && ref.getValuesCount() > 1) {
+            throw new SchemaException("Multiple value is used for single value: " + path);
+        }
+
+        for (ReferenceMessage value : ref.getValuesList()) {
+            holder.add(toPrismReferenceValue(prismContext, definition, value));
         }
     }
 
-    public static void addExtensionValue(PrismContext prismContext, PrismContainer extension, ItemDefinition definition, ItemPath path, ExtensionValue value) throws SchemaException {
-        // For ObjectReferenceType, we need to use PrismReference to hold it.
-        // For other types, we need to use PrismProperty to hold it.
-        if (definition.getTypeClass() == com.evolveum.prism.xml.ns._public.types_3.ObjectReferenceType.class) {
-            PrismReference reference = extension.findOrCreateReference(path);
-            Object o = toRealValue(prismContext, value);
-            if (!(o instanceof ObjectReferenceType)) {
-                throw new SchemaException("The value must be ObjectReferenceType but it's " + o.getClass());
-            }
-            reference.add(((ObjectReferenceType) o).asReferenceValue());
-        } else {
-            PrismProperty property = extension.findOrCreateProperty(path);
-            property.addRealValue(toRealValue(prismContext, value));
+    private static void addExtensionValue(PrismContext prismContext, PrismContainer extension, PrismContainerDefinition definition,
+                                          ItemPath path, PrismContainerMessage container) throws SchemaException {
+        // Empty, do nothing
+        if (container.getValuesCount() == 0) {
+            return;
+        }
+
+        PrismContainer holder = extension.findOrCreateContainer(path);
+
+        if (definition.isSingleValue() && container.getValuesCount() > 1) {
+            throw new SchemaException("Multiple value is used for single value: " + path);
+        }
+
+        for (PrismContainerValueMessage value : container.getValuesList()) {
+            holder.add(toPrismContainerValue(prismContext, definition, value));
         }
     }
 
-    public static QName toQName(ExtensionMessage message, String localPart) {
+    private static void addExtensionValue(PrismContext prismContext, PrismContainer extension, PrismPropertyDefinition definition,
+                                          ItemPath path, PrismPropertyMessage property) throws SchemaException {
+        // Empty, do nothing
+        if (property.getValuesCount() == 0) {
+            return;
+        }
+
+        PrismProperty holder = extension.findOrCreateProperty(path);
+
+        if (definition.isSingleValue() && property.getValuesCount() > 1) {
+            throw new SchemaException("Multiple value is used for single value: " + path);
+        }
+
+        for (PrismPropertyValueMessage value : property.getValuesList()) {
+            holder.add(toPrismPropertyValue(prismContext, definition, value));
+        }
+    }
+
+    public static QName toQName(ItemMessage message, String localPart) {
+        if (message.getNamespaceURI().isEmpty()) {
+            return new QName(localPart);
+        }
+        return new QName(message.getNamespaceURI(), localPart);
+    }
+
+    public static QName toQName(PrismValueMessage message, String localPart) {
         if (message.getNamespaceURI().isEmpty()) {
             return new QName(localPart);
         }
@@ -846,39 +878,40 @@ public class TypeConverter {
 
     public static PrismObject<UserType> toPrismObject(PrismContext prismContext, RepositoryService repo, UserTypeMessage message) throws SchemaException {
         UserType user = new UserType(prismContext);
+        PrismContainerDefinition definition = user.asPrismContainerValue().getDefinition();
 
         // ObjectType
-        user.setName(toRealValue(message.getName()));
-        user.setDescription(toRealValue(message.getDescription()));
-        user.createSubtypeList().addAll(toRealValue(prismContext, String.class, message.getSubtypeList()));
-        user.setLifecycleState(toRealValue(message.getLifecycleState()));
+        user.setName(toPolyStringTypeValue(message.getName()));
+        user.setDescription(toStringValue(message.getDescription()));
+        user.createSubtypeList().addAll(message.getSubtypeList());
+        user.setLifecycleState(toStringValue(message.getLifecycleState()));
 
         // AssignmentHolderType
-        user.createAssignmentList().addAll(toRealValue(prismContext, message.getAssignmentList()));
+        user.createAssignmentList().addAll(toAssignmentTypeListValue(prismContext, message.getAssignmentList()));
         // can't set Archetype here directly because it throws policy error always.
 
         // FocusType
-        user.setJpegPhoto(toRealValue(message.getJpegPhoto()));
-        user.setCostCenter(toRealValue(message.getCostCenter()));
-        user.setLocality((toRealValue(message.getLocality())));
-        user.setPreferredLanguage(toRealValue(message.getPreferredLanguage()));
-        user.setLocale(toRealValue(message.getLocale()));
-        user.setTimezone(toRealValue(message.getTimezone()));
-        user.setEmailAddress(toRealValue(message.getEmailAddress()));
-        user.setTelephoneNumber(toRealValue(message.getTelephoneNumber()));
+        user.setJpegPhoto(toByteArrayValue(message.getJpegPhoto()));
+        user.setCostCenter(toStringValue(message.getCostCenter()));
+        user.setLocality((toPolyStringTypeValue(message.getLocality())));
+        user.setPreferredLanguage(toStringValue(message.getPreferredLanguage()));
+        user.setLocale(toStringValue(message.getLocale()));
+        user.setTimezone(toStringValue(message.getTimezone()));
+        user.setEmailAddress(toStringValue(message.getEmailAddress()));
+        user.setTelephoneNumber(toStringValue(message.getTelephoneNumber()));
 
         // UserType
-        user.setFullName(toRealValue(message.getFullName()));
-        user.setGivenName(toRealValue(message.getGivenName()));
-        user.setFamilyName(toRealValue(message.getFamilyName()));
-        user.setAdditionalName(toRealValue(message.getAdditionalName()));
-        user.setNickName(toRealValue(message.getNickName()));
-        user.setHonorificPrefix(toRealValue(message.getHonorificPrefix()));
-        user.setHonorificSuffix(toRealValue(message.getHonorificSuffix()));
-        user.setTitle(toRealValue(message.getTitle()));
-        user.setEmployeeNumber(toRealValue(message.getEmployeeNumber()));
-        user.createOrganizationList().addAll(toRealValue(prismContext, PolyStringType.class, message.getOrganizationList()));
-        user.createOrganizationalUnitList().addAll(toRealValue(prismContext, PolyStringType.class, message.getOrganizationalUnitList()));
+        user.setFullName(toPolyStringTypeValue(message.getFullName()));
+        user.setGivenName(toPolyStringTypeValue(message.getGivenName()));
+        user.setFamilyName(toPolyStringTypeValue(message.getFamilyName()));
+        user.setAdditionalName(toPolyStringTypeValue(message.getAdditionalName()));
+        user.setNickName(toPolyStringTypeValue(message.getNickName()));
+        user.setHonorificPrefix(toPolyStringTypeValue(message.getHonorificPrefix()));
+        user.setHonorificSuffix(toPolyStringTypeValue(message.getHonorificSuffix()));
+        user.setTitle(toPolyStringTypeValue(message.getTitle()));
+        user.setEmployeeNumber(toStringValue(message.getEmployeeNumber()));
+        user.createOrganizationList().addAll(toPolyStringTypeValueList(message.getOrganizationList()));
+        user.createOrganizationalUnitList().addAll(toPolyStringTypeValueList(message.getOrganizationalUnitList()));
 
         // Extension
         addExtensionType(prismContext, user, message.getExtensionMap());
@@ -886,63 +919,66 @@ public class TypeConverter {
         return user.asPrismObject();
     }
 
+    private static List<PolyStringType> toPolyStringTypeValueList(List<PolyStringMessage> organizationList) {
+        return organizationList.stream().map(x -> toPolyStringTypeValue(x)).collect(Collectors.toList());
+    }
 
-    public static UserTypeMessage toMessage(UserType u) {
+    public static UserTypeMessage toUserTypeMessage(UserType u) {
         return BuilderWrapper.wrap(UserTypeMessage.newBuilder())
                 // ObjectType
                 .nullSafe(u.getOid(), (b, v) -> b.setOid(v))
                 .nullSafe(u.getVersion(), (b, v) -> b.setVersion(v))
-                .nullSafe(toMessage(u.getName()), (b, v) -> b.setName(v))
+                .nullSafe(toPolyStringMessage(u.getName()), (b, v) -> b.setName(v))
                 .nullSafe(u.getDescription(), (b, v) -> b.setDescription(v))
                 .nullSafe(u.getSubtype(), (b, v) -> b.addAllSubtype(v))
                 .nullSafe(u.getLifecycleState(), (b, v) -> b.setLifecycleState(v))
                 // FocusType
-                .nullSafe(toMessage(u.getJpegPhoto()), (b, v) -> b.setJpegPhoto(v))
+                .nullSafe(toBytesMessage(u.getJpegPhoto()), (b, v) -> b.setJpegPhoto(v))
                 .nullSafe(u.getCostCenter(), (b, v) -> b.setCostCenter(v))
-                .nullSafe(toMessage(u.getLocality()), (b, v) -> b.setLocality(v))
+                .nullSafe(toPolyStringMessage(u.getLocality()), (b, v) -> b.setLocality(v))
                 .nullSafe(u.getPreferredLanguage(), (b, v) -> b.setPreferredLanguage(v))
                 .nullSafe(u.getLocale(), (b, v) -> b.setLocale(v))
                 .nullSafe(u.getTimezone(), (b, v) -> b.setTimezone(v))
                 .nullSafe(u.getEmailAddress(), (b, v) -> b.setEmailAddress(v))
                 .nullSafe(u.getTelephoneNumber(), (b, v) -> b.setTelephoneNumber(v))
                 // UserType
-                .nullSafe(toMessage(u.getFullName()), (b, v) -> b.setFullName(v))
-                .nullSafe(toMessage(u.getGivenName()), (b, v) -> b.setGivenName(v))
-                .nullSafe(toMessage(u.getFamilyName()), (b, v) -> b.setFamilyName(v))
-                .nullSafe(toMessage(u.getAdditionalName()), (b, v) -> b.setAdditionalName(v))
-                .nullSafe(toMessage(u.getNickName()), (b, v) -> b.setNickName(v))
-                .nullSafe(toMessage(u.getHonorificPrefix()), (b, v) -> b.setHonorificPrefix(v))
-                .nullSafe(toMessage(u.getHonorificSuffix()), (b, v) -> b.setHonorificSuffix(v))
-                .nullSafe(toMessage(u.getTitle()), (b, v) -> b.setTitle(v))
+                .nullSafe(toPolyStringMessage(u.getFullName()), (b, v) -> b.setFullName(v))
+                .nullSafe(toPolyStringMessage(u.getGivenName()), (b, v) -> b.setGivenName(v))
+                .nullSafe(toPolyStringMessage(u.getFamilyName()), (b, v) -> b.setFamilyName(v))
+                .nullSafe(toPolyStringMessage(u.getAdditionalName()), (b, v) -> b.setAdditionalName(v))
+                .nullSafe(toPolyStringMessage(u.getNickName()), (b, v) -> b.setNickName(v))
+                .nullSafe(toPolyStringMessage(u.getHonorificPrefix()), (b, v) -> b.setHonorificPrefix(v))
+                .nullSafe(toPolyStringMessage(u.getHonorificSuffix()), (b, v) -> b.setHonorificSuffix(v))
+                .nullSafe(toPolyStringMessage(u.getTitle()), (b, v) -> b.setTitle(v))
                 .nullSafe(u.getEmployeeNumber(), (b, v) -> b.setEmployeeNumber(v))
-                .nullSafe(toMessage(u.getOrganization()), (b, v) -> b.addAllOrganization(v))
-                .nullSafe(toMessage(u.getOrganizationalUnit()), (b, v) -> b.addAllOrganizationalUnit(v))
+                .nullSafe(toPolyStringMessageList(u.getOrganization()), (b, v) -> b.addAllOrganization(v))
+                .nullSafe(toPolyStringMessageList(u.getOrganizationalUnit()), (b, v) -> b.addAllOrganizationalUnit(v))
                 // Extension
-                .nullSafe(toExtensionMessageMap(u.asPrismObject()), (b, v) -> b.putAllExtension(v))
+                .nullSafe(toItemMessageMap(u.asPrismObject()), (b, v) -> b.putAllExtension(v))
                 .unwrap()
                 .build();
     }
 
-    public static RoleTypeMessage toMessage(RoleType u) {
+    public static RoleTypeMessage toRoleTypeMessage(RoleType u) {
         return BuilderWrapper.wrap(RoleTypeMessage.newBuilder())
                 // ObjectType
                 .nullSafe(u.getOid(), (b, v) -> b.setOid(v))
                 .nullSafe(u.getVersion(), (b, v) -> b.setVersion(v))
-                .nullSafe(toMessage(u.getName()), (b, v) -> b.setName(v))
+                .nullSafe(toPolyStringMessage(u.getName()), (b, v) -> b.setName(v))
                 .nullSafe(u.getDescription(), (b, v) -> b.setDescription(v))
                 .nullSafe(u.getSubtype(), (b, v) -> b.addAllSubtype(v))
                 .nullSafe(u.getLifecycleState(), (b, v) -> b.setLifecycleState(v))
                 // FocusType
-                .nullSafe(toMessage(u.getJpegPhoto()), (b, v) -> b.setJpegPhoto(v))
+                .nullSafe(toBytesMessage(u.getJpegPhoto()), (b, v) -> b.setJpegPhoto(v))
                 .nullSafe(u.getCostCenter(), (b, v) -> b.setCostCenter(v))
-                .nullSafe(toMessage(u.getLocality()), (b, v) -> b.setLocality(v))
+                .nullSafe(toPolyStringMessage(u.getLocality()), (b, v) -> b.setLocality(v))
                 .nullSafe(u.getPreferredLanguage(), (b, v) -> b.setPreferredLanguage(v))
                 .nullSafe(u.getLocale(), (b, v) -> b.setLocale(v))
                 .nullSafe(u.getTimezone(), (b, v) -> b.setTimezone(v))
                 .nullSafe(u.getEmailAddress(), (b, v) -> b.setEmailAddress(v))
                 .nullSafe(u.getTelephoneNumber(), (b, v) -> b.setTelephoneNumber(v))
                 // AbstractRoleType
-                .nullSafe(toMessage(u.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                .nullSafe(toPolyStringMessage(u.getDisplayName()), (b, v) -> b.setDisplayName(v))
                 .nullSafe(u.getIdentifier(), (b, v) -> b.setIdentifier(v))
                 .nullSafe(u.isRequestable(), (b, v) -> b.setRequestable(v))
                 .nullSafe(u.isDelegable(), (b, v) -> b.setDelegable(v))
@@ -950,31 +986,31 @@ public class TypeConverter {
                 // RoleType
                 .nullSafe(u.getRoleType(), (b, v) -> b.setRoleType(v))
                 // Extension
-                .nullSafe(toExtensionMessageMap(u.asPrismObject()), (b, v) -> b.putAllExtension(v))
+                .nullSafe(toItemMessageMap(u.asPrismObject()), (b, v) -> b.putAllExtension(v))
                 .unwrap()
                 .build();
     }
 
-    public static OrgTypeMessage toMessage(OrgType u) {
+    public static OrgTypeMessage toOrgTypeMessage(OrgType u) {
         return BuilderWrapper.wrap(OrgTypeMessage.newBuilder())
                 // ObjectType
                 .nullSafe(u.getOid(), (b, v) -> b.setOid(v))
                 .nullSafe(u.getVersion(), (b, v) -> b.setVersion(v))
-                .nullSafe(toMessage(u.getName()), (b, v) -> b.setName(v))
+                .nullSafe(toPolyStringMessage(u.getName()), (b, v) -> b.setName(v))
                 .nullSafe(u.getDescription(), (b, v) -> b.setDescription(v))
                 .nullSafe(u.getSubtype(), (b, v) -> b.addAllSubtype(v))
                 .nullSafe(u.getLifecycleState(), (b, v) -> b.setLifecycleState(v))
                 // FocusType
-                .nullSafe(toMessage(u.getJpegPhoto()), (b, v) -> b.setJpegPhoto(v))
+                .nullSafe(toBytesMessage(u.getJpegPhoto()), (b, v) -> b.setJpegPhoto(v))
                 .nullSafe(u.getCostCenter(), (b, v) -> b.setCostCenter(v))
-                .nullSafe(toMessage(u.getLocality()), (b, v) -> b.setLocality(v))
+                .nullSafe(toPolyStringMessage(u.getLocality()), (b, v) -> b.setLocality(v))
                 .nullSafe(u.getPreferredLanguage(), (b, v) -> b.setPreferredLanguage(v))
                 .nullSafe(u.getLocale(), (b, v) -> b.setLocale(v))
                 .nullSafe(u.getTimezone(), (b, v) -> b.setTimezone(v))
                 .nullSafe(u.getEmailAddress(), (b, v) -> b.setEmailAddress(v))
                 .nullSafe(u.getTelephoneNumber(), (b, v) -> b.setTelephoneNumber(v))
                 // AbstractRoleType
-                .nullSafe(toMessage(u.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                .nullSafe(toPolyStringMessage(u.getDisplayName()), (b, v) -> b.setDisplayName(v))
                 .nullSafe(u.getIdentifier(), (b, v) -> b.setIdentifier(v))
                 .nullSafe(u.isRequestable(), (b, v) -> b.setRequestable(v))
                 .nullSafe(u.isDelegable(), (b, v) -> b.setDelegable(v))
@@ -985,94 +1021,230 @@ public class TypeConverter {
                 .nullSafe(u.getMailDomain(), (b, v) -> b.addAllMailDomain(v))
                 .nullSafe(u.getDisplayOrder(), (b, v) -> b.setDisplayOrder(v))
                 // Extension
-                .nullSafe(toExtensionMessageMap(u.asPrismObject()), (b, v) -> b.putAllExtension(v))
+                .nullSafe(toItemMessageMap(u.asPrismObject()), (b, v) -> b.putAllExtension(v))
                 .unwrap()
                 .build();
     }
 
-    public static Map<String, ExtensionMessage> toExtensionMessageMap(PrismObject<?> object) {
+    public static Map<String, ItemMessage> toItemMessageMap(PrismObject<?> object) {
         PrismContainer<?> extension = object.getExtension();
         if (extension == null) {
             return null;
         }
 
-        Map<String, ExtensionMessage> map = new LinkedHashMap<>();
+        Map<String, ItemMessage> map = new LinkedHashMap<>();
 
         PrismContainerValue<?> extensionValue = extension.getValue();
         for (Item item : extensionValue.getItems()) {
             ItemDefinition definition = item.getDefinition();
 
-            ExtensionMessage.Builder extBuilder = ExtensionMessage.newBuilder();
-
-            if (item.isSingleValue()) {
-                addExtensionEntryValue(extBuilder, definition, item.getRealValue());
-            } else {
-                addExtensionEntryValue(extBuilder, definition, item.getRealValues());
-            }
             // Currently, it doesn't use namespaceURI as the key
             String key = definition.getItemName().getLocalPart();
-            map.put(key, extBuilder.build());
+
+            try {
+                map.put(key, toItemMessage(definition, item));
+            } catch (SchemaException e) {
+                StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                        .withDescription("invalid_schema: " + e.getMessage())
+                        .withCause(e)
+                        .asRuntimeException();
+                throw exception;
+            }
         }
 
         return map;
     }
 
-    private static void addExtensionEntryValue(ExtensionMessage.Builder extBuilder, ItemDefinition definition, Collection<?> valuess) {
-        ExtensionValueList.Builder listBuilder = ExtensionValueList.newBuilder();
-        List<ExtensionValue> extensionValues = valuess.stream()
-                .map(x -> toMessage(definition, x)).collect(Collectors.toList());
-        listBuilder.addAllValues(extensionValues);
-        extBuilder.setMultiple(listBuilder);
-    }
-
-    private static void addExtensionEntryValue(ExtensionMessage.Builder extBuilder, ItemDefinition definition, Object value) {
-        ExtensionValue extensionValue = toMessage(definition, value);
-        extBuilder.setSingle(extensionValue);
-    }
-
-    private static ExtensionValue toMessage(ItemDefinition definition, Object value) {
-        ExtensionValue.Builder entryValueBuilder = ExtensionValue.newBuilder();
-        if (definition.getTypeClass() == String.class) {
-            entryValueBuilder.setString((String) value);
-        } else if (definition.getTypeClass() == PolyString.class) {
-            entryValueBuilder.setPolyString(toMessage((PolyString) value));
+    public static Map<String, PrismValueMessage> toPrismValueMessageMap(PrismObject<?> object) {
+        PrismContainer<?> extension = object.getExtension();
+        if (extension == null) {
+            return null;
         }
-        return entryValueBuilder.build();
+
+        Map<String, PrismValueMessage> map = new LinkedHashMap<>();
+
+        PrismContainerValue<?> extensionValue = extension.getValue();
+        for (Item item : extensionValue.getItems()) {
+            ItemDefinition definition = item.getDefinition();
+
+            // Currently, it doesn't use namespaceURI as the key
+            String key = definition.getItemName().getLocalPart();
+
+            try {
+                map.put(key, toPrismValueMessage(item));
+            } catch (SchemaException e) {
+                StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                        .withDescription("invalid_schema: " + e.getMessage())
+                        .withCause(e)
+                        .asRuntimeException();
+                throw exception;
+            }
+        }
+
+        return map;
     }
 
-    public static ItemPath toRealValue(ItemPathMessage itemPath) {
+    private static PrismContainerValueMessage toPrismContainerValueMessage(PrismContainerDefinition definition,
+                                                                           PrismContainerValue<?> value) throws SchemaException {
+        PrismContainerValueMessage.Builder builder = PrismContainerValueMessage.newBuilder();
+
+        if (value.getId() != null) {
+            builder.setId(value.getId());
+        }
+
+        for (Item<?, ?> item : value.getItems()) {
+            ItemDefinition itemDefinition = item.getDefinition();
+            String key = itemDefinition.getItemName().getLocalPart();
+            builder.putValue(key, toItemMessage(itemDefinition, item));
+        }
+
+        return builder.build();
+    }
+
+    private static ItemMessage toItemMessage(ItemDefinition definition, Item<?, ?> item) throws SchemaException {
+        if (definition.isSingleValue()) {
+            if (item.size() > 1) {
+                throw new SchemaException("It must be single value: " + definition);
+            }
+        }
+
+        ItemMessage.Builder builder = ItemMessage.newBuilder()
+                .setMultiple(definition.isMultiValue());
+
+        if (definition instanceof PrismPropertyDefinition) {
+            return builder
+                    .setProperty(toPrismPropertyMessage((PrismPropertyDefinition) definition, (PrismProperty) item))
+                    .build();
+
+        } else if (definition instanceof PrismContainerDefinition) {
+            return builder
+                    .setContainer(toPrismContainerMessage((PrismContainerDefinition) definition, (PrismContainer) item))
+                    .build();
+
+        } else if (definition instanceof PrismReferenceDefinition) {
+            return builder
+                    .setRef(toPrismReferenceMessage((PrismReferenceDefinition) definition, (PrismReference) item))
+                    .build();
+
+        } else {
+            throw new SchemaException(definition.getClass() + " is not supported");
+        }
+
+    }
+
+    private static PrismValueMessage toPrismValueMessage(Item<?, ?> item) throws SchemaException {
+        ItemDefinition definition = item.getDefinition();
+        if (definition instanceof PrismPropertyDefinition) {
+            return PrismValueMessage.newBuilder()
+                    .setProperty(toPrismPropertyValueMessage((PrismPropertyDefinition) definition, ((PrismProperty) item).getValue()))
+                    .build();
+
+        } else if (definition instanceof PrismContainerDefinition) {
+            return PrismValueMessage.newBuilder()
+                    .setContainer(toPrismContainerValueMessage((PrismContainerDefinition) definition, ((PrismContainer) item).getValue()))
+                    .build();
+
+        } else if (definition instanceof PrismReferenceDefinition) {
+            return PrismValueMessage.newBuilder()
+                    .setRef(toReferenceMessage((PrismReferenceDefinition) definition, ((PrismReference) item).getValue()))
+                    .build();
+
+        } else {
+            throw new UnsupportedOperationException(definition.getClass() + " is not supported");
+        }
+    }
+
+    private static PrismPropertyMessage toPrismPropertyMessage(PrismPropertyDefinition<?> definition, PrismProperty<?> value) {
+        if (definition.isSingleValue()) {
+            return PrismPropertyMessage.newBuilder()
+                    .addValues(toPrismPropertyValueMessage(definition, value.getValue()))
+                    .build();
+        } else {
+            PrismPropertyMessage.Builder builder = PrismPropertyMessage.newBuilder();
+            for (PrismPropertyValue<?> v : value.getValues()) {
+                builder.addValues(toPrismPropertyValueMessage(definition, v));
+            }
+            return builder.build();
+        }
+    }
+
+    private static PrismContainerMessage toPrismContainerMessage(PrismContainerDefinition definition, PrismContainer value) throws SchemaException {
+        if (definition.isSingleValue()) {
+            return PrismContainerMessage.newBuilder()
+                    .addValues(toPrismContainerValueMessage(definition, value.getValue()))
+                    .build();
+        } else {
+            PrismContainerMessage.Builder builder = PrismContainerMessage.newBuilder();
+            for (Object v : value.getValues()) {
+                builder.addValues(toPrismContainerValueMessage(definition, (PrismContainerValue) v));
+            }
+            return builder.build();
+        }
+    }
+
+    private static PrismReferenceMessage toPrismReferenceMessage(PrismReferenceDefinition definition, PrismReference value) {
+        if (definition.isSingleValue()) {
+            return PrismReferenceMessage.newBuilder()
+                    .addValues(toReferenceMessage(definition, value.getValue()))
+                    .build();
+        } else {
+            PrismReferenceMessage.Builder builder = PrismReferenceMessage.newBuilder();
+            for (PrismReferenceValue v : value.getValues()) {
+                builder.addValues(toReferenceMessage(definition, v));
+            }
+            return builder.build();
+        }
+    }
+
+    private static PrismPropertyValueMessage toPrismPropertyValueMessage(PrismPropertyDefinition definition, PrismPropertyValue<?> value) {
+        PrismPropertyValueMessage.Builder builder = PrismPropertyValueMessage.newBuilder();
+        if (definition.getTypeClass() == String.class) {
+            // TODO need type check?
+            builder.setString((String) value.getValue());
+        } else if (definition.getTypeClass() == PolyString.class) {
+            // TODO need type check?
+            builder.setPolyString(toPolyStringMessage((PolyString) value));
+        } else if (definition.getTypeClass() == int.class) {
+            builder.setInteger(toIntegerMessage((Integer) value.getValue()));
+        } else if (definition.getTypeClass() == long.class) {
+            builder.setLong(toLongMessage((Long) value.getValue()));
+        }
+        return builder.build();
+    }
+
+    public static ItemPath toItemPathValue(ItemPathMessage itemPath) {
         List<QName> qnames = itemPath.getPathList().stream()
-                .map(x -> toRealValue(x))
+                .map(x -> toQNameValue(x))
                 .collect(Collectors.toList());
         return ItemPath.create(qnames);
     }
 
-    public static List<PrismValue> toPrismValue(PrismContext prismContext, ItemDefinition definition, List<PrismValueMessage> prismValueMessageList, Class itemClass) throws SchemaException {
+    public static List<PrismValue> toPrismValueList(PrismContext prismContext, ItemDefinition definition, List<PrismValueMessage> prismValue) throws SchemaException {
         List<PrismValue> values = new ArrayList<>();
-        for (PrismValueMessage value : prismValueMessageList) {
-            values.add(toPrismValue(prismContext, definition, value));
+        for (PrismValueMessage pvm : prismValue) {
+            values.add(toPrismValue(prismContext, definition, pvm));
         }
         return values;
     }
 
-    private static PrismValue toPrismValue(PrismContext prismContext, ItemDefinition definition, PrismValueMessage prismValue) throws SchemaException {
-        if (prismValue.hasContainer()) {
+    private static PrismValue toPrismValue(PrismContext prismContext, ItemDefinition definition, PrismValueMessage prismValueMessage) throws SchemaException {
+        if (prismValueMessage.hasContainer()) {
             if (!(definition instanceof PrismContainerDefinition)) {
                 StatusRuntimeException exception = Status.INVALID_ARGUMENT
                         .withDescription("invalid_prism_container_schema")
                         .asRuntimeException();
                 throw exception;
             }
-            return toPrismContainerValue(prismContext, (PrismContainerDefinition) definition, prismValue.getContainer());
+            return toPrismContainerValue(prismContext, (PrismContainerDefinition) definition, prismValueMessage.getContainer());
 
-        } else if (prismValue.hasProperty()) {
+        } else if (prismValueMessage.hasProperty()) {
             if (!(definition instanceof PrismPropertyDefinition)) {
                 StatusRuntimeException exception = Status.INVALID_ARGUMENT
                         .withDescription("invalid_prism_property_schema")
                         .asRuntimeException();
                 throw exception;
             }
-            return toPrismPropertyValue(prismContext, (PrismPropertyDefinition) definition, prismValue.getProperty());
+            return toPrismPropertyValue(prismContext, (PrismPropertyDefinition) definition, prismValueMessage.getProperty());
 
         } else {
             // Reference case
@@ -1082,70 +1254,80 @@ public class TypeConverter {
                         .asRuntimeException();
                 throw exception;
             }
-            return toPrismReferenceValue(prismContext, (PrismReferenceDefinition) definition, prismValue.getRef());
+            return toPrismReferenceValue(prismContext, (PrismReferenceDefinition) definition, prismValueMessage.getRef());
         }
     }
 
-    private static PrismContainerValue toPrismContainerValue(PrismContext prismContext, PrismContainerDefinition definition, PrismContainerValueMessage container) throws SchemaException {
-        PrismContainerValue impl = new PrismContainerValueImpl(prismContext);
+    private static PrismContainer toPrismContainer(PrismContext prismContext, PrismContainerDefinition definition,
+                                                   PrismContainerMessage container) throws SchemaException {
+        PrismContainer pc = prismContext.itemFactory().createContainer(definition.getItemName(), definition);
+        for (PrismContainerValueMessage pcvm : container.getValuesList()) {
+            pc.add(toPrismContainerValue(prismContext, definition, pcvm));
+        }
+        return pc;
+    }
+
+    private static PrismContainerValue toPrismContainerValue(PrismContext prismContext, PrismContainerDefinition definition,
+                                                             PrismContainerValueMessage message) throws SchemaException {
+        PrismContainerValue impl = prismContext.itemFactory().createContainerValue();
         // Need to apply here
         impl.applyDefinition(definition);
 
-        Map<String, PrismValueMessage> valueMap = container.getValueMap();
-        for (Map.Entry<String, PrismValueMessage> entry : valueMap.entrySet()) {
-            QName qname = toQName(entry.getValue(), entry.getKey());
+        for (Map.Entry<String, ItemMessage> entry : message.getValueMap().entrySet()) {
+            String k = entry.getKey();
+            ItemMessage v = entry.getValue();
 
-            ItemDefinition entryDefinition = definition.findItemDefinition(ItemPath.create(qname), ItemDefinition.class);
-            PrismValue realValue = toPrismValue(prismContext, entryDefinition, entry.getValue());
+            QName qname = toQName(v, k);
+            ItemPath path = ItemPath.create(qname);
 
-            if (realValue instanceof PrismContainerValue) {
-                PrismContainer childContainer = impl.findOrCreateContainer(qname);
-                childContainer.setValue((PrismContainerValue) realValue);
+            ItemDefinition itemDefinition = definition.findItemDefinition(path);
+            if (itemDefinition == null) {
+                throw new SchemaException("No schema: " + qname);
+            }
 
-            } else if (realValue instanceof PrismPropertyValue) {
-                PrismProperty property = impl.createProperty(qname);
+            if (itemDefinition instanceof PrismPropertyDefinition) {
+                impl.add(toPrismProperty(prismContext, (PrismPropertyDefinition) itemDefinition, v.getProperty()));
 
-                Object realPropertyValue = realValue.getRealValue();
+            } else if (itemDefinition instanceof PrismContainerDefinition) {
+                impl.add(toPrismContainer(prismContext, (PrismContainerDefinition) itemDefinition, v.getContainer()));
 
-                if (realPropertyValue instanceof List) {
-                    property.setRealValues(((List) realPropertyValue).toArray());
-                } else {
-                    property.setRealValue(realPropertyValue);
-                }
-            } else if (realValue instanceof PrismReferenceValue) {
-                PrismReference ref = impl.findOrCreateReference(qname);
-                ref.add(realValue.getRealValue());
+            } else if (itemDefinition instanceof PrismReferenceDefinition) {
+                impl.add(toPrismReference(prismContext, (PrismReferenceDefinition) itemDefinition, v.getRef()));
+
+            } else {
+                throw new UnsupportedOperationException(itemDefinition.getClass() + " is not supported");
             }
         }
 
         return impl;
     }
 
-    private static QName toQName(PrismValueMessage message, String localPart) {
-        if (message.getNamespaceURI().isEmpty()) {
-            return new QName(localPart);
+    private static Item toPrismReference(PrismContext prismContext, PrismReferenceDefinition definition, PrismReferenceMessage ref) throws SchemaException {
+        PrismReference pp = prismContext.itemFactory().createReference(definition.getItemName(), definition);
+        for (ReferenceMessage value : ref.getValuesList()) {
+            pp.add(toPrismReferenceValue(prismContext, definition, value));
         }
-        return new QName(message.getNamespaceURI(), localPart);
+        return pp;
     }
 
-    private static PrismPropertyValue toPrismPropertyValue(PrismContext prismContext, PrismPropertyDefinition definition, PrismPropertyMessage property) {
-        if (property.hasSingle()) {
-            return new PrismPropertyValueImpl(toPrismValue(prismContext, property.getSingle()));
-        } else {
-            return new PrismPropertyValueImpl(toPrismValue(prismContext, property.getMultiple()));
+    private static Item toPrismProperty(PrismContext prismContext, PrismPropertyDefinition definition, PrismPropertyMessage property) {
+        PrismProperty pp = prismContext.itemFactory().createProperty(definition.getItemName(), definition);
+        for (PrismPropertyValueMessage ppvm : property.getValuesList()) {
+            pp.addValue(toPrismPropertyValue(prismContext, definition, ppvm));
         }
+        return pp;
     }
 
-    private static Object toPrismValue(PrismContext prismContext, PrismPropertyValueMessageList multiple) {
-        return multiple.getValuesList().stream().map(x -> toPrismValue(prismContext, x)).collect(Collectors.toList());
+    private static PrismPropertyValue toPrismPropertyValue(PrismContext prismContext, PrismPropertyDefinition definition, PrismPropertyValueMessage property) {
+        return new PrismPropertyValueImpl(toRealValue(prismContext, property));
     }
 
-    private static Object toPrismValue(PrismContext prismContext, PrismPropertyValueMessage message) {
+    private static Object toRealValue(PrismContext prismContext, PrismPropertyValueMessage message) {
         if (message.hasInteger()) {
-            return toRealValue(message.getInteger());
+            return toIntegerValue(message.getInteger());
         }
         if (message.hasLong()) {
-            return toRealValue(message.getLong());
+            return toLongValue(message.getLong());
         }
         if (message.hasPolyString()) {
             // Need to return PolyString in PrismValue
@@ -1163,6 +1345,6 @@ public class TypeConverter {
     }
 
     private static PrismReferenceValue toPrismReferenceValue(PrismContext prismContext, PrismReferenceDefinition definition, ReferenceMessage ref) throws SchemaException {
-        return toRealValue(prismContext, ref).asReferenceValue();
+        return toObjectReferenceTypeValue(prismContext, ref).asReferenceValue();
     }
 }

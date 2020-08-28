@@ -26,13 +26,13 @@ public class TestModifyClient {
 
         ModifyProfileRequest request = ModifyProfileRequest.newBuilder()
                 .addModifications(
-                        UserItemDelta.newBuilder()
+                        UserItemDeltaMessage.newBuilder()
 //                                .setUserTypePath(DefaultUserTypePath.F_FAMILY_NAME)
                                 .setPath("familyName")
-                                .setValuesToAdd("hoge1")
+                                .addValuesToAdd("hoge1")
                 )
                 .addModifications(
-                        UserItemDelta.newBuilder()
+                        UserItemDeltaMessage.newBuilder()
 //                                .setUserTypePath(DefaultUserTypePath.F_FAMILY_NAME)
                                 .setPath("extension/singleString")
 //                                .setPath("familyName")
@@ -41,7 +41,7 @@ public class TestModifyClient {
 //                                                .addPath(QNameMessage.newBuilder().setLocalPart("extension"))
 //                                                .addPath(QNameMessage.newBuilder().setLocalPart("singleString"))
 //                                )
-                                .setValuesToAdd("hoge2")
+                                .addValuesToAdd("hoge2")
                 )
                 .build();
 

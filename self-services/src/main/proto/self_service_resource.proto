@@ -71,28 +71,6 @@ message GetSelfResponse {
     UserTypeMessage profile = 1;
 }
 
-message ExtensionMessage {
-    string namespace_URI = 1;
-    oneof value_wrapper {
-        ExtensionValue single = 2;
-        ExtensionValueList multiple = 3;
-    }
-}
-
-message ExtensionValueList {
-    repeated ExtensionValue values = 1;
-}
-
-message ExtensionValue {
-    oneof value {
-        string string = 1;
-        PolyStringMessage poly_string = 2;
-        IntegerMessage integer = 3;
-        LongMessage long = 4;
-        ReferenceMessage ref = 5;
-    }
-}
-
 message BytesMessage {
     oneof bytes_optional {
         bytes value = 1;
@@ -184,7 +162,7 @@ message UserTypeMessage {
     repeated PolyStringMessage organizational_unit = 61;
 
     // extension. the key is "localPart" format of the QName.
-    map<string, ExtensionMessage> extension = 100;
+    map<string, ItemMessage> extension = 100;
 }
 
 message RoleTypeMessage {
@@ -248,7 +226,7 @@ message RoleTypeMessage {
     string role_type = 70;
 
     // extension. the key is "localPart" format of the QName.
-    map<string, ExtensionMessage> extension = 100;
+    map<string, ItemMessage> extension = 100;
 }
 
 message OrgTypeMessage {
@@ -321,7 +299,7 @@ message OrgTypeMessage {
     //ReferenceMessage security_policy_ref = 74;
 
     // extension. the key is "localPart" format of the QName.
-    map<string, ExtensionMessage> extension = 100;
+    map<string, ItemMessage> extension = 100;
 }
 
 message GetSelfAssignmentRequest {
@@ -338,7 +316,7 @@ message AssignmentMessage {
         ReferenceMessage org_ref = 2;
     }
     // extension. the key is "localPart" format of the QName.
-    map<string, ExtensionMessage> extension = 3;
+    map<string, ItemMessage> extension = 3;
 }
 
 message ReferenceMessage {
@@ -366,19 +344,19 @@ message QNameMessage {
 }
 
 message ModifyProfileRequest {
-    repeated UserItemDelta modifications = 1;
-    repeated string options = 2;
+    repeated string options = 1;
+    repeated UserItemDeltaMessage modifications = 2;
 }
 
-message UserItemDelta {
+message UserItemDeltaMessage {
     oneof path_wrapper {
         string path = 1;
         ItemPathMessage item_path = 2;
         DefaultUserTypePath user_type_path = 3;
     }
-    string values_to_add = 20;
-    string values_to_replace = 21;
-    string values_to_delete = 22;
+    repeated string values_to_add = 20;
+    repeated string values_to_replace = 21;
+    repeated string values_to_delete = 22;
 
     repeated PrismValueMessage prism_values_to_add = 23;
     repeated PrismValueMessage prism_values_to_replace = 24;
@@ -389,21 +367,16 @@ message PrismValueMessage {
     string namespace_URI = 1;
     oneof value_wrapper {
         PrismContainerValueMessage container = 2;
-        PrismPropertyMessage property = 3;
+        PrismPropertyValueMessage property = 3;
+        // TODO: Rename to PrismReferenceValueMessage
         ReferenceMessage ref = 4;
     }
 }
 
 message PrismContainerValueMessage {
-    // extension. the key is "localPart" format of the QName.
-    map<string, PrismValueMessage> value = 1;
-}
-
-message PrismPropertyMessage {
-    oneof value_wrapper {
-        PrismPropertyValueMessage single = 2;
-        PrismPropertyValueMessageList multiple = 3;
-    }
+    int64 id = 1;
+    // the key is "localPart" format of the QName.
+    map<string, ItemMessage> value = 2;
 }
 
 message PrismPropertyValueMessage {
@@ -415,8 +388,28 @@ message PrismPropertyValueMessage {
     }
 }
 
-message PrismPropertyValueMessageList {
+message ItemMessage {
+    string namespace_URI = 1;
+    bool multiple = 2;
+    oneof value_wrapper {
+        PrismContainerMessage container = 3;
+        PrismPropertyMessage property = 4;
+        // TODO: Rename to PrismReferenceValueMessage
+        PrismReferenceMessage ref = 5;
+    }
+}
+
+message PrismContainerMessage {
+    repeated PrismContainerValueMessage values = 1;
+}
+
+message PrismPropertyMessage {
     repeated PrismPropertyValueMessage values = 1;
+}
+
+message PrismReferenceMessage {
+    // TODO: Rename to PrismReferenceValueMessage
+    repeated ReferenceMessage values = 1;
 }
 
 message ItemPathMessage {

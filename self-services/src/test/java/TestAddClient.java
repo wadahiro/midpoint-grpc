@@ -26,25 +26,26 @@ public class TestAddClient {
         AddUserRequest request = AddUserRequest.newBuilder()
                 .setProfile(
                         UserTypeMessage.newBuilder()
-                                .setName(PolyStringMessage.newBuilder().setOrig("foo"))
+                                .setName(PolyStringMessage.newBuilder().setOrig("foo9"))
+                                .addOrganization(PolyStringMessage.newBuilder().setOrig("org1"))
+                                .addOrganization(PolyStringMessage.newBuilder().setOrig("org2"))
                                 .addAssignment(
                                         AssignmentMessage.newBuilder()
                                                 .setTargetRef(
                                                         ReferenceMessage.newBuilder()
                                                                 .setObjectType(DefaultObjectType.ROLE_TYPE)
-                                                                .setName(PolyStringMessage.newBuilder().setOrig("ProjUser"))
+                                                                .setName(PolyStringMessage.newBuilder().setOrig("ProjGuest"))
                                                 )
                                                 .putExtension("manager",
-                                                        ExtensionMessage.newBuilder()
-                                                                .setMultiple(
-                                                                        ExtensionValueList.newBuilder()
+                                                        ItemMessage.newBuilder()
+                                                                .setRef(
+                                                                        PrismReferenceMessage.newBuilder()
                                                                                 .addValues(
-                                                                                        ExtensionValue.newBuilder().setRef(
-                                                                                                ReferenceMessage.newBuilder()
-                                                                                                        .setObjectType(DefaultObjectType.USER_TYPE)
-                                                                                                        .setEmailAddress("TEST@example.com")
-                                                                                        )
+                                                                                        ReferenceMessage.newBuilder()
+                                                                                                .setObjectType(DefaultObjectType.USER_TYPE)
+                                                                                                .setEmailAddress("TEST@example.com")
                                                                                 )
+
                                                                 )
                                                                 .build()
                                                 )
@@ -58,27 +59,55 @@ public class TestAddClient {
                                                 )
                                 )
                                 .putExtension("singleString",
-                                        ExtensionMessage.newBuilder()
-                                                .setSingle(
-                                                        ExtensionValue.newBuilder().setString("ext1").build()
+                                        ItemMessage.newBuilder()
+                                                .setProperty(
+                                                        PrismPropertyMessage.newBuilder()
+                                                                .addValues(
+                                                                        PrismPropertyValueMessage.newBuilder()
+                                                                                .setString("ext1")
+                                                                )
                                                 )
                                                 .build()
                                 )
                                 .putExtension("multipleString",
-                                        ExtensionMessage.newBuilder()
-                                                .setMultiple(
-                                                        ExtensionValueList.newBuilder()
+                                        ItemMessage.newBuilder()
+                                                .setProperty(
+                                                        PrismPropertyMessage.newBuilder()
                                                                 .addValues(
-                                                                        ExtensionValue.newBuilder().setString("ext1").build()
+                                                                        PrismPropertyValueMessage.newBuilder()
+                                                                                .setString("ext1")
                                                                 )
                                                                 .addValues(
-                                                                        ExtensionValue.newBuilder().setString("ext2").build()
+                                                                        PrismPropertyValueMessage.newBuilder()
+                                                                                .setString("ext2")
+                                                                )
+                                                )
+                                                .build()
+                                )
+                                .putExtension("singleComplex",
+                                        ItemMessage.newBuilder()
+                                                .setContainer(
+                                                        PrismContainerMessage.newBuilder()
+                                                                .addValues(
+                                                                        PrismContainerValueMessage.newBuilder()
+                                                                                .putValue("name",
+                                                                                        ItemMessage.newBuilder()
+                                                                                                .setProperty(
+                                                                                                        PrismPropertyMessage.newBuilder()
+                                                                                                                .addValues(
+                                                                                                                        PrismPropertyValueMessage.newBuilder()
+                                                                                                                                .setString("singleComplexName")
+                                                                                                                )
+                                                                                                )
+                                                                                                .build()
+                                                                                )
                                                                 )
                                                 )
                                                 .build()
                                 )
                 )
                 .build();
+
 
         AddUserResponse response = stub.addUser(request);
 

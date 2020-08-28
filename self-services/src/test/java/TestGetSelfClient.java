@@ -20,7 +20,7 @@ public class TestGetSelfClient {
 
         Metadata headers = new Metadata();
         headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
-        headers.put(Constant.SwitchToPrincipalByNameMetadataKey, "test");
+//        headers.put(Constant.SwitchToPrincipalByNameMetadataKey, "test");
 
         stub = MetadataUtils.attachHeaders(stub, headers);
 
