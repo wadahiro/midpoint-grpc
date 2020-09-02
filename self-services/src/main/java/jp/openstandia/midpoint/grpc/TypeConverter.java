@@ -243,6 +243,11 @@ public class TypeConverter {
             return null;
         }
 
+        if (ref.getOid() == null) {
+            System.out.println("ref oid is null" + ref);
+            return null;
+        }
+
         QName relation = ref.getRelation();
         ReferenceMessage.Builder builder = BuilderWrapper.wrap(ReferenceMessage.newBuilder())
                 .nullSafe(toPolyStringMessage(ref.getTargetName()), (b, v) -> b.setName(v))
@@ -1101,7 +1106,7 @@ public class TypeConverter {
         return builder.build();
     }
 
-    private static ItemMessage toItemMessage(ItemDefinition definition, Item<?, ?> item) throws SchemaException {
+    public static ItemMessage toItemMessage(ItemDefinition definition, Item<?, ?> item) throws SchemaException {
         if (definition.isSingleValue()) {
             if (item.size() > 1) {
                 throw new SchemaException("It must be single value: " + definition);
@@ -1190,7 +1195,11 @@ public class TypeConverter {
         } else {
             PrismReferenceMessage.Builder builder = PrismReferenceMessage.newBuilder();
             for (PrismReferenceValue v : value.getValues()) {
-                builder.addValues(toReferenceMessage(definition, v));
+                ReferenceMessage message = toReferenceMessage(definition, v);
+                if (message == null) {
+                    continue;
+                }
+                builder.addValues(message);
             }
             return builder.build();
         }
@@ -1203,7 +1212,7 @@ public class TypeConverter {
             builder.setString((String) value.getValue());
         } else if (definition.getTypeClass() == PolyString.class) {
             // TODO need type check?
-            builder.setPolyString(toPolyStringMessage((PolyString) value));
+            builder.setPolyString(toPolyStringMessage((PolyString) value.getValue()));
         } else if (definition.getTypeClass() == int.class) {
             builder.setInteger(toIntegerMessage((Integer) value.getValue()));
         } else if (definition.getTypeClass() == long.class) {

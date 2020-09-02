@@ -45,6 +45,11 @@ service SelfServiceResource {
     rpc addUser (AddUserRequest) returns (AddUserResponse);
 
     /**
+     * Delete an object.
+     */
+    rpc deleteObject (DeleteObjectRequest) returns (DeleteObjectResponse);
+
+    /**
      * Search users.
      */
     rpc searchUsers (SearchRequest) returns (SearchUsersResponse);
@@ -58,6 +63,11 @@ service SelfServiceResource {
      * Search orgs.
      */
     rpc searchOrgs (SearchRequest) returns (SearchOrgsResponse);
+
+    /**
+     * Search objects.
+     */
+    rpc searchObjectsAsStream (SearchObjectsRequest) returns (stream SearchObjectsResponse);
 }
 
 message GetSelfRequest {
@@ -363,6 +373,14 @@ message UserItemDeltaMessage {
     repeated PrismValueMessage prism_values_to_delete = 25;
 }
 
+message ItemDeltaMessage {
+    oneof path_wrapper {
+        string path = 1;
+        ItemPathMessage item_path = 2;
+    }
+
+}
+
 message PrismValueMessage {
     string namespace_URI = 1;
     oneof value_wrapper {
@@ -533,6 +551,21 @@ message AddUserResponse {
     string oid = 1;
 }
 
+message DeleteObjectRequest {
+    oneof type_wrapper {
+        QNameMessage type = 1;
+        DefaultObjectType object_type = 2;
+    }
+    oneof id_wrapper {
+        string oid = 10;
+        string name = 11;
+    }
+    repeated string options = 20;
+}
+
+message DeleteObjectResponse {
+}
+
 message SearchRequest {
     QueryMessage query = 1;
     repeated string options = 2;
@@ -554,6 +587,22 @@ message SearchRolesResponse {
 message SearchOrgsResponse {
     repeated OrgTypeMessage results = 1;
     int32 number_of_all_results = 2;
+}
+
+message SearchObjectsRequest {
+    oneof type_wrapper {
+        QNameMessage type = 1;
+        DefaultObjectType object_type = 2;
+    }
+    QueryMessage query = 10;
+    repeated string options = 11;
+    repeated string include = 12;
+    repeated string exclude = 13;
+    repeated string resolve_names = 14;
+}
+
+message SearchObjectsResponse {
+    repeated ItemMessage results = 1;
 }
 
 message QueryMessage {

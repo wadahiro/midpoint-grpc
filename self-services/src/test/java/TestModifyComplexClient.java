@@ -31,7 +31,7 @@ public class TestModifyComplexClient {
                                 .addPrismValuesToReplace(PrismValueMessage.newBuilder()
                                         .setProperty(
                                                 PrismPropertyValueMessage.newBuilder()
-                                                .setString("hogehoge")
+                                                .setString("aiueo")
                                         )
                                 )
 

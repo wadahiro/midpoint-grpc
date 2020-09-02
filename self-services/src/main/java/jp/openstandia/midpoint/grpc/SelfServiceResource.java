@@ -24,6 +24,7 @@ import com.evolveum.midpoint.prism.query.QueryFactory;
 import com.evolveum.midpoint.prism.schema.SchemaRegistry;
 import com.evolveum.midpoint.repo.api.RepositoryService;
 import com.evolveum.midpoint.schema.*;
+import com.evolveum.midpoint.schema.constants.ObjectTypes;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.schema.util.LocalizationUtil;
@@ -55,8 +56,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.evolveum.midpoint.xml.ns._public.common.common_3.PartialProcessingTypeType.SKIP;
-import static jp.openstandia.midpoint.grpc.TypeConverter.toPrismObject;
-import static jp.openstandia.midpoint.grpc.TypeConverter.toReferenceMessage;
+import static jp.openstandia.midpoint.grpc.TypeConverter.*;
 
 @GRpcService
 public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceResourceImplBase implements MidPointGrpcService {
@@ -72,11 +72,14 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     public static final String OPERATION_SELF = CLASS_DOT + "self";
     public static final String OPERATION_SELF_ASSIGNMENT = CLASS_DOT + "selfAssignment";
     public static final String OPERATION_ADD_USER = CLASS_DOT + "addUser";
+    public static final String OPERATION_DELETE_USER = CLASS_DOT + "deleteUser";
     public static final String OPERATION_EXECUTE_USER_UPDATE = CLASS_DOT + "executeUserUpdate";
     public static final String OPERATION_EXECUTE_CREDENTIAL_CHECK = CLASS_DOT + "executeCredentialCheck";
     public static final String OPERATION_EXECUTE_CREDENTIAL_UPDATE = CLASS_DOT + "executeCredentialUpdate";
     public static final String OPERATION_REQUEST_ASSIGNMENTS = CLASS_DOT + "requestAssignments";
     public static final String OPERATION_SEARCH_OBJECTS = CLASS_DOT + "searchObjects";
+
+    private static final long WAIT_FOR_TASK_STOP = 2000L;
 
     @Autowired
     protected ModelService modelService;
@@ -812,6 +815,111 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         responseObserver.onCompleted();
 
         LOGGER.debug("End searchOrgs");
+    }
+
+    @Override
+    public void searchObjectsAsStream(SearchObjectsRequest request, StreamObserver<SearchObjectsResponse> responseObserver) {
+        runTask(ctx -> {
+            Task task = ctx.task;
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_SEARCH_OBJECTS);
+
+            List<String> options = request.getOptionsList();
+            List<String> include = request.getIncludeList();
+            List<String> exclude = request.getExcludeList();
+            List<String> resolveNames = request.getResolveNamesList();
+
+            try {
+                Collection<SelectorOptions<GetOperationOptions>> searchOptions = GetOperationOptions.fromRestOptions(options, include,
+                        exclude, resolveNames, DefinitionProcessingOption.FULL, prismContext);
+
+                Class<? extends ObjectType> clazz;
+                if (request.hasType()) {
+                    QName qname = toQNameValue(request.getType());
+                    clazz = ObjectTypes.getObjectTypeClass(qname);
+                } else {
+                    QName qname = toQNameValue(request.getObjectType());
+                    clazz = ObjectTypes.getObjectTypeClass(qname);
+                }
+
+                ObjectQuery query = TypeConverter.toObjectQuery(prismContext, clazz, request.getQuery());
+
+                SearchResultMetadata metadata = modelService.searchObjectsIterative(clazz, query,
+                        (object, pr) -> {
+                            try {
+                                ItemMessage itemMessage = toItemMessage(object.getDefinition(), object);
+
+                                SearchObjectsResponse response = SearchObjectsResponse.newBuilder()
+                                        .addResults(itemMessage)
+                                        .build();
+                                responseObserver.onNext(response);
+
+                            } catch (SchemaException e) {
+                                LOGGER.error("Failed to convert the object", e);
+                                responseObserver.onError(e);
+                            }
+                            return true;
+                        },
+                        searchOptions,
+                        task, parentResult);
+
+                parentResult.recordSuccessIfUnknown();
+                return null;
+            } finally {
+                parentResult.computeStatusIfUnknown();
+            }
+        });
+
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void deleteObject(DeleteObjectRequest request, StreamObserver<DeleteObjectResponse> responseObserver) {
+        runTask(ctx -> {
+            Task task = ctx.task;
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_DELETE_USER);
+
+            Class<? extends ObjectType> clazz;
+            if (request.hasType()) {
+                QName qname = toQNameValue(request.getType());
+                clazz = ObjectTypes.getObjectTypeClass(qname);
+            } else {
+                QName qname = toQNameValue(request.getObjectType());
+                clazz = ObjectTypes.getObjectTypeClass(qname);
+            }
+
+            String oid = request.getOid();
+            List<String> options = request.getOptionsList();
+
+            if (clazz.isAssignableFrom(TaskType.class)) {
+                taskService.suspendAndDeleteTask(oid, WAIT_FOR_TASK_STOP, true, task, parentResult);
+                parentResult.computeStatus();
+//                    finishRequest(task);
+                if (parentResult.isSuccess()) {
+                    return null;
+                }
+//                    return Response.serverError().entity(parentResult.getMessage()).build();
+                StatusRuntimeException exception = Status.INTERNAL
+                        .withDescription(parentResult.getMessage())
+                        .asRuntimeException();
+                throw exception;
+            }
+
+            ModelExecuteOptions modelExecuteOptions = ModelExecuteOptions.fromRestOptions(options);
+
+            try {
+                modelCrudService.deleteObject(clazz, oid, modelExecuteOptions, task, parentResult);
+            } catch (SchemaException e) {
+//                repositoryService.deleteObject(clazz, oid, parentResult);
+                throw e;
+            }
+
+            return null;
+        });
+
+        responseObserver.onNext(DeleteObjectResponse.newBuilder().build());
+        responseObserver.onCompleted();
     }
 
     private <T> List<PrismObject<UserType>> findUsers(QName propertyName, T email, QName matchingRule,
