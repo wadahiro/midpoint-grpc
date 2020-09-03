@@ -334,18 +334,18 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                     // Plain string
                     // TODO Remove this API
                     if (!m.getValuesToAddList().isEmpty()) {
-                        S_MaybeDelete av = v.add(TypeConverter.toRealValue(m.getValuesToAddList(), itemClass));
+                        S_MaybeDelete av = v.addRealValues(TypeConverter.toRealValue(m.getValuesToAddList(), itemClass));
 
                         if (!m.getValuesToDeleteList().isEmpty()) {
-                            entry = av.delete(TypeConverter.toRealValue(m.getValuesToDeleteList(), itemClass));
+                            entry = av.deleteRealValues(TypeConverter.toRealValue(m.getValuesToDeleteList(), itemClass));
                         } else {
                             entry = av;
                         }
                     } else if (!m.getValuesToReplaceList().isEmpty()) {
-                        entry = v.replace(TypeConverter.toRealValue(m.getValuesToReplaceList(), itemClass));
+                        entry = v.replaceRealValues(TypeConverter.toRealValue(m.getValuesToReplaceList(), itemClass));
 
                     } else if (!m.getValuesToDeleteList().isEmpty()) {
-                        entry = v.delete(TypeConverter.toRealValue(m.getValuesToDeleteList(), itemClass));
+                        entry = v.deleteRealValues(TypeConverter.toRealValue(m.getValuesToDeleteList(), itemClass));
                     }
 
                     // PrismValue
