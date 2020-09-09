@@ -8,9 +8,7 @@ import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.prism.query.ObjectQuery;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.schema.util.ObjectQueryUtil;
-import com.evolveum.midpoint.security.api.ConnectionEnvironment;
-import com.evolveum.midpoint.security.api.HttpConnectionInformation;
-import com.evolveum.midpoint.security.api.MidPointPrincipal;
+import com.evolveum.midpoint.security.api.*;
 import com.evolveum.midpoint.security.enforcer.api.AuthorizationParameters;
 import com.evolveum.midpoint.security.enforcer.api.SecurityEnforcer;
 import com.evolveum.midpoint.task.api.Task;
@@ -19,16 +17,20 @@ import com.evolveum.midpoint.util.exception.*;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.web.boot.GrpcServerConfiguration;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.AuthorizationType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 import io.grpc.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
 import org.springframework.stereotype.Component;
 
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.List;
 
 import static jp.openstandia.midpoint.grpc.MidPointGrpcService.CHANNEL_GRPC_SERVICE_URI;
@@ -117,6 +119,12 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
         UserType user = ((MidPointPrincipal) auth.getPrincipal()).getUser();
         task.setOwner(user.asPrismObject());
 
+        // Run Privileged
+        String runPrivileged = headers.get(Constant.RunPrivilegedMetadataKey);
+        if (Boolean.parseBoolean(runPrivileged)) {
+            auth = runPrivileged(auth);
+        }
+
         Context ctx = Context.current()
                 .withValue(ServerConstant.ConnectionContextKey, connection)
                 .withValue(ServerConstant.ConnectionEnvironmentContextKey, connEnv)
@@ -152,6 +160,35 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
         };
 
         return Contexts.interceptCall(ctx, serverCall, headers, next);
+    }
+
+    private Authentication runPrivileged(Authentication origAuthentication) {
+        LOGGER.debug("Running gRPC service as privileged");
+        LOGGER.trace("ORIG auth {}", origAuthentication);
+        Authorization privilegedAuthorization = createPrivilegedAuthorization();
+        Object newPrincipal = null;
+        Object origPrincipal;
+
+        origPrincipal = origAuthentication.getPrincipal();
+
+        LOGGER.trace("ORIG principal {} ({})", origPrincipal, origPrincipal != null ? origPrincipal.getClass() : null);
+        MidPointPrincipal newMidPointPrincipal = ((MidPointPrincipal) origPrincipal).clone();
+        newMidPointPrincipal.getAuthorities().add(privilegedAuthorization);
+        newPrincipal = newMidPointPrincipal;
+
+        Collection<GrantedAuthority> newAuthorities = new ArrayList();
+        newAuthorities.addAll(origAuthentication.getAuthorities());
+        newAuthorities.add(privilegedAuthorization);
+        PreAuthenticatedAuthenticationToken newAuthorization = new PreAuthenticatedAuthenticationToken(newPrincipal, (Object) null, newAuthorities);
+        LOGGER.trace("NEW auth {}", newAuthorization);
+
+        return newAuthorization;
+    };
+
+    private Authorization createPrivilegedAuthorization() {
+        AuthorizationType authorizationType = new AuthorizationType();
+        authorizationType.getAction().add(AuthorizationConstants.AUTZ_ALL_URL);
+        return new Authorization(authorizationType);
     }
 
     protected abstract String getType();

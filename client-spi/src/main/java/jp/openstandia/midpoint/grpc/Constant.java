@@ -11,4 +11,6 @@ public class Constant {
             Metadata.Key.of("Switch-To-Principal", ASCII_STRING_MARSHALLER);
     public static final Metadata.Key<String> SwitchToPrincipalByNameMetadataKey =
             Metadata.Key.of("Switch-To-Principal-By-Name", ASCII_STRING_MARSHALLER);
+    public static final Metadata.Key<String> RunPrivilegedMetadataKey =
+            Metadata.Key.of("Run-Privileged", ASCII_STRING_MARSHALLER);
 }
