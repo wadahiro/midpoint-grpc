@@ -45,6 +45,11 @@ service SelfServiceResource {
     rpc addUser (AddUserRequest) returns (AddUserResponse);
 
     /**
+     * Get an user.
+     */
+    rpc getUser (GetUserRequest) returns (GetUserResponse);
+
+    /**
      * Delete an object.
      */
     rpc deleteObject (DeleteObjectRequest) returns (DeleteObjectResponse);
@@ -551,6 +556,22 @@ message AddUserResponse {
     string oid = 1;
 }
 
+message GetUserRequest {
+    oneof id_wrapper {
+        string oid = 10;
+        // Not implemented yet
+        string name = 11;
+    }
+    repeated string options = 20;
+    repeated string include = 21;
+    repeated string exclude = 22;
+    repeated string resolve_names = 23;
+}
+
+message GetUserResponse {
+    UserTypeMessage result = 1;
+}
+
 message DeleteObjectRequest {
     oneof type_wrapper {
         QNameMessage type = 1;
@@ -558,6 +579,7 @@ message DeleteObjectRequest {
     }
     oneof id_wrapper {
         string oid = 10;
+        // Not implemented yet
         string name = 11;
     }
     repeated string options = 20;

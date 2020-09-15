@@ -72,6 +72,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     public static final String OPERATION_SELF = CLASS_DOT + "self";
     public static final String OPERATION_SELF_ASSIGNMENT = CLASS_DOT + "selfAssignment";
     public static final String OPERATION_ADD_USER = CLASS_DOT + "addUser";
+    public static final String OPERATION_GET_USER = CLASS_DOT + "getUser";
     public static final String OPERATION_DELETE_USER = CLASS_DOT + "deleteUser";
     public static final String OPERATION_EXECUTE_USER_UPDATE = CLASS_DOT + "executeUserUpdate";
     public static final String OPERATION_EXECUTE_CREDENTIAL_CHECK = CLASS_DOT + "executeCredentialCheck";
@@ -870,6 +871,37 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             }
         });
 
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void getUser(GetUserRequest request, StreamObserver<GetUserResponse> responseObserver) {
+        PrismObject<UserType> foundUser = runTask(ctx -> {
+            Task task = ctx.task;
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_GET_USER);
+
+            String oid = request.getOid();
+            List<String> options = request.getOptionsList();
+            List<String> include = request.getIncludeList();
+            List<String> exclude = request.getExcludeList();
+            List<String> resolveNames = request.getResolveNamesList();
+
+            Collection<SelectorOptions<GetOperationOptions>> getOptions = GetOperationOptions.fromRestOptions(options, include,
+                    exclude, resolveNames, null, prismContext);
+
+            try {
+                PrismObject<UserType> user = modelCrudService.getObject(UserType.class, oid, getOptions, task, parentResult);
+                parentResult.recordSuccessIfUnknown();
+                return user;
+            } finally {
+                parentResult.computeStatusIfUnknown();
+            }
+        });
+
+        responseObserver.onNext(GetUserResponse.newBuilder()
+                .setResult(toUserTypeMessage(foundUser.asObjectable()))
+                .build());
         responseObserver.onCompleted();
     }
 
