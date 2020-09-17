@@ -28,6 +28,7 @@ import com.evolveum.midpoint.schema.constants.ObjectTypes;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.schema.util.LocalizationUtil;
+import com.evolveum.midpoint.schema.util.ObjectQueryUtil;
 import com.evolveum.midpoint.task.api.Task;
 import com.evolveum.midpoint.task.api.TaskCategory;
 import com.evolveum.midpoint.util.LocalizableMessage;
@@ -881,7 +882,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
             OperationResult parentResult = task.getResult().createSubresult(OPERATION_GET_USER);
 
-            String oid = request.getOid();
+            String oid = resolveOid(task, parentResult, UserType.class, request.getOid(), request.getName());
+
             List<String> options = request.getOptionsList();
             List<String> include = request.getIncludeList();
             List<String> exclude = request.getExcludeList();
@@ -905,6 +907,26 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         responseObserver.onCompleted();
     }
 
+    private <T extends ObjectType> T searchObjectByName(Class<T> type, String name, Task task, OperationResult result)
+            throws SecurityViolationException, ObjectNotFoundException, CommunicationException, ConfigurationException,
+            SchemaException, ExpressionEvaluationException {
+        ObjectQuery nameQuery = ObjectQueryUtil.createNameQuery(name, prismContext);
+        List<PrismObject<T>> foundObjects = modelService
+                .searchObjects(type, nameQuery,
+                        getDefaultGetOptionCollection(), task, result);
+        if (foundObjects.isEmpty()) {
+            return null;
+        }
+        if (foundObjects.size() > 1) {
+            throw new IllegalStateException("More than one object found for type " + type + " and name '" + name + "'");
+        }
+        return foundObjects.iterator().next().asObjectable();
+    }
+
+    private Collection<SelectorOptions<GetOperationOptions>> getDefaultGetOptionCollection() {
+        return SelectorOptions.createCollection(GetOperationOptions.createExecutionPhase());
+    }
+
     @Override
     public void deleteObject(DeleteObjectRequest request, StreamObserver<DeleteObjectResponse> responseObserver) {
         runTask(ctx -> {
@@ -921,7 +943,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 clazz = ObjectTypes.getObjectTypeClass(qname);
             }
 
-            String oid = request.getOid();
+            String oid = resolveOid(task, parentResult, UserType.class, request.getOid(), request.getName());
+
             List<String> options = request.getOptionsList();
 
             if (clazz.isAssignableFrom(TaskType.class)) {
@@ -954,28 +977,17 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         responseObserver.onCompleted();
     }
 
-    private <T> List<PrismObject<UserType>> findUsers(QName propertyName, T email, QName matchingRule,
-                                                      Task task, OperationResult result) throws SchemaException, ObjectNotFoundException,
-            SecurityViolationException, CommunicationException, ConfigurationException, ExpressionEvaluationException {
-
-        ObjectQuery query = createUserEQQuery(propertyName, matchingRule, email);
-        List<PrismObject<UserType>> foundObjects = modelService.searchObjects(UserType.class, query, null,
-                task, result);
-        return foundObjects;
-    }
-
-    private <T> ObjectQuery createUserEQQuery(QName property, QName matchingRule, T value)
-            throws SchemaException {
-        return prismContext.queryFor(UserType.class)
-                .item(property)
-                .eq(value)
-                .matching(matchingRule)
-                .build();
-    }
-
-    private <T> ObjectQuery createInOidQuery(Class<? extends Containerable> queryClass, List<String> oids) throws SchemaException {
-        return prismContext.queryFor(queryClass)
-                .id(oids.toArray(new String[]{}))
-                .build();
+    private String resolveOid(Task task, OperationResult result, Class<? extends ObjectType> clazz,
+                              String oid, String name) throws SecurityViolationException, ObjectNotFoundException,
+            CommunicationException, ConfigurationException, SchemaException, ExpressionEvaluationException {
+        if (oid.isEmpty() && !name.isEmpty()) {
+            // Fallback to search by name
+            ObjectType obj = searchObjectByName(clazz, name, task, result);
+            if (obj == null) {
+                throw new ObjectNotFoundException("Not found: " + name);
+            }
+            oid = obj.getOid();
+        }
+        return oid;
     }
 }

@@ -559,7 +559,6 @@ message AddUserResponse {
 message GetUserRequest {
     oneof id_wrapper {
         string oid = 10;
-        // Not implemented yet
         string name = 11;
     }
     repeated string options = 20;
@@ -579,7 +578,6 @@ message DeleteObjectRequest {
     }
     oneof id_wrapper {
         string oid = 10;
-        // Not implemented yet
         string name = 11;
     }
     repeated string options = 20;
