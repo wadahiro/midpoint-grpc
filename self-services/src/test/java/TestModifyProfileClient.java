@@ -7,7 +7,7 @@ import jp.openstandia.midpoint.grpc.*;
 import java.io.UnsupportedEncodingException;
 import java.util.Base64;
 
-public class TestModifyClient {
+public class TestModifyProfileClient {
 
     public static void main(String[] args) throws UnsupportedEncodingException {
         ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", 6565)

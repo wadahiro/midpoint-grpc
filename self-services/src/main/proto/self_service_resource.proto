@@ -60,6 +60,11 @@ service SelfServiceResource {
     rpc deleteObject (DeleteObjectRequest) returns (DeleteObjectResponse);
 
     /**
+     * Recompute an object.
+     */
+    rpc recomputeObject (RecomputeObjectRequest) returns (RecomputeObjectResponse);
+
+    /**
      * Search users.
      */
     rpc searchUsers (SearchRequest) returns (SearchUsersResponse);
@@ -600,6 +605,20 @@ message DeleteObjectRequest {
 }
 
 message DeleteObjectResponse {
+}
+
+message RecomputeObjectRequest {
+    oneof type_wrapper {
+        QNameMessage type = 1;
+        DefaultObjectType object_type = 2;
+    }
+    oneof id_wrapper {
+        string oid = 10;
+        string name = 11;
+    }
+}
+
+message RecomputeObjectResponse {
 }
 
 message SearchRequest {

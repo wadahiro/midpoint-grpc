@@ -7,7 +7,7 @@ import jp.openstandia.midpoint.grpc.*;
 import java.io.UnsupportedEncodingException;
 import java.util.Base64;
 
-public class TestRecomputeClient {
+public class TestModifyUserClient {
 
     public static void main(String[] args) throws UnsupportedEncodingException {
         ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", 6565)
@@ -24,12 +24,16 @@ public class TestRecomputeClient {
 
         stub = MetadataUtils.attachHeaders(stub, headers);
 
-        RecomputeObjectRequest request = RecomputeObjectRequest.newBuilder()
+        ModifyUserRequest request = ModifyUserRequest.newBuilder()
                 .setName("foo")
-                .setObjectType(DefaultObjectType.USER_TYPE)
+                .addModifications(
+                        UserItemDeltaMessage.newBuilder()
+                                .setPath("familyName")
+                                .addValuesToAdd("hoge1")
+                )
                 .build();
 
-        RecomputeObjectResponse response = stub.recomputeObject(request);
+        ModifyUserResponse response = stub.modifyUser(request);
 
         System.out.println(response);
 

@@ -11,10 +11,7 @@ import com.evolveum.midpoint.model.impl.util.ModelImplUtils;
 import com.evolveum.midpoint.prism.*;
 import com.evolveum.midpoint.prism.crypto.EncryptionException;
 import com.evolveum.midpoint.prism.crypto.Protector;
-import com.evolveum.midpoint.prism.delta.DeltaFactory;
-import com.evolveum.midpoint.prism.delta.ItemDelta;
-import com.evolveum.midpoint.prism.delta.ObjectDelta;
-import com.evolveum.midpoint.prism.delta.PropertyDelta;
+import com.evolveum.midpoint.prism.delta.*;
 import com.evolveum.midpoint.prism.delta.builder.S_ItemEntry;
 import com.evolveum.midpoint.prism.delta.builder.S_MaybeDelete;
 import com.evolveum.midpoint.prism.delta.builder.S_ValuesEntry;
@@ -77,6 +74,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     public static final String OPERATION_MODIFY_USER = CLASS_DOT + "modifyUser";
     public static final String OPERATION_GET_USER = CLASS_DOT + "getUser";
     public static final String OPERATION_DELETE_USER = CLASS_DOT + "deleteUser";
+    public static final String OPERATION_RECOMPUTE_OBJECT = CLASS_DOT + "recomputeObject";
     public static final String OPERATION_EXECUTE_USER_UPDATE = CLASS_DOT + "executeUserUpdate";
     public static final String OPERATION_EXECUTE_CREDENTIAL_CHECK = CLASS_DOT + "executeCredentialCheck";
     public static final String OPERATION_EXECUTE_CREDENTIAL_UPDATE = CLASS_DOT + "executeCredentialUpdate";
@@ -1024,6 +1022,49 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         });
 
         responseObserver.onNext(DeleteObjectResponse.newBuilder().build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void recomputeObject(RecomputeObjectRequest request, StreamObserver<RecomputeObjectResponse> responseObserver) {
+        runTask(ctx -> {
+            Task task = ctx.task;
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_RECOMPUTE_OBJECT);
+
+            Class<? extends FocusType> clazz;
+            if (request.hasType()) {
+                QName qname = toQNameValue(request.getType());
+                clazz = ObjectTypes.getObjectTypeClass(qname);
+            } else {
+                QName qname = toQNameValue(request.getObjectType());
+                clazz = ObjectTypes.getObjectTypeClass(qname);
+            }
+
+            if (!FocusType.class.isAssignableFrom(clazz)) {
+                StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                        .withDescription("invalid_object_type")
+                        .asRuntimeException();
+                throw exception;
+            }
+
+            String oid = resolveOid(task, parentResult, UserType.class, request.getOid(), request.getName());
+            ModelExecuteOptions options =  ModelExecuteOptions.createReconcile();
+
+            try {
+                ObjectDelta<? extends FocusType> emptyDelta = prismContext.deltaFactory().object()
+                        .createEmptyDelta(clazz, oid, ChangeType.MODIFY);
+                modelService.executeChanges(Collections.singleton(emptyDelta), options, task, parentResult);
+
+                parentResult.recordSuccessIfUnknown();
+            } finally {
+                parentResult.computeStatusIfUnknown();
+            }
+
+            return null;
+        });
+
+        responseObserver.onNext(RecomputeObjectResponse.newBuilder().build());
         responseObserver.onCompleted();
     }
 
