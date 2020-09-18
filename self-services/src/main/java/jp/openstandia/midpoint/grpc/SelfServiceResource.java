@@ -135,13 +135,10 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             Collection<SelectorOptions<GetOperationOptions>> getOptions = GetOperationOptions.fromRestOptions(options, include,
                     exclude, resolveNames, null, prismContext);
 
-            try {
-                PrismObject<UserType> user = modelCrudService.getObject(UserType.class, loggedInUser.getOid(), getOptions, task, parentResult);
-                parentResult.recordSuccessIfUnknown();
-                return user;
-            } finally {
-                parentResult.computeStatusIfUnknown();
-            }
+            PrismObject<UserType> user = modelCrudService.getObject(UserType.class, loggedInUser.getOid(), getOptions, task, parentResult);
+
+            parentResult.computeStatus();
+            return user;
         });
 
         GetSelfResponse res = GetSelfResponse.newBuilder()
@@ -174,37 +171,36 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
             OperationResult parentResult = task.getResult().createSubresult(OPERATION_SELF_ASSIGNMENT);
 
-            try {
-                PrismObject<UserType> user = modelCrudService.getObject(UserType.class, loggedInUser.getOid(), null, task, parentResult);
-                UserType userType = user.asObjectable();
+            PrismObject<UserType> user = modelCrudService.getObject(UserType.class, loggedInUser.getOid(), null, task, parentResult);
+            UserType userType = user.asObjectable();
 
-                List<AssignmentType> assignment = userType.getAssignment();
-                List<String> oids = assignment.stream()
-                        .map(x -> x.getTargetRef().getOid())
+            List<AssignmentType> assignment = userType.getAssignment();
+            List<String> oids = assignment.stream()
+                    .map(x -> x.getTargetRef().getOid())
+                    .collect(Collectors.toList());
+
+            if (request.getIncludeOrgRefDetail()) {
+                List<String> orgRefOids = assignment.stream()
+                        .filter(x -> x.getOrgRef() != null)
+                        .map(x -> x.getOrgRef().getOid())
                         .collect(Collectors.toList());
+                oids.addAll(orgRefOids);
+            }
 
-                if (request.getIncludeOrgRefDetail()) {
-                    List<String> orgRefOids = assignment.stream()
-                            .filter(x -> x.getOrgRef() != null)
-                            .map(x -> x.getOrgRef().getOid())
-                            .collect(Collectors.toList());
-                    oids.addAll(orgRefOids);
-                }
+            // key: oid, value: Org/Role/Archetype etc.
+            Map<String, AbstractRoleType> cache = new HashMap<>();
 
-                // key: oid, value: Org/Role/Archetype etc.
-                Map<String, AbstractRoleType> cache = new HashMap<>();
+            // TODO: use search mode for performance?
+            // For caching detail of the target objects
+            oids.stream().forEach(x -> {
+                try {
+                    AbstractRoleType o = modelService.getObject(AbstractRoleType.class, x,
+                            SelectorOptions.createCollection(GetOperationOptions.createExecutionPhase().resolveNames(true)), task, parentResult)
+                            .asObjectable();
+                    cache.put(x, o);
 
-                // TODO: use search mode for performance?
-                // For caching detail of the target objects
-                oids.stream().forEach(x -> {
-                    try {
-                        AbstractRoleType o = modelService.getObject(AbstractRoleType.class, x,
-                                SelectorOptions.createCollection(GetOperationOptions.createExecutionPhase().resolveNames(true)), task, parentResult)
-                                .asObjectable();
-                        cache.put(x, o);
-
-                        // End User doesn't have get permission for Archetype with default.
-                        // So currently, we rely on `resolveNames` mode to get name of archetype.
+                    // End User doesn't have get permission for Archetype with default.
+                    // So currently, we rely on `resolveNames` mode to get name of archetype.
 //                        if (request.getIncludeArchetypeRefDetail()) {
 //                            o.getArchetypeRef().stream()
 //                                    .forEach(ref -> {
@@ -219,60 +215,57 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 //                                        }
 //                                    });
 //                        }
-                    } catch (CommonException e) {
-                        LOGGER.warn("Cannot fetch the object for collecting assignment detail. oid: {}", x, e);
-                    }
-                });
+                } catch (CommonException e) {
+                    LOGGER.warn("Cannot fetch the object for collecting assignment detail. oid: {}", x, e);
+                }
+            });
 
-                // End User doesn't have search permission with default setting...
-                // TODO: use admin permission partially?
-                // For caching detail of the target objects
+            // End User doesn't have search permission with default setting...
+            // TODO: use admin permission partially?
+            // For caching detail of the target objects
 //                ObjectQuery query = createInOidQuery(ObjectType.class, oids);
 //                SearchResultList<PrismObject<AbstractRoleType>> foundObjects = modelService.searchObjects(AbstractRoleType.class, query, null,
 //                        task, parentResult);
 //                foundObjects.stream().forEach(x -> cache.put(x.getOid(), x.asObjectable()));
 
-                List<AssignmentMessage> assignmentMessages = assignment.stream()
-                        // The user might not have permission to get the target. So filter them.
-                        .filter(x -> cache.containsKey(x.getTargetRef().getOid()))
-                        .map(x -> {
-                            AbstractRoleType o = cache.get(x.getTargetRef().getOid());
+            List<AssignmentMessage> assignmentMessages = assignment.stream()
+                    // The user might not have permission to get the target. So filter them.
+                    .filter(x -> cache.containsKey(x.getTargetRef().getOid()))
+                    .map(x -> {
+                        AbstractRoleType o = cache.get(x.getTargetRef().getOid());
 
-                            ObjectReferenceType orgRef = x.getOrgRef();
-                            AbstractRoleType resolvedOrgRef = null;
-                            if (orgRef != null) {
-                                resolvedOrgRef = cache.get(orgRef.getOid());
-                            }
+                        ObjectReferenceType orgRef = x.getOrgRef();
+                        AbstractRoleType resolvedOrgRef = null;
+                        if (orgRef != null) {
+                            resolvedOrgRef = cache.get(orgRef.getOid());
+                        }
 
-                            QName relation = x.getTargetRef().getRelation();
+                        QName relation = x.getTargetRef().getRelation();
 
-                            return BuilderWrapper.wrap(AssignmentMessage.newBuilder())
-                                    .nullSafe(toReferenceMessage(orgRef, resolvedOrgRef), (b, v) -> b.setOrgRef(v))
-                                    .unwrap()
-                                    .setTargetRef(
-                                            BuilderWrapper.wrap(ReferenceMessage.newBuilder())
-                                                    .nullSafe(o.getOid(), (b, v) -> b.setOid(v))
-                                                    .nullSafe(TypeConverter.toPolyStringMessage(o.getName()), (b, v) -> b.setName(v))
-                                                    .nullSafe(TypeConverter.toStringMessage(o.getDescription()), (b, v) -> b.setDescription(v))
-                                                    .nullSafe(TypeConverter.toPolyStringMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
-                                                    .nullSafe(TypeConverter.toReferenceMessageList(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
-                                                    .unwrap()
-                                                    .setRelation(
-                                                            QNameMessage.newBuilder()
-                                                                    .setNamespaceURI(relation.getNamespaceURI())
-                                                                    .setLocalPart(relation.getLocalPart())
-                                                                    .setPrefix(relation.getPrefix())
-                                                    )
-                                                    .build()
-                                    ).build();
-                        })
-                        .collect(Collectors.toList());
+                        return BuilderWrapper.wrap(AssignmentMessage.newBuilder())
+                                .nullSafe(toReferenceMessage(orgRef, resolvedOrgRef), (b, v) -> b.setOrgRef(v))
+                                .unwrap()
+                                .setTargetRef(
+                                        BuilderWrapper.wrap(ReferenceMessage.newBuilder())
+                                                .nullSafe(o.getOid(), (b, v) -> b.setOid(v))
+                                                .nullSafe(TypeConverter.toPolyStringMessage(o.getName()), (b, v) -> b.setName(v))
+                                                .nullSafe(TypeConverter.toStringMessage(o.getDescription()), (b, v) -> b.setDescription(v))
+                                                .nullSafe(TypeConverter.toPolyStringMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                                                .nullSafe(TypeConverter.toReferenceMessageList(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
+                                                .unwrap()
+                                                .setRelation(
+                                                        QNameMessage.newBuilder()
+                                                                .setNamespaceURI(relation.getNamespaceURI())
+                                                                .setLocalPart(relation.getLocalPart())
+                                                                .setPrefix(relation.getPrefix())
+                                                )
+                                                .build()
+                                ).build();
+                    })
+                    .collect(Collectors.toList());
 
-                parentResult.recordSuccessIfUnknown();
-                return assignmentMessages;
-            } finally {
-                parentResult.computeStatusIfUnknown();
-            }
+            parentResult.computeStatus();
+            return assignmentMessages;
         });
 
         GetSelfAssignmentResponse res = GetSelfAssignmentResponse.newBuilder()
@@ -296,14 +289,9 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             UserType loggedInUser = ctx.principal.getUser();
             ModelExecuteOptions modelExecuteOptions = ModelExecuteOptions.fromRestOptions(request.getOptionsList());
 
-            try {
-                executeChanges(loggedInUser.getOid(), request.getModificationsList(), modelExecuteOptions, task, parentResult);
+            executeChanges(loggedInUser.getOid(), request.getModificationsList(), modelExecuteOptions, task, parentResult);
 
-                parentResult.recordSuccessIfUnknown();
-            } finally {
-                parentResult.computeStatusIfUnknown();
-            }
-
+            parentResult.computeStatus();
             return null;
         });
 
@@ -322,93 +310,88 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
         OperationResult updateResult = result.createSubresult(OPERATION_EXECUTE_USER_UPDATE);
 
-        try {
-            PrismContainerDefinition<UserType> definition = prismContext.getSchemaRegistry()
-                    .findContainerDefinitionByCompileTimeClass(UserType.class);
+        PrismContainerDefinition<UserType> definition = prismContext.getSchemaRegistry()
+                .findContainerDefinitionByCompileTimeClass(UserType.class);
 
-            S_ItemEntry i = prismContext.deltaFor(UserType.class);
+        S_ItemEntry i = prismContext.deltaFor(UserType.class);
 
-            // https://wiki.evolveum.com/display/midPoint/Using+Prism+Deltas
-            for (UserItemDeltaMessage m : userModifications) {
-                ItemPath path;
-                if (m.hasItemPath()) {
-                    path = TypeConverter.toItemPathValue(m.getItemPath());
+        // https://wiki.evolveum.com/display/midPoint/Using+Prism+Deltas
+        for (UserItemDeltaMessage m : userModifications) {
+            ItemPath path;
+            if (m.hasItemPath()) {
+                path = TypeConverter.toItemPathValue(m.getItemPath());
 
-                } else if (m.getPathWrapperCase() == UserItemDeltaMessage.PathWrapperCase.PATH) {
-                    path = TypeConverter.toItemPath(m.getPath());
+            } else if (m.getPathWrapperCase() == UserItemDeltaMessage.PathWrapperCase.PATH) {
+                path = TypeConverter.toItemPath(m.getPath());
 
-                } else if (m.getPathWrapperCase() == UserItemDeltaMessage.PathWrapperCase.USER_TYPE_PATH) {
-                    path = TypeConverter.toItemName(m.getUserTypePath());
+            } else if (m.getPathWrapperCase() == UserItemDeltaMessage.PathWrapperCase.USER_TYPE_PATH) {
+                path = TypeConverter.toItemName(m.getUserTypePath());
 
-                } else {
-                    StatusRuntimeException exception = Status.INVALID_ARGUMENT
-                            .withDescription("invalid_path")
-                            .asRuntimeException();
-                    throw exception;
-                }
-
-                ItemDefinition itemDef = definition.findItemDefinition(path);
-                if (itemDef == null) {
-                    StatusRuntimeException exception = Status.INVALID_ARGUMENT
-                            .withDescription("invalid_path")
-                            .asRuntimeException();
-                    throw exception;
-                }
-
-                Class itemClass = itemDef.getTypeClass();
-
-                S_ValuesEntry v = i.item(path);
-
-                S_ItemEntry entry = null;
-
-                // Plain string
-                // TODO Remove this API
-                if (!m.getValuesToAddList().isEmpty()) {
-                    S_MaybeDelete av = v.addRealValues(TypeConverter.toRealValue(m.getValuesToAddList(), itemClass));
-
-                    if (!m.getValuesToDeleteList().isEmpty()) {
-                        entry = av.deleteRealValues(TypeConverter.toRealValue(m.getValuesToDeleteList(), itemClass));
-                    } else {
-                        entry = av;
-                    }
-                } else if (!m.getValuesToReplaceList().isEmpty()) {
-                    entry = v.replaceRealValues(TypeConverter.toRealValue(m.getValuesToReplaceList(), itemClass));
-
-                } else if (!m.getValuesToDeleteList().isEmpty()) {
-                    entry = v.deleteRealValues(TypeConverter.toRealValue(m.getValuesToDeleteList(), itemClass));
-                }
-
-                // PrismValue
-                if (!m.getPrismValuesToAddList().isEmpty()) {
-                    S_MaybeDelete av = v.add(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToAddList()));
-
-                    if (!m.getPrismValuesToDeleteList().isEmpty()) {
-                        entry = av.delete(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToDeleteList()));
-                    } else {
-                        entry = av;
-                    }
-                } else if (!m.getPrismValuesToReplaceList().isEmpty()) {
-                    entry = v.replace(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToReplaceList()));
-
-                } else if (!m.getPrismValuesToDeleteList().isEmpty()) {
-                    entry = v.delete(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToDeleteList()));
-                }
-
-                if (entry == null) {
-                    LOGGER.warn("Invalid argument. No values for modification.");
-                    throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-                }
-                i = entry;
+            } else {
+                StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                        .withDescription("invalid_path")
+                        .asRuntimeException();
+                throw exception;
             }
-            Collection<? extends ItemDelta<?, ?>> modifications = i.asItemDeltas();
 
+            ItemDefinition itemDef = definition.findItemDefinition(path);
+            if (itemDef == null) {
+                StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                        .withDescription("invalid_path")
+                        .asRuntimeException();
+                throw exception;
+            }
 
-            modelCrudService.modifyObject(UserType.class, oid, modifications, modelExecuteOptions, task, updateResult);
+            Class itemClass = itemDef.getTypeClass();
 
-            updateResult.computeStatus();
-        } finally {
-            updateResult.computeStatusIfUnknown();
+            S_ValuesEntry v = i.item(path);
+
+            S_ItemEntry entry = null;
+
+            // Plain string
+            // TODO Remove this API
+            if (!m.getValuesToAddList().isEmpty()) {
+                S_MaybeDelete av = v.addRealValues(TypeConverter.toRealValue(m.getValuesToAddList(), itemClass));
+
+                if (!m.getValuesToDeleteList().isEmpty()) {
+                    entry = av.deleteRealValues(TypeConverter.toRealValue(m.getValuesToDeleteList(), itemClass));
+                } else {
+                    entry = av;
+                }
+            } else if (!m.getValuesToReplaceList().isEmpty()) {
+                entry = v.replaceRealValues(TypeConverter.toRealValue(m.getValuesToReplaceList(), itemClass));
+
+            } else if (!m.getValuesToDeleteList().isEmpty()) {
+                entry = v.deleteRealValues(TypeConverter.toRealValue(m.getValuesToDeleteList(), itemClass));
+            }
+
+            // PrismValue
+            if (!m.getPrismValuesToAddList().isEmpty()) {
+                S_MaybeDelete av = v.add(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToAddList()));
+
+                if (!m.getPrismValuesToDeleteList().isEmpty()) {
+                    entry = av.delete(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToDeleteList()));
+                } else {
+                    entry = av;
+                }
+            } else if (!m.getPrismValuesToReplaceList().isEmpty()) {
+                entry = v.replace(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToReplaceList()));
+
+            } else if (!m.getPrismValuesToDeleteList().isEmpty()) {
+                entry = v.delete(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToDeleteList()));
+            }
+
+            if (entry == null) {
+                LOGGER.warn("Invalid argument. No values for modification.");
+                throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+            }
+            i = entry;
         }
+        Collection<? extends ItemDelta<?, ?>> modifications = i.asItemDeltas();
+
+        modelCrudService.modifyObject(UserType.class, oid, modifications, modelExecuteOptions, task, updateResult);
+
+        updateResult.computeStatus();
     }
 
     @Override
@@ -543,7 +526,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 taskOid = runTask(reqTask, task, parentResult);
             }
 
-            parentResult.recordSuccess();
+            parentResult.computeStatus();
             return taskOid;
         });
 
@@ -666,6 +649,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             String oid = modelCrudService.addObject(user, modelExecuteOptions, task, parentResult);
             LOGGER.debug("returned oid :  {}", oid);
 
+            parentResult.computeStatus();
             return oid;
         });
 
@@ -690,17 +674,12 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             Task task = ctx.task;
             OperationResult parentResult = task.getResult().createSubresult(OPERATION_MODIFY_USER);
 
-            String oid = resolveOid(task, parentResult, UserType.class, request.getOid(), request.getName());
+            String oid = resolveOid(UserType.class, request.getOid(), request.getName(), task, parentResult);
             ModelExecuteOptions modelExecuteOptions = ModelExecuteOptions.fromRestOptions(request.getOptionsList());
 
-            try {
-                executeChanges(oid, request.getModificationsList(), modelExecuteOptions, task, parentResult);
+            executeChanges(oid, request.getModificationsList(), modelExecuteOptions, task, parentResult);
 
-                parentResult.recordSuccessIfUnknown();
-            } finally {
-                parentResult.computeStatusIfUnknown();
-            }
-
+            parentResult.computeStatus();
             return null;
         });
 
@@ -779,30 +758,26 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             List<String> exclude = request.getExcludeList();
             List<String> resolveNames = request.getResolveNamesList();
 
-            try {
-                Collection<SelectorOptions<GetOperationOptions>> searchOptions = GetOperationOptions.fromRestOptions(options, include,
-                        exclude, resolveNames, DefinitionProcessingOption.FULL, prismContext);
+            Collection<SelectorOptions<GetOperationOptions>> searchOptions = GetOperationOptions.fromRestOptions(options, include,
+                    exclude, resolveNames, DefinitionProcessingOption.FULL, prismContext);
 
-                ObjectQuery query = TypeConverter.toObjectQuery(prismContext, clazz, request.getQuery());
+            ObjectQuery query = TypeConverter.toObjectQuery(prismContext, clazz, request.getQuery());
 
-                Integer total = modelService.countObjects(clazz, query, searchOptions,
-                        task, parentResult);
+            Integer total = modelService.countObjects(clazz, query, searchOptions,
+                    task, parentResult);
 
-                SearchResultList<PrismObject<T>> foundObjects = modelService.searchObjects(clazz, query, searchOptions,
-                        task, parentResult);
+            SearchResultList<PrismObject<T>> foundObjects = modelService.searchObjects(clazz, query, searchOptions,
+                    task, parentResult);
 
-                SearchResultMetadata metadata = foundObjects.getMetadata();
-                if (metadata == null) {
-                    metadata = new SearchResultMetadata();
-                    foundObjects.setMetadata(metadata);
-                }
-                foundObjects.getMetadata().setApproxNumberOfAllResults(total);
-
-                parentResult.recordSuccessIfUnknown();
-                return foundObjects;
-            } finally {
-                parentResult.computeStatusIfUnknown();
+            SearchResultMetadata metadata = foundObjects.getMetadata();
+            if (metadata == null) {
+                metadata = new SearchResultMetadata();
+                foundObjects.setMetadata(metadata);
             }
+            foundObjects.getMetadata().setApproxNumberOfAllResults(total);
+
+            parentResult.computeStatus();
+            return foundObjects;
         });
         return result;
     }
@@ -879,45 +854,41 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             List<String> exclude = request.getExcludeList();
             List<String> resolveNames = request.getResolveNamesList();
 
-            try {
-                Collection<SelectorOptions<GetOperationOptions>> searchOptions = GetOperationOptions.fromRestOptions(options, include,
-                        exclude, resolveNames, DefinitionProcessingOption.FULL, prismContext);
+            Collection<SelectorOptions<GetOperationOptions>> searchOptions = GetOperationOptions.fromRestOptions(options, include,
+                    exclude, resolveNames, DefinitionProcessingOption.FULL, prismContext);
 
-                Class<? extends ObjectType> clazz;
-                if (request.hasType()) {
-                    QName qname = toQNameValue(request.getType());
-                    clazz = ObjectTypes.getObjectTypeClass(qname);
-                } else {
-                    QName qname = toQNameValue(request.getObjectType());
-                    clazz = ObjectTypes.getObjectTypeClass(qname);
-                }
-
-                ObjectQuery query = TypeConverter.toObjectQuery(prismContext, clazz, request.getQuery());
-
-                SearchResultMetadata metadata = modelService.searchObjectsIterative(clazz, query,
-                        (object, pr) -> {
-                            try {
-                                ItemMessage itemMessage = toItemMessage(object.getDefinition(), object);
-
-                                SearchObjectsResponse response = SearchObjectsResponse.newBuilder()
-                                        .addResults(itemMessage)
-                                        .build();
-                                responseObserver.onNext(response);
-
-                            } catch (SchemaException e) {
-                                LOGGER.error("Failed to convert the object", e);
-                                responseObserver.onError(e);
-                            }
-                            return true;
-                        },
-                        searchOptions,
-                        task, parentResult);
-
-                parentResult.recordSuccessIfUnknown();
-                return null;
-            } finally {
-                parentResult.computeStatusIfUnknown();
+            Class<? extends ObjectType> clazz;
+            if (request.hasType()) {
+                QName qname = toQNameValue(request.getType());
+                clazz = ObjectTypes.getObjectTypeClass(qname);
+            } else {
+                QName qname = toQNameValue(request.getObjectType());
+                clazz = ObjectTypes.getObjectTypeClass(qname);
             }
+
+            ObjectQuery query = TypeConverter.toObjectQuery(prismContext, clazz, request.getQuery());
+
+            SearchResultMetadata metadata = modelService.searchObjectsIterative(clazz, query,
+                    (object, pr) -> {
+                        try {
+                            ItemMessage itemMessage = toItemMessage(object.getDefinition(), object);
+
+                            SearchObjectsResponse response = SearchObjectsResponse.newBuilder()
+                                    .addResults(itemMessage)
+                                    .build();
+                            responseObserver.onNext(response);
+
+                        } catch (SchemaException e) {
+                            LOGGER.error("Failed to convert the object", e);
+                            responseObserver.onError(e);
+                        }
+                        return true;
+                    },
+                    searchOptions,
+                    task, parentResult);
+
+            parentResult.computeStatus();
+            return null;
         });
 
         responseObserver.onCompleted();
@@ -930,7 +901,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
             OperationResult parentResult = task.getResult().createSubresult(OPERATION_GET_USER);
 
-            String oid = resolveOid(task, parentResult, UserType.class, request.getOid(), request.getName());
+            String oid = resolveOid(UserType.class, request.getOid(), request.getName(), task, parentResult);
 
             List<String> options = request.getOptionsList();
             List<String> include = request.getIncludeList();
@@ -940,35 +911,16 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             Collection<SelectorOptions<GetOperationOptions>> getOptions = GetOperationOptions.fromRestOptions(options, include,
                     exclude, resolveNames, null, prismContext);
 
-            try {
-                PrismObject<UserType> user = modelCrudService.getObject(UserType.class, oid, getOptions, task, parentResult);
-                parentResult.recordSuccessIfUnknown();
-                return user;
-            } finally {
-                parentResult.computeStatusIfUnknown();
-            }
+            PrismObject<UserType> user = modelCrudService.getObject(UserType.class, oid, getOptions, task, parentResult);
+
+            parentResult.computeStatus();
+            return user;
         });
 
         responseObserver.onNext(GetUserResponse.newBuilder()
                 .setResult(toUserTypeMessage(foundUser.asObjectable()))
                 .build());
         responseObserver.onCompleted();
-    }
-
-    private <T extends ObjectType> T searchObjectByName(Class<T> type, String name, Task task, OperationResult result)
-            throws SecurityViolationException, ObjectNotFoundException, CommunicationException, ConfigurationException,
-            SchemaException, ExpressionEvaluationException {
-        ObjectQuery nameQuery = ObjectQueryUtil.createNameQuery(name, prismContext);
-        List<PrismObject<T>> foundObjects = modelService
-                .searchObjects(type, nameQuery,
-                        getDefaultGetOptionCollection(), task, result);
-        if (foundObjects.isEmpty()) {
-            return null;
-        }
-        if (foundObjects.size() > 1) {
-            throw new IllegalStateException("More than one object found for type " + type + " and name '" + name + "'");
-        }
-        return foundObjects.iterator().next().asObjectable();
     }
 
     private Collection<SelectorOptions<GetOperationOptions>> getDefaultGetOptionCollection() {
@@ -991,18 +943,16 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 clazz = ObjectTypes.getObjectTypeClass(qname);
             }
 
-            String oid = resolveOid(task, parentResult, UserType.class, request.getOid(), request.getName());
+            String oid = resolveOid(UserType.class, request.getOid(), request.getName(), task, parentResult);
 
             List<String> options = request.getOptionsList();
 
             if (clazz.isAssignableFrom(TaskType.class)) {
                 taskService.suspendAndDeleteTask(oid, WAIT_FOR_TASK_STOP, true, task, parentResult);
                 parentResult.computeStatus();
-//                    finishRequest(task);
                 if (parentResult.isSuccess()) {
                     return null;
                 }
-//                    return Response.serverError().entity(parentResult.getMessage()).build();
                 StatusRuntimeException exception = Status.INTERNAL
                         .withDescription(parentResult.getMessage())
                         .asRuntimeException();
@@ -1014,10 +964,12 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             try {
                 modelCrudService.deleteObject(clazz, oid, modelExecuteOptions, task, parentResult);
             } catch (SchemaException e) {
+                // TODO Add force delete mode for invalid schema data
 //                repositoryService.deleteObject(clazz, oid, parentResult);
                 throw e;
             }
 
+            parentResult.computeStatus();
             return null;
         });
 
@@ -1048,19 +1000,14 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 throw exception;
             }
 
-            String oid = resolveOid(task, parentResult, UserType.class, request.getOid(), request.getName());
-            ModelExecuteOptions options =  ModelExecuteOptions.createReconcile();
+            String oid = resolveOid(UserType.class, request.getOid(), request.getName(), task, parentResult);
+            ModelExecuteOptions options = ModelExecuteOptions.createReconcile();
 
-            try {
-                ObjectDelta<? extends FocusType> emptyDelta = prismContext.deltaFactory().object()
-                        .createEmptyDelta(clazz, oid, ChangeType.MODIFY);
-                modelService.executeChanges(Collections.singleton(emptyDelta), options, task, parentResult);
+            ObjectDelta<? extends FocusType> emptyDelta = prismContext.deltaFactory().object()
+                    .createEmptyDelta(clazz, oid, ChangeType.MODIFY);
+            modelService.executeChanges(Collections.singleton(emptyDelta), options, task, parentResult);
 
-                parentResult.recordSuccessIfUnknown();
-            } finally {
-                parentResult.computeStatusIfUnknown();
-            }
-
+            parentResult.computeStatus();
             return null;
         });
 
@@ -1068,8 +1015,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         responseObserver.onCompleted();
     }
 
-    private String resolveOid(Task task, OperationResult result, Class<? extends ObjectType> clazz,
-                              String oid, String name) throws SecurityViolationException, ObjectNotFoundException,
+    private String resolveOid(Class<? extends ObjectType> clazz, String oid, String name, Task task, OperationResult result) throws SecurityViolationException, ObjectNotFoundException,
             CommunicationException, ConfigurationException, SchemaException, ExpressionEvaluationException {
         if (oid.isEmpty() && !name.isEmpty()) {
             // Fallback to search by name
@@ -1080,5 +1026,21 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             oid = obj.getOid();
         }
         return oid;
+    }
+
+    private <T extends ObjectType> T searchObjectByName(Class<T> type, String name, Task task, OperationResult result)
+            throws SecurityViolationException, ObjectNotFoundException, CommunicationException, ConfigurationException,
+            SchemaException, ExpressionEvaluationException {
+        ObjectQuery nameQuery = ObjectQueryUtil.createNameQuery(name, prismContext);
+        List<PrismObject<T>> foundObjects = modelService
+                .searchObjects(type, nameQuery,
+                        getDefaultGetOptionCollection(), task, result);
+        if (foundObjects.isEmpty()) {
+            return null;
+        }
+        if (foundObjects.size() > 1) {
+            throw new IllegalStateException("More than one object found for type " + type + " and name '" + name + "'");
+        }
+        return foundObjects.iterator().next().asObjectable();
     }
 }
