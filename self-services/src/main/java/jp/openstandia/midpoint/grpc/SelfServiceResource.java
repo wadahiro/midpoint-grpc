@@ -72,7 +72,9 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     public static final String CLASS_DOT = SelfServiceResource.class.getName() + ".";
     public static final String OPERATION_SELF = CLASS_DOT + "self";
     public static final String OPERATION_SELF_ASSIGNMENT = CLASS_DOT + "selfAssignment";
+    public static final String OPERATION_MODIFY_PROFILE = CLASS_DOT + "modifyProfile";
     public static final String OPERATION_ADD_USER = CLASS_DOT + "addUser";
+    public static final String OPERATION_MODIFY_USER = CLASS_DOT + "modifyUser";
     public static final String OPERATION_GET_USER = CLASS_DOT + "getUser";
     public static final String OPERATION_DELETE_USER = CLASS_DOT + "deleteUser";
     public static final String OPERATION_EXECUTE_USER_UPDATE = CLASS_DOT + "executeUserUpdate";
@@ -291,97 +293,19 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
         runTask(ctx -> {
             Task task = ctx.task;
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_MODIFY_PROFILE);
+
             UserType loggedInUser = ctx.principal.getUser();
+            ModelExecuteOptions modelExecuteOptions = ModelExecuteOptions.fromRestOptions(request.getOptionsList());
 
-            OperationResult updateResult = task.getResult().createSubresult(OPERATION_EXECUTE_USER_UPDATE);
             try {
-                PrismContainerDefinition<UserType> definition = prismContext.getSchemaRegistry()
-                        .findContainerDefinitionByCompileTimeClass(UserType.class);
+                executeChanges(loggedInUser.getOid(), request.getModificationsList(), modelExecuteOptions, task, parentResult);
 
-                S_ItemEntry i = prismContext.deltaFor(UserType.class);
-
-                // https://wiki.evolveum.com/display/midPoint/Using+Prism+Deltas
-                for (UserItemDeltaMessage m : request.getModificationsList()) {
-                    ItemPath path;
-                    if (m.hasItemPath()) {
-                        path = TypeConverter.toItemPathValue(m.getItemPath());
-
-                    } else if (m.getPathWrapperCase() == UserItemDeltaMessage.PathWrapperCase.PATH) {
-                        path = TypeConverter.toItemPath(m.getPath());
-
-                    } else if (m.getPathWrapperCase() == UserItemDeltaMessage.PathWrapperCase.USER_TYPE_PATH) {
-                        path = TypeConverter.toItemName(m.getUserTypePath());
-
-                    } else {
-                        StatusRuntimeException exception = Status.INVALID_ARGUMENT
-                                .withDescription("invalid_path")
-                                .asRuntimeException();
-                        throw exception;
-                    }
-
-                    ItemDefinition itemDef = definition.findItemDefinition(path);
-                    if (itemDef == null) {
-                        StatusRuntimeException exception = Status.INVALID_ARGUMENT
-                                .withDescription("invalid_path")
-                                .asRuntimeException();
-                        throw exception;
-                    }
-
-                    Class itemClass = itemDef.getTypeClass();
-
-                    S_ValuesEntry v = i.item(path);
-
-                    S_ItemEntry entry = null;
-
-                    // Plain string
-                    // TODO Remove this API
-                    if (!m.getValuesToAddList().isEmpty()) {
-                        S_MaybeDelete av = v.addRealValues(TypeConverter.toRealValue(m.getValuesToAddList(), itemClass));
-
-                        if (!m.getValuesToDeleteList().isEmpty()) {
-                            entry = av.deleteRealValues(TypeConverter.toRealValue(m.getValuesToDeleteList(), itemClass));
-                        } else {
-                            entry = av;
-                        }
-                    } else if (!m.getValuesToReplaceList().isEmpty()) {
-                        entry = v.replaceRealValues(TypeConverter.toRealValue(m.getValuesToReplaceList(), itemClass));
-
-                    } else if (!m.getValuesToDeleteList().isEmpty()) {
-                        entry = v.deleteRealValues(TypeConverter.toRealValue(m.getValuesToDeleteList(), itemClass));
-                    }
-
-                    // PrismValue
-                    if (!m.getPrismValuesToAddList().isEmpty()) {
-                        S_MaybeDelete av = v.add(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToAddList()));
-
-                        if (!m.getPrismValuesToDeleteList().isEmpty()) {
-                            entry = av.delete(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToDeleteList()));
-                        } else {
-                            entry = av;
-                        }
-                    } else if (!m.getPrismValuesToReplaceList().isEmpty()) {
-                        entry = v.replace(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToReplaceList()));
-
-                    } else if (!m.getPrismValuesToDeleteList().isEmpty()) {
-                        entry = v.delete(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToDeleteList()));
-                    }
-
-                    if (entry == null) {
-                        LOGGER.warn("Invalid argument. No values for modification.");
-                        throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
-                    }
-                    i = entry;
-                }
-                Collection<? extends ItemDelta<?, ?>> modifications = i.asItemDeltas();
-
-                ModelExecuteOptions modelExecuteOptions = ModelExecuteOptions.fromRestOptions(request.getOptionsList());
-
-                modelCrudService.modifyObject(UserType.class, loggedInUser.getOid(), modifications, modelExecuteOptions, task, updateResult);
-
-                updateResult.computeStatus();
+                parentResult.recordSuccessIfUnknown();
             } finally {
-                updateResult.computeStatusIfUnknown();
+                parentResult.computeStatusIfUnknown();
             }
+
             return null;
         });
 
@@ -390,6 +314,103 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         responseObserver.onCompleted();
 
         LOGGER.debug("End updateProfile");
+    }
+
+    private void executeChanges(String oid, List<UserItemDeltaMessage> userModifications,
+                                ModelExecuteOptions modelExecuteOptions,
+                                Task task, OperationResult result) throws SchemaException, CommunicationException,
+            ObjectNotFoundException, ObjectAlreadyExistsException, PolicyViolationException, SecurityViolationException,
+            ConfigurationException, ExpressionEvaluationException {
+
+        OperationResult updateResult = result.createSubresult(OPERATION_EXECUTE_USER_UPDATE);
+
+        try {
+            PrismContainerDefinition<UserType> definition = prismContext.getSchemaRegistry()
+                    .findContainerDefinitionByCompileTimeClass(UserType.class);
+
+            S_ItemEntry i = prismContext.deltaFor(UserType.class);
+
+            // https://wiki.evolveum.com/display/midPoint/Using+Prism+Deltas
+            for (UserItemDeltaMessage m : userModifications) {
+                ItemPath path;
+                if (m.hasItemPath()) {
+                    path = TypeConverter.toItemPathValue(m.getItemPath());
+
+                } else if (m.getPathWrapperCase() == UserItemDeltaMessage.PathWrapperCase.PATH) {
+                    path = TypeConverter.toItemPath(m.getPath());
+
+                } else if (m.getPathWrapperCase() == UserItemDeltaMessage.PathWrapperCase.USER_TYPE_PATH) {
+                    path = TypeConverter.toItemName(m.getUserTypePath());
+
+                } else {
+                    StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                            .withDescription("invalid_path")
+                            .asRuntimeException();
+                    throw exception;
+                }
+
+                ItemDefinition itemDef = definition.findItemDefinition(path);
+                if (itemDef == null) {
+                    StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                            .withDescription("invalid_path")
+                            .asRuntimeException();
+                    throw exception;
+                }
+
+                Class itemClass = itemDef.getTypeClass();
+
+                S_ValuesEntry v = i.item(path);
+
+                S_ItemEntry entry = null;
+
+                // Plain string
+                // TODO Remove this API
+                if (!m.getValuesToAddList().isEmpty()) {
+                    S_MaybeDelete av = v.addRealValues(TypeConverter.toRealValue(m.getValuesToAddList(), itemClass));
+
+                    if (!m.getValuesToDeleteList().isEmpty()) {
+                        entry = av.deleteRealValues(TypeConverter.toRealValue(m.getValuesToDeleteList(), itemClass));
+                    } else {
+                        entry = av;
+                    }
+                } else if (!m.getValuesToReplaceList().isEmpty()) {
+                    entry = v.replaceRealValues(TypeConverter.toRealValue(m.getValuesToReplaceList(), itemClass));
+
+                } else if (!m.getValuesToDeleteList().isEmpty()) {
+                    entry = v.deleteRealValues(TypeConverter.toRealValue(m.getValuesToDeleteList(), itemClass));
+                }
+
+                // PrismValue
+                if (!m.getPrismValuesToAddList().isEmpty()) {
+                    S_MaybeDelete av = v.add(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToAddList()));
+
+                    if (!m.getPrismValuesToDeleteList().isEmpty()) {
+                        entry = av.delete(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToDeleteList()));
+                    } else {
+                        entry = av;
+                    }
+                } else if (!m.getPrismValuesToReplaceList().isEmpty()) {
+                    entry = v.replace(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToReplaceList()));
+
+                } else if (!m.getPrismValuesToDeleteList().isEmpty()) {
+                    entry = v.delete(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToDeleteList()));
+                }
+
+                if (entry == null) {
+                    LOGGER.warn("Invalid argument. No values for modification.");
+                    throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+                }
+                i = entry;
+            }
+            Collection<? extends ItemDelta<?, ?>> modifications = i.asItemDeltas();
+
+
+            modelCrudService.modifyObject(UserType.class, oid, modifications, modelExecuteOptions, task, updateResult);
+
+            updateResult.computeStatus();
+        } finally {
+            updateResult.computeStatusIfUnknown();
+        }
     }
 
     @Override
@@ -661,6 +682,35 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         responseObserver.onCompleted();
 
         LOGGER.debug("End addUser");
+    }
+
+    @Override
+    public void modifyUser(ModifyUserRequest request, StreamObserver<ModifyUserResponse> responseObserver) {
+        LOGGER.debug("Start modifyUser");
+
+        runTask(ctx -> {
+            Task task = ctx.task;
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_MODIFY_USER);
+
+            String oid = resolveOid(task, parentResult, UserType.class, request.getOid(), request.getName());
+            ModelExecuteOptions modelExecuteOptions = ModelExecuteOptions.fromRestOptions(request.getOptionsList());
+
+            try {
+                executeChanges(oid, request.getModificationsList(), modelExecuteOptions, task, parentResult);
+
+                parentResult.recordSuccessIfUnknown();
+            } finally {
+                parentResult.computeStatusIfUnknown();
+            }
+
+            return null;
+        });
+
+        ModifyUserResponse res = ModifyUserResponse.newBuilder().build();
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End modifyUser");
     }
 
     protected void updateCredential(MidPointTaskContext ctx, String oldCred, String newCred, boolean validate) throws SchemaException, SecurityViolationException, CommunicationException, ConfigurationException, ExpressionEvaluationException, ObjectNotFoundException, EncryptionException, PolicyViolationException, ObjectAlreadyExistsException {

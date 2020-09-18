@@ -233,7 +233,6 @@ public class TypeConverter {
                 .collect(Collectors.toList());
     }
 
-
     private static ReferenceMessage toReferenceMessage(ItemDefinition definition, PrismReferenceValue value) {
         return toReferenceMessage((ObjectReferenceType) value.getRealValue(), null);
     }

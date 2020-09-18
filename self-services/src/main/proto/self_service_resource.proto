@@ -45,6 +45,11 @@ service SelfServiceResource {
     rpc addUser (AddUserRequest) returns (AddUserResponse);
 
     /**
+     * Modify an user.
+     */
+    rpc modifyUser (ModifyUserRequest) returns (ModifyUserResponse);
+
+    /**
      * Get an user.
      */
     rpc getUser (GetUserRequest) returns (GetUserResponse);
@@ -383,7 +388,6 @@ message ItemDeltaMessage {
         string path = 1;
         ItemPathMessage item_path = 2;
     }
-
 }
 
 message PrismValueMessage {
@@ -554,6 +558,18 @@ message AddUserRequest {
 
 message AddUserResponse {
     string oid = 1;
+}
+
+message ModifyUserRequest {
+    oneof id_wrapper {
+        string oid = 10;
+        string name = 11;
+    }
+    repeated string options = 20;
+    repeated UserItemDeltaMessage modifications = 21;
+}
+
+message ModifyUserResponse {
 }
 
 message GetUserRequest {
