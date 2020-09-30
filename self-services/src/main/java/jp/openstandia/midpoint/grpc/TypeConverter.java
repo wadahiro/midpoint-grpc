@@ -9,6 +9,8 @@ import com.evolveum.midpoint.prism.polystring.PolyString;
 import com.evolveum.midpoint.prism.query.*;
 import com.evolveum.midpoint.prism.query.builder.*;
 import com.evolveum.midpoint.repo.api.RepositoryService;
+import com.evolveum.midpoint.schema.GetOperationOptions;
+import com.evolveum.midpoint.schema.SelectorOptions;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import com.evolveum.midpoint.util.LocalizableMessage;
 import com.evolveum.midpoint.util.LocalizableMessageList;
@@ -927,105 +929,150 @@ public class TypeConverter {
         return organizationList.stream().map(x -> toPolyStringTypeValue(x)).collect(Collectors.toList());
     }
 
-    public static UserTypeMessage toUserTypeMessage(UserType u) {
+    public static UserTypeMessage toUserTypeMessage(UserType u, Collection<SelectorOptions<GetOperationOptions>> options) {
         return BuilderWrapper.wrap(UserTypeMessage.newBuilder())
                 // ObjectType
                 .nullSafe(u.getOid(), (b, v) -> b.setOid(v))
                 .nullSafe(u.getVersion(), (b, v) -> b.setVersion(v))
                 .nullSafe(toPolyStringMessage(u.getName()), (b, v) -> b.setName(v))
-                .nullSafe(u.getDescription(), (b, v) -> b.setDescription(v))
-                .nullSafe(u.getSubtype(), (b, v) -> b.addAllSubtype(v))
-                .nullSafe(u.getLifecycleState(), (b, v) -> b.setLifecycleState(v))
+                .selectOptions(options)
+                .nullSafeWithRetrieve(UserType.F_DESCRIPTION, u.getDescription(), (b, v) -> b.setDescription(v))
+                .nullSafeWithRetrieve(UserType.F_SUBTYPE, u.getSubtype(), (b, v) -> b.addAllSubtype(v))
+                .nullSafeWithRetrieve(UserType.F_LIFECYCLE_STATE, u.getLifecycleState(), (b, v) -> b.setLifecycleState(v))
+                // AssignmentHolderType
+                .nullSafeWithRetrieve(UserType.F_ASSIGNMENT, u.getAssignment(), (b, v) -> {
+                    return b.addAllAssignment(v.stream().map(a -> {
+                        return AssignmentMessage.newBuilder()
+                                .setTargetRef(
+                                        toReferenceMessage(a.getTargetRef(), null)
+                                ).build();
+                    }).collect(Collectors.toList()));
+                })
+                .nullSafeWithRetrieve(UserType.F_ARCHETYPE_REF, u.getArchetypeRef(), (b, v) -> {
+                    return b.addAllArchetypeRef(v.stream().map(a -> {
+                        return toReferenceMessage(a, null);
+                    }).collect(Collectors.toList()));
+                })
                 // FocusType
-                .nullSafe(toBytesMessage(u.getJpegPhoto()), (b, v) -> b.setJpegPhoto(v))
-                .nullSafe(u.getCostCenter(), (b, v) -> b.setCostCenter(v))
-                .nullSafe(toPolyStringMessage(u.getLocality()), (b, v) -> b.setLocality(v))
-                .nullSafe(u.getPreferredLanguage(), (b, v) -> b.setPreferredLanguage(v))
-                .nullSafe(u.getLocale(), (b, v) -> b.setLocale(v))
-                .nullSafe(u.getTimezone(), (b, v) -> b.setTimezone(v))
-                .nullSafe(u.getEmailAddress(), (b, v) -> b.setEmailAddress(v))
-                .nullSafe(u.getTelephoneNumber(), (b, v) -> b.setTelephoneNumber(v))
+                .nullSafeWithRetrieve(UserType.F_JPEG_PHOTO, toBytesMessage(u.getJpegPhoto()), (b, v) -> b.setJpegPhoto(v))
+                .nullSafeWithRetrieve(UserType.F_COST_CENTER, u.getCostCenter(), (b, v) -> b.setCostCenter(v))
+                .nullSafeWithRetrieve(UserType.F_LOCALITY, toPolyStringMessage(u.getLocality()), (b, v) -> b.setLocality(v))
+                .nullSafeWithRetrieve(UserType.F_PREFERRED_LANGUAGE, u.getPreferredLanguage(), (b, v) -> b.setPreferredLanguage(v))
+                .nullSafeWithRetrieve(UserType.F_LOCALE, u.getLocale(), (b, v) -> b.setLocale(v))
+                .nullSafeWithRetrieve(UserType.F_TIMEZONE, u.getTimezone(), (b, v) -> b.setTimezone(v))
+                .nullSafeWithRetrieve(UserType.F_EMAIL_ADDRESS, u.getEmailAddress(), (b, v) -> b.setEmailAddress(v))
+                .nullSafeWithRetrieve(UserType.F_TELEPHONE_NUMBER, u.getTelephoneNumber(), (b, v) -> b.setTelephoneNumber(v))
                 // UserType
-                .nullSafe(toPolyStringMessage(u.getFullName()), (b, v) -> b.setFullName(v))
-                .nullSafe(toPolyStringMessage(u.getGivenName()), (b, v) -> b.setGivenName(v))
-                .nullSafe(toPolyStringMessage(u.getFamilyName()), (b, v) -> b.setFamilyName(v))
-                .nullSafe(toPolyStringMessage(u.getAdditionalName()), (b, v) -> b.setAdditionalName(v))
-                .nullSafe(toPolyStringMessage(u.getNickName()), (b, v) -> b.setNickName(v))
-                .nullSafe(toPolyStringMessage(u.getHonorificPrefix()), (b, v) -> b.setHonorificPrefix(v))
-                .nullSafe(toPolyStringMessage(u.getHonorificSuffix()), (b, v) -> b.setHonorificSuffix(v))
-                .nullSafe(toPolyStringMessage(u.getTitle()), (b, v) -> b.setTitle(v))
-                .nullSafe(u.getEmployeeNumber(), (b, v) -> b.setEmployeeNumber(v))
-                .nullSafe(toPolyStringMessageList(u.getOrganization()), (b, v) -> b.addAllOrganization(v))
-                .nullSafe(toPolyStringMessageList(u.getOrganizationalUnit()), (b, v) -> b.addAllOrganizationalUnit(v))
+                .nullSafeWithRetrieve(UserType.F_FULL_NAME, toPolyStringMessage(u.getFullName()), (b, v) -> b.setFullName(v))
+                .nullSafeWithRetrieve(UserType.F_GIVEN_NAME, toPolyStringMessage(u.getGivenName()), (b, v) -> b.setGivenName(v))
+                .nullSafeWithRetrieve(UserType.F_FAMILY_NAME, toPolyStringMessage(u.getFamilyName()), (b, v) -> b.setFamilyName(v))
+                .nullSafeWithRetrieve(UserType.F_ADDITIONAL_NAME, toPolyStringMessage(u.getAdditionalName()), (b, v) -> b.setAdditionalName(v))
+                .nullSafeWithRetrieve(UserType.F_NICK_NAME, toPolyStringMessage(u.getNickName()), (b, v) -> b.setNickName(v))
+                .nullSafeWithRetrieve(UserType.F_HONORIFIC_PREFIX, toPolyStringMessage(u.getHonorificPrefix()), (b, v) -> b.setHonorificPrefix(v))
+                .nullSafeWithRetrieve(UserType.F_HONORIFIC_SUFFIX, toPolyStringMessage(u.getHonorificSuffix()), (b, v) -> b.setHonorificSuffix(v))
+                .nullSafeWithRetrieve(UserType.F_TITLE, toPolyStringMessage(u.getTitle()), (b, v) -> b.setTitle(v))
+                .nullSafeWithRetrieve(UserType.F_EMPLOYEE_NUMBER, u.getEmployeeNumber(), (b, v) -> b.setEmployeeNumber(v))
+                .nullSafeWithRetrieve(UserType.F_ORGANIZATION, toPolyStringMessageList(u.getOrganization()), (b, v) -> b.addAllOrganization(v))
+                .nullSafeWithRetrieve(UserType.F_ORGANIZATIONAL_UNIT, toPolyStringMessageList(u.getOrganizationalUnit()), (b, v) -> b.addAllOrganizationalUnit(v))
                 // Extension
-                .nullSafe(toItemMessageMap(u.asPrismObject()), (b, v) -> b.putAllExtension(v))
+                .nullSafeWithRetrieve(UserType.F_EXTENSION, toItemMessageMap(u.asPrismObject()), (b, v) -> b.putAllExtension(v))
                 .unwrap()
                 .build();
     }
 
-    public static RoleTypeMessage toRoleTypeMessage(RoleType u) {
+    public static RoleTypeMessage toRoleTypeMessage(RoleType u, Collection<SelectorOptions<GetOperationOptions>> options) {
         return BuilderWrapper.wrap(RoleTypeMessage.newBuilder())
                 // ObjectType
                 .nullSafe(u.getOid(), (b, v) -> b.setOid(v))
                 .nullSafe(u.getVersion(), (b, v) -> b.setVersion(v))
                 .nullSafe(toPolyStringMessage(u.getName()), (b, v) -> b.setName(v))
-                .nullSafe(u.getDescription(), (b, v) -> b.setDescription(v))
-                .nullSafe(u.getSubtype(), (b, v) -> b.addAllSubtype(v))
-                .nullSafe(u.getLifecycleState(), (b, v) -> b.setLifecycleState(v))
+                .selectOptions(options)
+                .nullSafeWithRetrieve(RoleType.F_DESCRIPTION, u.getDescription(), (b, v) -> b.setDescription(v))
+                .nullSafeWithRetrieve(RoleType.F_SUBTYPE, u.getSubtype(), (b, v) -> b.addAllSubtype(v))
+                .nullSafeWithRetrieve(RoleType.F_LIFECYCLE_STATE, u.getLifecycleState(), (b, v) -> b.setLifecycleState(v))
+                // AssignmentHolderType
+                .nullSafeWithRetrieve(UserType.F_ASSIGNMENT, u.getAssignment(), (b, v) -> {
+                    return b.addAllAssignment(v.stream().map(a -> {
+                        return AssignmentMessage.newBuilder()
+                                .setTargetRef(
+                                        toReferenceMessage(a.getTargetRef(), null)
+                                ).build();
+                    }).collect(Collectors.toList()));
+                })
+                .nullSafeWithRetrieve(UserType.F_ARCHETYPE_REF, u.getArchetypeRef(), (b, v) -> {
+                    return b.addAllArchetypeRef(v.stream().map(a -> {
+                        return toReferenceMessage(a, null);
+                    }).collect(Collectors.toList()));
+                })
                 // FocusType
-                .nullSafe(toBytesMessage(u.getJpegPhoto()), (b, v) -> b.setJpegPhoto(v))
-                .nullSafe(u.getCostCenter(), (b, v) -> b.setCostCenter(v))
-                .nullSafe(toPolyStringMessage(u.getLocality()), (b, v) -> b.setLocality(v))
-                .nullSafe(u.getPreferredLanguage(), (b, v) -> b.setPreferredLanguage(v))
-                .nullSafe(u.getLocale(), (b, v) -> b.setLocale(v))
-                .nullSafe(u.getTimezone(), (b, v) -> b.setTimezone(v))
-                .nullSafe(u.getEmailAddress(), (b, v) -> b.setEmailAddress(v))
-                .nullSafe(u.getTelephoneNumber(), (b, v) -> b.setTelephoneNumber(v))
+                .nullSafeWithRetrieve(RoleType.F_JPEG_PHOTO, toBytesMessage(u.getJpegPhoto()), (b, v) -> b.setJpegPhoto(v))
+                .nullSafeWithRetrieve(RoleType.F_COST_CENTER, u.getCostCenter(), (b, v) -> b.setCostCenter(v))
+                .nullSafeWithRetrieve(RoleType.F_LOCALITY, toPolyStringMessage(u.getLocality()), (b, v) -> b.setLocality(v))
+                .nullSafeWithRetrieve(RoleType.F_PREFERRED_LANGUAGE, u.getPreferredLanguage(), (b, v) -> b.setPreferredLanguage(v))
+                .nullSafeWithRetrieve(RoleType.F_LOCALE, u.getLocale(), (b, v) -> b.setLocale(v))
+                .nullSafeWithRetrieve(RoleType.F_TIMEZONE, u.getTimezone(), (b, v) -> b.setTimezone(v))
+                .nullSafeWithRetrieve(RoleType.F_EMAIL_ADDRESS, u.getEmailAddress(), (b, v) -> b.setEmailAddress(v))
+                .nullSafeWithRetrieve(RoleType.F_TELEPHONE_NUMBER, u.getTelephoneNumber(), (b, v) -> b.setTelephoneNumber(v))
                 // AbstractRoleType
-                .nullSafe(toPolyStringMessage(u.getDisplayName()), (b, v) -> b.setDisplayName(v))
-                .nullSafe(u.getIdentifier(), (b, v) -> b.setIdentifier(v))
-                .nullSafe(u.isRequestable(), (b, v) -> b.setRequestable(v))
-                .nullSafe(u.isDelegable(), (b, v) -> b.setDelegable(v))
-                .nullSafe(u.getRiskLevel(), (b, v) -> b.setRiskLevel(v))
+                .nullSafeWithRetrieve(RoleType.F_DISPLAY_NAME, toPolyStringMessage(u.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                .nullSafeWithRetrieve(RoleType.F_IDENTIFIER, u.getIdentifier(), (b, v) -> b.setIdentifier(v))
+                .nullSafeWithRetrieve(RoleType.F_REQUESTABLE, u.isRequestable(), (b, v) -> b.setRequestable(v))
+                .nullSafeWithRetrieve(RoleType.F_DELEGABLE, u.isDelegable(), (b, v) -> b.setDelegable(v))
+                .nullSafeWithRetrieve(RoleType.F_RISK_LEVEL, u.getRiskLevel(), (b, v) -> b.setRiskLevel(v))
                 // RoleType
-                .nullSafe(u.getRoleType(), (b, v) -> b.setRoleType(v))
+                .nullSafeWithRetrieve(RoleType.F_ROLE_TYPE, u.getRoleType(), (b, v) -> b.setRoleType(v))
                 // Extension
-                .nullSafe(toItemMessageMap(u.asPrismObject()), (b, v) -> b.putAllExtension(v))
+                .nullSafeWithRetrieve(RoleType.F_EXTENSION, toItemMessageMap(u.asPrismObject()), (b, v) -> b.putAllExtension(v))
                 .unwrap()
                 .build();
     }
 
-    public static OrgTypeMessage toOrgTypeMessage(OrgType u) {
+    public static OrgTypeMessage toOrgTypeMessage(OrgType u, Collection<SelectorOptions<GetOperationOptions>> options) {
         return BuilderWrapper.wrap(OrgTypeMessage.newBuilder())
                 // ObjectType
                 .nullSafe(u.getOid(), (b, v) -> b.setOid(v))
                 .nullSafe(u.getVersion(), (b, v) -> b.setVersion(v))
                 .nullSafe(toPolyStringMessage(u.getName()), (b, v) -> b.setName(v))
-                .nullSafe(u.getDescription(), (b, v) -> b.setDescription(v))
-                .nullSafe(u.getSubtype(), (b, v) -> b.addAllSubtype(v))
-                .nullSafe(u.getLifecycleState(), (b, v) -> b.setLifecycleState(v))
+                .selectOptions(options)
+                .nullSafeWithRetrieve(OrgType.F_DESCRIPTION, u.getDescription(), (b, v) -> b.setDescription(v))
+                .nullSafeWithRetrieve(OrgType.F_SUBTYPE, u.getSubtype(), (b, v) -> b.addAllSubtype(v))
+                .nullSafeWithRetrieve(OrgType.F_LIFECYCLE_STATE, u.getLifecycleState(), (b, v) -> b.setLifecycleState(v))
+                // AssignmentHolderType
+                .nullSafeWithRetrieve(UserType.F_ASSIGNMENT, u.getAssignment(), (b, v) -> {
+                    return b.addAllAssignment(v.stream().map(a -> {
+                        return AssignmentMessage.newBuilder()
+                                .setTargetRef(
+                                        toReferenceMessage(a.getTargetRef(), null)
+                                ).build();
+                    }).collect(Collectors.toList()));
+                })
+                .nullSafeWithRetrieve(UserType.F_ARCHETYPE_REF, u.getArchetypeRef(), (b, v) -> {
+                    return b.addAllArchetypeRef(v.stream().map(a -> {
+                        return toReferenceMessage(a, null);
+                    }).collect(Collectors.toList()));
+                })
                 // FocusType
-                .nullSafe(toBytesMessage(u.getJpegPhoto()), (b, v) -> b.setJpegPhoto(v))
-                .nullSafe(u.getCostCenter(), (b, v) -> b.setCostCenter(v))
-                .nullSafe(toPolyStringMessage(u.getLocality()), (b, v) -> b.setLocality(v))
-                .nullSafe(u.getPreferredLanguage(), (b, v) -> b.setPreferredLanguage(v))
-                .nullSafe(u.getLocale(), (b, v) -> b.setLocale(v))
-                .nullSafe(u.getTimezone(), (b, v) -> b.setTimezone(v))
-                .nullSafe(u.getEmailAddress(), (b, v) -> b.setEmailAddress(v))
-                .nullSafe(u.getTelephoneNumber(), (b, v) -> b.setTelephoneNumber(v))
+                .nullSafeWithRetrieve(OrgType.F_JPEG_PHOTO, toBytesMessage(u.getJpegPhoto()), (b, v) -> b.setJpegPhoto(v))
+                .nullSafeWithRetrieve(OrgType.F_COST_CENTER, u.getCostCenter(), (b, v) -> b.setCostCenter(v))
+                .nullSafeWithRetrieve(OrgType.F_LOCALITY, toPolyStringMessage(u.getLocality()), (b, v) -> b.setLocality(v))
+                .nullSafeWithRetrieve(OrgType.F_PREFERRED_LANGUAGE, u.getPreferredLanguage(), (b, v) -> b.setPreferredLanguage(v))
+                .nullSafeWithRetrieve(OrgType.F_LOCALE, u.getLocale(), (b, v) -> b.setLocale(v))
+                .nullSafeWithRetrieve(OrgType.F_TIMEZONE, u.getTimezone(), (b, v) -> b.setTimezone(v))
+                .nullSafeWithRetrieve(OrgType.F_EMAIL_ADDRESS, u.getEmailAddress(), (b, v) -> b.setEmailAddress(v))
+                .nullSafeWithRetrieve(OrgType.F_TELEPHONE_NUMBER, u.getTelephoneNumber(), (b, v) -> b.setTelephoneNumber(v))
                 // AbstractRoleType
-                .nullSafe(toPolyStringMessage(u.getDisplayName()), (b, v) -> b.setDisplayName(v))
-                .nullSafe(u.getIdentifier(), (b, v) -> b.setIdentifier(v))
-                .nullSafe(u.isRequestable(), (b, v) -> b.setRequestable(v))
-                .nullSafe(u.isDelegable(), (b, v) -> b.setDelegable(v))
-                .nullSafe(u.getRiskLevel(), (b, v) -> b.setRiskLevel(v))
+                .nullSafeWithRetrieve(OrgType.F_DISPLAY_NAME, toPolyStringMessage(u.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                .nullSafeWithRetrieve(OrgType.F_IDENTIFIER, u.getIdentifier(), (b, v) -> b.setIdentifier(v))
+                .nullSafeWithRetrieve(OrgType.F_REQUESTABLE, u.isRequestable(), (b, v) -> b.setRequestable(v))
+                .nullSafeWithRetrieve(OrgType.F_DELEGABLE, u.isDelegable(), (b, v) -> b.setDelegable(v))
+                .nullSafeWithRetrieve(OrgType.F_RISK_LEVEL, u.getRiskLevel(), (b, v) -> b.setRiskLevel(v))
                 // OrgType
-                .nullSafe(u.getOrgType(), (b, v) -> b.addAllOrgType(v))
-                .nullSafe(u.isTenant(), (b, v) -> b.setTenant(v))
-                .nullSafe(u.getMailDomain(), (b, v) -> b.addAllMailDomain(v))
-                .nullSafe(u.getDisplayOrder(), (b, v) -> b.setDisplayOrder(v))
+                .nullSafeWithRetrieve(OrgType.F_ORG_TYPE, u.getOrgType(), (b, v) -> b.addAllOrgType(v))
+                .nullSafeWithRetrieve(OrgType.F_TENANT, u.isTenant(), (b, v) -> b.setTenant(v))
+                .nullSafeWithRetrieve(OrgType.F_MAIL_DOMAIN, u.getMailDomain(), (b, v) -> b.addAllMailDomain(v))
+                .nullSafeWithRetrieve(OrgType.F_DISPLAY_ORDER, u.getDisplayOrder(), (b, v) -> b.setDisplayOrder(v))
                 // Extension
-                .nullSafe(toItemMessageMap(u.asPrismObject()), (b, v) -> b.putAllExtension(v))
+                .nullSafeWithRetrieve(OrgType.F_EXTENSION, toItemMessageMap(u.asPrismObject()), (b, v) -> b.putAllExtension(v))
                 .unwrap()
                 .build();
     }

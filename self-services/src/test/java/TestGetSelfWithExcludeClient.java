@@ -7,7 +7,7 @@ import jp.openstandia.midpoint.grpc.*;
 import java.io.UnsupportedEncodingException;
 import java.util.Base64;
 
-public class TestGetSelfClient {
+public class TestGetSelfWithExcludeClient {
 
     public static void main(String[] args) throws UnsupportedEncodingException {
         ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", 6565)
@@ -25,6 +25,8 @@ public class TestGetSelfClient {
         stub = MetadataUtils.attachHeaders(stub, headers);
 
         GetSelfRequest req = GetSelfRequest.newBuilder()
+                .addInclude("archetypeRef")
+                .addResolveNames("archetypeRef")
                 .build();
 
         GetSelfResponse self = stub.getSelf(req);
