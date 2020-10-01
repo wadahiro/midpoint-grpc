@@ -23,7 +23,10 @@ public class MidPointGrpcTestRunner implements BeforeAllCallback, AfterAllCallba
     public void afterAll(ExtensionContext extensionContext) throws Exception {
         setProperites();
 
-        MidPointSpringApplication.main(new String[]{"stop"});
+        // maven-surefire-plugin does not support tests or any referenced libraries calling System.exit() at any time
+        // see https://maven.apache.org/surefire/maven-surefire-plugin/faq.html#vm-termination
+
+        // MidPointSpringApplication.main(new String[]{"stop"});
     }
 
     public void setProperites() {
