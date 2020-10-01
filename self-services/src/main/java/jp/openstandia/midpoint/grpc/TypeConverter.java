@@ -975,7 +975,9 @@ public class TypeConverter {
                 .nullSafeWithRetrieve(UserType.F_ORGANIZATION, toPolyStringMessageList(u.getOrganization()), (b, v) -> b.addAllOrganization(v))
                 .nullSafeWithRetrieve(UserType.F_ORGANIZATIONAL_UNIT, toPolyStringMessageList(u.getOrganizationalUnit()), (b, v) -> b.addAllOrganizationalUnit(v))
                 // Extension
-                .nullSafeWithRetrieve(UserType.F_EXTENSION, toItemMessageMap(u.asPrismObject()), (b, v) -> b.putAllExtension(v))
+                .nullSafeWithRetrieve(OrgType.F_EXTENSION, u.getExtension(),
+                        (v, ops, hasInclude) -> toItemMessageMap(v, ops, hasInclude),
+                        (b, v) -> b.putAllExtension(v))
                 .unwrap()
                 .build();
     }
@@ -1022,7 +1024,9 @@ public class TypeConverter {
                 // RoleType
                 .nullSafeWithRetrieve(RoleType.F_ROLE_TYPE, u.getRoleType(), (b, v) -> b.setRoleType(v))
                 // Extension
-                .nullSafeWithRetrieve(RoleType.F_EXTENSION, toItemMessageMap(u.asPrismObject()), (b, v) -> b.putAllExtension(v))
+                .nullSafeWithRetrieve(OrgType.F_EXTENSION, u.getExtension(),
+                        (v, ops, hasInclude) -> toItemMessageMap(v, ops, hasInclude),
+                        (b, v) -> b.putAllExtension(v))
                 .unwrap()
                 .build();
     }
@@ -1072,25 +1076,32 @@ public class TypeConverter {
                 .nullSafeWithRetrieve(OrgType.F_MAIL_DOMAIN, u.getMailDomain(), (b, v) -> b.addAllMailDomain(v))
                 .nullSafeWithRetrieve(OrgType.F_DISPLAY_ORDER, u.getDisplayOrder(), (b, v) -> b.setDisplayOrder(v))
                 // Extension
-                .nullSafeWithRetrieve(OrgType.F_EXTENSION, toItemMessageMap(u.asPrismObject()), (b, v) -> b.putAllExtension(v))
+                .nullSafeWithRetrieve(OrgType.F_EXTENSION, u.getExtension(),
+                        (v, ops, hasInclude) -> toItemMessageMap(v, ops, hasInclude),
+                        (b, v) -> b.putAllExtension(v))
                 .unwrap()
                 .build();
     }
 
-    public static Map<String, ItemMessage> toItemMessageMap(PrismObject<?> object) {
-        PrismContainer<?> extension = object.getExtension();
+    public static Map<String, ItemMessage> toItemMessageMap(ExtensionType extension,
+                                                            Collection<SelectorOptions<GetOperationOptions>> options,
+                                                            boolean hasInclude) {
         if (extension == null) {
             return null;
         }
 
         Map<String, ItemMessage> map = new LinkedHashMap<>();
 
-        PrismContainerValue<?> extensionValue = extension.getValue();
+        PrismContainerValue<?> extensionValue = extension.asPrismContainerValue();
         for (Item item : extensionValue.getItems()) {
             ItemDefinition definition = item.getDefinition();
 
             // Currently, it doesn't use namespaceURI as the key
             String key = definition.getItemName().getLocalPart();
+
+            if (!SelectorOptions.hasToLoadPath(item.getPath(), options, !hasInclude)) {
+                continue;
+            }
 
             try {
                 map.put(key, toItemMessage(definition, item));

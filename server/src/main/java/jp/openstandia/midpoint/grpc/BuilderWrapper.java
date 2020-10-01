@@ -58,6 +58,21 @@ public class BuilderWrapper<T> {
         return this;
     }
 
+    public <V, O> BuilderWrapper<T> nullSafeWithRetrieve(ItemPath path, V value, Converter<V, O> converter, Task<T, O> t) {
+        if (value != null) {
+            O converted = converter.run(value, this.options, this.hasInclude);
+
+            if (converted != null) {
+                t.run((T) this.b, converted);
+            }
+        }
+        return this;
+    }
+
+    public interface Converter<V, O> {
+        O run(V value, Collection<SelectorOptions<GetOperationOptions>> options, boolean hasInclude);
+    }
+
     public T unwrap() {
         return b;
     }
