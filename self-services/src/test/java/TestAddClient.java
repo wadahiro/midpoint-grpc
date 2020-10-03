@@ -26,7 +26,7 @@ public class TestAddClient {
         AddUserRequest request = AddUserRequest.newBuilder()
                 .setProfile(
                         UserTypeMessage.newBuilder()
-                                .setName(PolyStringMessage.newBuilder().setOrig("foo9"))
+                                .setName(PolyStringMessage.newBuilder().setOrig("foo10"))
                                 .addOrganization(PolyStringMessage.newBuilder().setOrig("org1"))
                                 .addOrganization(PolyStringMessage.newBuilder().setOrig("org2"))
                                 .addAssignment(
