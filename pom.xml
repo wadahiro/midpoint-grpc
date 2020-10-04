@@ -63,6 +63,7 @@
 
     <modules>
         <module>client-spi</module>
+        <module>integration</module>
         <module>server</module>
         <module>self-services</module>
     </modules>
