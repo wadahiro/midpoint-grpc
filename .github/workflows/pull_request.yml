@@ -1,10 +1,8 @@
-name: Java CI
+name: Build and test for the pull request
 
 on:
-  push:
-    branches-ignore:
-      - "master"
   pull_request:
+    types: [opened, synchronize]
 
 jobs:
   build:
@@ -17,6 +15,11 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 11
+          server-id: ossrh
+          server-username: OSSRH_JIRA_USERNAME
+          server-password: OSSRH_JIRA_PASSWORD
+          gpg-private-key: ${{ secrets.OSSRH_GPG_SECRET_KEY }}
+          gpg-passphrase: OSSRH_GPG_SECRET_KEY_PASSWORD
       - uses: actions/cache@v2
         with:
           path: ~/.m2/repository
@@ -30,4 +33,11 @@ jobs:
       - name: Install protoc-gen-doc
         run: go get -u github.com/pseudomuto/protoc-gen-doc/cmd/protoc-gen-doc
       - name: Build with Maven
-        run: mvn -B package --file pom.xml
+        run: mvn -B package
+      - name: Deploy SNAPSHOT version
+        run: mvn -B -DskipTests deploy
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OSSRH_JIRA_USERNAME: ${{ secrets.OSSRH_JIRA_USERNAME }}
+          OSSRH_JIRA_PASSWORD: ${{ secrets.OSSRH_JIRA_PASSWORD }}
+          OSSRH_GPG_SECRET_KEY_PASSWORD: ${{ secrets.OSSRH_GPG_SECRET_KEY_PASSWORD }}
