@@ -8,12 +8,15 @@
         <outputRelativeToContentRoot value="true" />
         <module name="midpoint-grpc-client-spi" />
         <module name="midpoint-grpc-self-services" />
+        <module name="keycloak-midpoint-grpc-client" />
         <module name="midpoint-grpc-server" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
+      <module name="keycloak-midpoint-grpc-client" target="1.8" />
       <module name="midpoint-grpc" target="1.5" />
       <module name="midpoint-grpc-client-spi" target="1.8" />
+      <module name="midpoint-grpc-integration-parent" target="1.5" />
       <module name="midpoint-grpc-self-services" target="1.8" />
       <module name="midpoint-grpc-server" target="1.8" />
     </bytecodeTargetLevel>
