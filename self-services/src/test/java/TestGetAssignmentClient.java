@@ -22,11 +22,13 @@ public class TestGetAssignmentClient {
         Metadata headers = new Metadata();
         headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
         headers.put(Constant.SwitchToPrincipalByNameMetadataKey, "test");
+        headers.put(Constant.RunPrivilegedMetadataKey, "true");
 
         stub = MetadataUtils.attachHeaders(stub, headers);
 
         GetSelfAssignmentRequest req = GetSelfAssignmentRequest.newBuilder()
                 .setIncludeOrgRefDetail(true)
+                .setIncludeIndirect(true)
                 .build();
 
         GetSelfAssignmentResponse self = stub.getSelfAssignment(req);

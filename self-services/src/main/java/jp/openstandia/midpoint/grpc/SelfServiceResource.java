@@ -175,61 +175,44 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             PrismObject<UserType> user = modelCrudService.getObject(UserType.class, loggedInUser.getOid(), null, task, parentResult);
             UserType userType = user.asObjectable();
 
-            List<AssignmentType> assignment = userType.getAssignment();
-            List<String> oids = assignment.stream()
+            Set<String> directOids = userType.getAssignment().stream()
                     .map(x -> x.getTargetRef().getOid())
-                    .collect(Collectors.toList());
+                    .collect(Collectors.toSet());
 
+            Set<String> orgRefOids = Collections.emptySet();
             if (request.getIncludeOrgRefDetail()) {
-                List<String> orgRefOids = assignment.stream()
+                orgRefOids = userType.getAssignment().stream()
                         .filter(x -> x.getOrgRef() != null)
                         .map(x -> x.getOrgRef().getOid())
-                        .collect(Collectors.toList());
-                oids.addAll(orgRefOids);
+                        .collect(Collectors.toSet());
             }
 
+            Set<String> indirectOids = Collections.emptySet();
+            if (request.getIncludeIndirect()) {
+                indirectOids = userType.getRoleMembershipRef().stream()
+                        .map(x -> x.getOid())
+                        .filter(x -> !directOids.contains(x))
+                        .collect(Collectors.toSet());
+            }
+
+            // For caching detail of the target objects
+            Set<String> oids = new HashSet<>();
+            oids.addAll(directOids);
+            oids.addAll(orgRefOids);
+            oids.addAll(indirectOids);
+
+            ObjectQuery query = prismContext.queryFor(AbstractRoleType.class)
+                    .id(oids.toArray(new String[0]))
+                    .build();
+            Collection<SelectorOptions<GetOperationOptions>> options = SelectorOptions.createCollection(
+                    GetOperationOptions.createExecutionPhase().resolveNames(true));
+
             // key: oid, value: Org/Role/Archetype etc.
-            Map<String, AbstractRoleType> cache = new HashMap<>();
+            Map<String, AbstractRoleType> cache = modelService.searchObjects(AbstractRoleType.class, query, options, task, parentResult)
+                    .stream()
+                    .collect(Collectors.toMap(a -> a.getOid(), a -> a.asObjectable()));
 
-            // TODO: use search mode for performance?
-            // For caching detail of the target objects
-            oids.stream().forEach(x -> {
-                try {
-                    AbstractRoleType o = modelService.getObject(AbstractRoleType.class, x,
-                            SelectorOptions.createCollection(GetOperationOptions.createExecutionPhase().resolveNames(true)), task, parentResult)
-                            .asObjectable();
-                    cache.put(x, o);
-
-                    // End User doesn't have get permission for Archetype with default.
-                    // So currently, we rely on `resolveNames` mode to get name of archetype.
-//                        if (request.getIncludeArchetypeRefDetail()) {
-//                            o.getArchetypeRef().stream()
-//                                    .forEach(ref -> {
-//                                        try {
-//                                            ArchetypeType a = modelService.getObject(ArchetypeType.class, ref.getOid(),
-//                                                    SelectorOptions.createCollection(GetOperationOptions.createExecutionPhase().resolve(true)), task, parentResult)
-//                                                    .asObjectable();
-//                                            cache.put(ref.getOid(), a);
-//
-//                                        } catch (CommonException e) {
-//                                            LOGGER.warn("Cannot fetch the archetype for collecting assignment detail. oid: {}", ref.getOid(), e);
-//                                        }
-//                                    });
-//                        }
-                } catch (CommonException e) {
-                    LOGGER.warn("Cannot fetch the object for collecting assignment detail. oid: {}", x, e);
-                }
-            });
-
-            // End User doesn't have search permission with default setting...
-            // TODO: use admin permission partially?
-            // For caching detail of the target objects
-//                ObjectQuery query = createInOidQuery(ObjectType.class, oids);
-//                SearchResultList<PrismObject<AbstractRoleType>> foundObjects = modelService.searchObjects(AbstractRoleType.class, query, null,
-//                        task, parentResult);
-//                foundObjects.stream().forEach(x -> cache.put(x.getOid(), x.asObjectable()));
-
-            List<AssignmentMessage> assignmentMessages = assignment.stream()
+            List<AssignmentMessage> assignmentMessages = userType.getAssignment().stream()
                     // The user might not have permission to get the target. So filter them.
                     .filter(x -> cache.containsKey(x.getTargetRef().getOid()))
                     .map(x -> {
@@ -245,6 +228,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
                         return BuilderWrapper.wrap(AssignmentMessage.newBuilder())
                                 .nullSafe(toReferenceMessage(orgRef, resolvedOrgRef), (b, v) -> b.setOrgRef(v))
+                                .nullSafe(x.getSubtype(), (b, v) -> b.addAllSubtype(v))
                                 .unwrap()
                                 .setTargetRef(
                                         BuilderWrapper.wrap(ReferenceMessage.newBuilder())
@@ -253,6 +237,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                                                 .nullSafe(TypeConverter.toStringMessage(o.getDescription()), (b, v) -> b.setDescription(v))
                                                 .nullSafe(TypeConverter.toPolyStringMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
                                                 .nullSafe(TypeConverter.toReferenceMessageList(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
+                                                .nullSafe(o.getSubtype(), (b, v) -> b.addAllSubtype(v))
                                                 .unwrap()
                                                 .setRelation(
                                                         QNameMessage.newBuilder()
@@ -264,6 +249,39 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                                 ).build();
                     })
                     .collect(Collectors.toList());
+
+            if (request.getIncludeIndirect()) {
+                List<AssignmentMessage> indirect = indirectOids.stream()
+                        .filter(x -> cache.containsKey(x))
+                        .map(x -> {
+                            AbstractRoleType o = cache.get(x);
+
+                            QName relation = prismContext.getDefaultRelation();
+
+                            return BuilderWrapper.wrap(AssignmentMessage.newBuilder())
+                                    .unwrap()
+                                    .setIndirect(true)
+                                    .setTargetRef(
+                                            BuilderWrapper.wrap(ReferenceMessage.newBuilder())
+                                                    .nullSafe(o.getOid(), (b, v) -> b.setOid(v))
+                                                    .nullSafe(toPolyStringMessage(o.getName()), (b, v) -> b.setName(v))
+                                                    .nullSafe(toStringMessage(o.getDescription()), (b, v) -> b.setDescription(v))
+                                                    .nullSafe(toPolyStringMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                                                    .nullSafe(toReferenceMessageList(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
+                                                    .nullSafe(o.getSubtype(), (b, v) -> b.addAllSubtype(v))
+                                                    .unwrap()
+                                                    .setRelation(
+                                                            QNameMessage.newBuilder()
+                                                                    .setNamespaceURI(relation.getNamespaceURI())
+                                                                    .setLocalPart(relation.getLocalPart())
+                                                                    .setPrefix(relation.getPrefix())
+                                                    )
+                                                    .build()
+                                    ).build();
+                        })
+                        .collect(Collectors.toList());
+                assignmentMessages.addAll(indirect);
+            }
 
             parentResult.computeStatus();
             return assignmentMessages;

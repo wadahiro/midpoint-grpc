@@ -329,6 +329,7 @@ message OrgTypeMessage {
 
 message GetSelfAssignmentRequest {
     bool include_org_ref_detail = 1;
+    bool include_indirect = 2;
 }
 
 message GetSelfAssignmentResponse {
@@ -342,6 +343,8 @@ message AssignmentMessage {
     }
     // extension. the key is "localPart" format of the QName.
     map<string, ItemMessage> extension = 3;
+    repeated string subtype = 4;
+    bool indirect = 10;
 }
 
 message ReferenceMessage {
@@ -360,6 +363,7 @@ message ReferenceMessage {
     string description = 8;
     repeated ReferenceMessage archetype_ref = 9;
     string email_address = 10;
+    repeated string subtype = 11;
 }
 
 message QNameMessage {
