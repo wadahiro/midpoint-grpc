@@ -191,7 +191,6 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             if (request.getIncludeIndirect()) {
                 indirectOids = userType.getRoleMembershipRef().stream()
                         .map(x -> x.getOid())
-                        .filter(x -> !directOids.contains(x))
                         .collect(Collectors.toSet());
             }
 
@@ -212,6 +211,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                     .stream()
                     .collect(Collectors.toMap(a -> a.getOid(), a -> a.asObjectable()));
 
+            Set<String> directAssignment = new HashSet<>();
+
             List<AssignmentMessage> assignmentMessages = userType.getAssignment().stream()
                     // The user might not have permission to get the target. So filter them.
                     .filter(x -> cache.containsKey(x.getTargetRef().getOid()))
@@ -226,6 +227,9 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
                         QName relation = x.getTargetRef().getRelation();
 
+                        if (request.getIncludeIndirect()) {
+                            directAssignment.add(x.getTargetRef().getOid() + "#" + relation.toString());
+                        }
                         return BuilderWrapper.wrap(AssignmentMessage.newBuilder())
                                 .nullSafe(toReferenceMessage(orgRef, resolvedOrgRef), (b, v) -> b.setOrgRef(v))
                                 .nullSafe(x.getSubtype(), (b, v) -> b.addAllSubtype(v))
@@ -233,10 +237,10 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                                 .setTargetRef(
                                         BuilderWrapper.wrap(ReferenceMessage.newBuilder())
                                                 .nullSafe(o.getOid(), (b, v) -> b.setOid(v))
-                                                .nullSafe(TypeConverter.toPolyStringMessage(o.getName()), (b, v) -> b.setName(v))
-                                                .nullSafe(TypeConverter.toStringMessage(o.getDescription()), (b, v) -> b.setDescription(v))
-                                                .nullSafe(TypeConverter.toPolyStringMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
-                                                .nullSafe(TypeConverter.toReferenceMessageList(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
+                                                .nullSafe(toPolyStringMessage(o.getName()), (b, v) -> b.setName(v))
+                                                .nullSafe(toStringMessage(o.getDescription()), (b, v) -> b.setDescription(v))
+                                                .nullSafe(toPolyStringMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                                                .nullSafe(toReferenceMessageList(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
                                                 .nullSafe(o.getSubtype(), (b, v) -> b.addAllSubtype(v))
                                                 .unwrap()
                                                 .setRelation(
@@ -251,12 +255,12 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                     .collect(Collectors.toList());
 
             if (request.getIncludeIndirect()) {
-                List<AssignmentMessage> indirect = indirectOids.stream()
-                        .filter(x -> cache.containsKey(x))
+                List<AssignmentMessage> indirect = userType.getRoleMembershipRef().stream()
+                        .filter(x -> cache.containsKey(x.getOid()))
+                        .filter(x -> !directAssignment.contains(x.getOid() + "#" + x.getRelation().toString()))
                         .map(x -> {
-                            AbstractRoleType o = cache.get(x);
-
-                            QName relation = prismContext.getDefaultRelation();
+                            AbstractRoleType o = cache.get(x.getOid());
+                            QName relation = x.getRelation();
 
                             return BuilderWrapper.wrap(AssignmentMessage.newBuilder())
                                     .unwrap()
