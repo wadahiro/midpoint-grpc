@@ -62,6 +62,7 @@ jobs:
             --verify-conditions @semantic-release/github,@conveyal/maven-semantic-release \
             --verify-release @conveyal/maven-semantic-release\
             --use-conveyal-workflow
+        timeout-minutes: 30
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OSSRH_JIRA_USERNAME: ${{ secrets.OSSRH_JIRA_USERNAME }}
