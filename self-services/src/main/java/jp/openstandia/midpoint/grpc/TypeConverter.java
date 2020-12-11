@@ -17,6 +17,8 @@ import com.evolveum.midpoint.util.LocalizableMessageList;
 import com.evolveum.midpoint.util.SingleLocalizableMessage;
 import com.evolveum.midpoint.util.exception.PolicyViolationException;
 import com.evolveum.midpoint.util.exception.SchemaException;
+import com.evolveum.midpoint.util.logging.Trace;
+import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
 import com.evolveum.prism.xml.ns._public.query_3.SearchFilterType;
 import com.evolveum.prism.xml.ns._public.types_3.PolyStringType;
@@ -31,6 +33,7 @@ import java.util.stream.Collectors;
 
 public class TypeConverter {
 
+    private static final Trace LOGGER = TraceManager.getTrace(SelfServiceResource.class);
     private static Map<DefaultUserTypePath, ItemName> userTypeMap = new HashMap<>();
 
     static {
@@ -1095,6 +1098,11 @@ public class TypeConverter {
         PrismContainerValue<?> extensionValue = extension.asPrismContainerValue();
         for (Item item : extensionValue.getItems()) {
             ItemDefinition definition = item.getDefinition();
+
+            if (definition == null) {
+                LOGGER.warn("No schema for the extension value: {}", item);
+                continue;
+            }
 
             // Currently, it doesn't use namespaceURI as the key
             String key = definition.getItemName().getLocalPart();
