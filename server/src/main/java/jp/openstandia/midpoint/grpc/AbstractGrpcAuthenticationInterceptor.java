@@ -183,7 +183,7 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
         LOGGER.trace("NEW auth {}", newAuthorization);
 
         return newAuthorization;
-    };
+    }
 
     private Authorization createPrivilegedAuthorization() {
         AuthorizationType authorizationType = new AuthorizationType();

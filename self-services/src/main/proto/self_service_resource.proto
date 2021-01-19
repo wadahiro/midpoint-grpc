@@ -55,6 +55,16 @@ service SelfServiceResource {
     rpc getUser (GetUserRequest) returns (GetUserResponse);
 
     /**
+     * Add object.
+     */
+    rpc addObject (AddObjectRequest) returns (AddObjectResponse);
+
+    /**
+     * Modify object.
+     */
+    rpc modifyObject (ModifyObjectRequest) returns (ModifyObjectResponse);
+
+    /**
      * Delete an object.
      */
     rpc deleteObject (DeleteObjectRequest) returns (DeleteObjectResponse);
@@ -78,6 +88,11 @@ service SelfServiceResource {
      * Search orgs.
      */
     rpc searchOrgs (SearchRequest) returns (SearchOrgsResponse);
+
+    /**
+     * Search services.
+     */
+    rpc searchServices (SearchRequest) returns (SearchServicesResponse);
 
     /**
      * Search objects.
@@ -327,6 +342,74 @@ message OrgTypeMessage {
     map<string, ItemMessage> extension = 100;
 }
 
+message ServiceTypeMessage {
+    // ObjectType
+
+    // oid.
+    string oid = 1;
+    // version.
+    string version = 2;
+    // name.
+    PolyStringMessage name = 3;
+    // description
+    string description = 4;
+    // subtype
+    repeated string subtype = 5;
+    // lifecycleState
+    string lifecycle_state = 6;
+
+    // AssignmentHolderType
+
+    // assignment
+    repeated AssignmentMessage assignment = 10;
+    // archetypeRef
+    repeated ReferenceMessage archetype_ref = 11;
+
+    // FocusType
+
+    // jpeg photo
+    BytesMessage jpeg_photo = 20;
+    // cost center.
+    string costCenter = 21;
+    // locality.
+    PolyStringMessage locality = 22;
+    // preferredLanguage.
+    string preferred_language = 23;
+    // locale.
+    string locale = 24;
+    // timezone.
+    string timezone = 25;
+    // email address.
+    string email_address = 26;
+    // telephone number.
+    string telephone_number = 27;
+
+    // AbstractRoleType
+
+    // display name.
+    PolyStringMessage display_name = 50;
+    // identifier.
+    string identifier = 51;
+    // requestable.
+    bool requestable = 52;
+    // delegable.
+    bool delegable = 53;
+    // risk level.
+    string risk_level = 54;
+
+    // ServiceType
+
+    // service type.
+    repeated string service_type = 70;
+    // display order.
+    int32 display_order = 71;
+    // url
+    string url = 72;
+
+    // extension. the key is "localPart" format of the QName.
+    map<string, ItemMessage> extension = 100;
+}
+
 message GetSelfAssignmentRequest {
     bool include_org_ref_detail = 1;
     bool include_indirect = 2;
@@ -397,6 +480,9 @@ message ItemDeltaMessage {
         string path = 1;
         ItemPathMessage item_path = 2;
     }
+    repeated PrismValueMessage prism_values_to_add = 23;
+    repeated PrismValueMessage prism_values_to_replace = 24;
+    repeated PrismValueMessage prism_values_to_delete = 25;
 }
 
 message PrismValueMessage {
@@ -596,6 +682,35 @@ message GetUserResponse {
     UserTypeMessage result = 1;
 }
 
+message AddObjectRequest {
+    repeated string options = 1;
+    oneof type_wrapper {
+        QNameMessage type = 2;
+        DefaultObjectType object_type = 3;
+    }
+    PrismContainerMessage object = 10;
+}
+
+message AddObjectResponse {
+    string oid = 1;
+}
+
+message ModifyObjectRequest {
+    oneof type_wrapper {
+        QNameMessage type = 1;
+        DefaultObjectType object_type = 2;
+    }
+    oneof id_wrapper {
+        string oid = 10;
+        string name = 11;
+    }
+    repeated string options = 20;
+    repeated ItemDeltaMessage modifications = 21;
+}
+
+message ModifyObjectResponse {
+}
+
 message DeleteObjectRequest {
     oneof type_wrapper {
         QNameMessage type = 1;
@@ -645,6 +760,11 @@ message SearchRolesResponse {
 
 message SearchOrgsResponse {
     repeated OrgTypeMessage results = 1;
+    int32 number_of_all_results = 2;
+}
+
+message SearchServicesResponse {
+    repeated ServiceTypeMessage results = 1;
     int32 number_of_all_results = 2;
 }
 
