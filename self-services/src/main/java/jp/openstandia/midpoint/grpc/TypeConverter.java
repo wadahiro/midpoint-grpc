@@ -17,6 +17,8 @@ import com.evolveum.midpoint.util.LocalizableMessageList;
 import com.evolveum.midpoint.util.SingleLocalizableMessage;
 import com.evolveum.midpoint.util.exception.PolicyViolationException;
 import com.evolveum.midpoint.util.exception.SchemaException;
+import com.evolveum.midpoint.util.logging.Trace;
+import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
 import com.evolveum.prism.xml.ns._public.query_3.SearchFilterType;
 import com.evolveum.prism.xml.ns._public.types_3.PolyStringType;
@@ -31,6 +33,7 @@ import java.util.stream.Collectors;
 
 public class TypeConverter {
 
+    private static final Trace LOGGER = TraceManager.getTrace(SelfServiceResource.class);
     private static Map<DefaultUserTypePath, ItemName> userTypeMap = new HashMap<>();
 
     static {
@@ -925,6 +928,34 @@ public class TypeConverter {
         return user.asPrismObject();
     }
 
+    public static PrismObject toPrismObject(PrismContext prismContext, Class clazz,
+                                            PrismContainerMessage message) throws SchemaException {
+
+        PrismContainerDefinition<ObjectType> definition = prismContext.getSchemaRegistry()
+                .findContainerDefinitionByCompileTimeClass(clazz);
+
+        // Create objectType instance with requested objectType class
+        PrismContainer<ObjectType> instantiate = definition.instantiate();
+        ObjectType objectType = instantiate.getRealValue();
+
+        // PrismObject must one value value
+        List<PrismContainerValueMessage> values = message.getValuesList();
+        if (values.size() > 1) {
+            StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                    .withDescription("invalid_schema: PrismObject with more than one value")
+                    .asRuntimeException();
+            throw exception;
+        }
+
+        if (values.size() > 0) {
+            // Convert PrismContainerValueMessage to PrismObjectValue
+            PrismObjectValue prismObjectValue = toPrismObjectValue(prismContext, definition, values.get(0), objectType);
+            instantiate.setValue(prismObjectValue);
+        }
+
+        return objectType.asPrismObject();
+    }
+
     private static List<PolyStringType> toPolyStringTypeValueList(List<PolyStringMessage> organizationList) {
         return organizationList.stream().map(x -> toPolyStringTypeValue(x)).collect(Collectors.toList());
     }
@@ -1083,6 +1114,57 @@ public class TypeConverter {
                 .build();
     }
 
+    public static ServiceTypeMessage toServiceTypeMessage(ServiceType u, Collection<SelectorOptions<GetOperationOptions>> options) {
+        return BuilderWrapper.wrap(ServiceTypeMessage.newBuilder())
+                // ObjectType
+                .nullSafe(u.getOid(), (b, v) -> b.setOid(v))
+                .nullSafe(u.getVersion(), (b, v) -> b.setVersion(v))
+                .nullSafe(toPolyStringMessage(u.getName()), (b, v) -> b.setName(v))
+                .selectOptions(options)
+                .nullSafeWithRetrieve(ServiceType.F_DESCRIPTION, u.getDescription(), (b, v) -> b.setDescription(v))
+                .nullSafeWithRetrieve(ServiceType.F_SUBTYPE, u.getSubtype(), (b, v) -> b.addAllSubtype(v))
+                .nullSafeWithRetrieve(ServiceType.F_LIFECYCLE_STATE, u.getLifecycleState(), (b, v) -> b.setLifecycleState(v))
+                // AssignmentHolderType
+                .nullSafeWithRetrieve(UserType.F_ASSIGNMENT, u.getAssignment(), (b, v) -> {
+                    return b.addAllAssignment(v.stream().map(a -> {
+                        return AssignmentMessage.newBuilder()
+                                .setTargetRef(
+                                        toReferenceMessage(a.getTargetRef(), null)
+                                ).build();
+                    }).collect(Collectors.toList()));
+                })
+                .nullSafeWithRetrieve(UserType.F_ARCHETYPE_REF, u.getArchetypeRef(), (b, v) -> {
+                    return b.addAllArchetypeRef(v.stream().map(a -> {
+                        return toReferenceMessage(a, null);
+                    }).collect(Collectors.toList()));
+                })
+                // FocusType
+                .nullSafeWithRetrieve(ServiceType.F_JPEG_PHOTO, toBytesMessage(u.getJpegPhoto()), (b, v) -> b.setJpegPhoto(v))
+                .nullSafeWithRetrieve(ServiceType.F_COST_CENTER, u.getCostCenter(), (b, v) -> b.setCostCenter(v))
+                .nullSafeWithRetrieve(ServiceType.F_LOCALITY, toPolyStringMessage(u.getLocality()), (b, v) -> b.setLocality(v))
+                .nullSafeWithRetrieve(ServiceType.F_PREFERRED_LANGUAGE, u.getPreferredLanguage(), (b, v) -> b.setPreferredLanguage(v))
+                .nullSafeWithRetrieve(ServiceType.F_LOCALE, u.getLocale(), (b, v) -> b.setLocale(v))
+                .nullSafeWithRetrieve(ServiceType.F_TIMEZONE, u.getTimezone(), (b, v) -> b.setTimezone(v))
+                .nullSafeWithRetrieve(ServiceType.F_EMAIL_ADDRESS, u.getEmailAddress(), (b, v) -> b.setEmailAddress(v))
+                .nullSafeWithRetrieve(ServiceType.F_TELEPHONE_NUMBER, u.getTelephoneNumber(), (b, v) -> b.setTelephoneNumber(v))
+                // AbstractRoleType
+                .nullSafeWithRetrieve(ServiceType.F_DISPLAY_NAME, toPolyStringMessage(u.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                .nullSafeWithRetrieve(ServiceType.F_IDENTIFIER, u.getIdentifier(), (b, v) -> b.setIdentifier(v))
+                .nullSafeWithRetrieve(ServiceType.F_REQUESTABLE, u.isRequestable(), (b, v) -> b.setRequestable(v))
+                .nullSafeWithRetrieve(ServiceType.F_DELEGABLE, u.isDelegable(), (b, v) -> b.setDelegable(v))
+                .nullSafeWithRetrieve(ServiceType.F_RISK_LEVEL, u.getRiskLevel(), (b, v) -> b.setRiskLevel(v))
+                // ServiceType
+                .nullSafeWithRetrieve(ServiceType.F_SERVICE_TYPE, u.getServiceType(), (b, v) -> b.addAllServiceType(v))
+                .nullSafeWithRetrieve(ServiceType.F_DISPLAY_ORDER, u.getDisplayOrder(), (b, v) -> b.setDisplayOrder(v))
+                .nullSafeWithRetrieve(ServiceType.F_URL, u.getUrl(), (b, v) -> b.setUrl(v))
+                // Extension
+                .nullSafeWithRetrieve(ServiceType.F_EXTENSION, u.getExtension(),
+                        (v, ops, hasInclude) -> toItemMessageMap(v, ops, hasInclude),
+                        (b, v) -> b.putAllExtension(v))
+                .unwrap()
+                .build();
+    }
+
     public static Map<String, ItemMessage> toItemMessageMap(ExtensionType extension,
                                                             Collection<SelectorOptions<GetOperationOptions>> options,
                                                             boolean hasInclude) {
@@ -1095,6 +1177,11 @@ public class TypeConverter {
         PrismContainerValue<?> extensionValue = extension.asPrismContainerValue();
         for (Item item : extensionValue.getItems()) {
             ItemDefinition definition = item.getDefinition();
+
+            if (definition == null) {
+                LOGGER.warn("No schema for the extension value: {}", item);
+                continue;
+            }
 
             // Currently, it doesn't use namespaceURI as the key
             String key = definition.getItemName().getLocalPart();
@@ -1336,6 +1423,41 @@ public class TypeConverter {
     private static PrismContainerValue toPrismContainerValue(PrismContext prismContext, PrismContainerDefinition definition,
                                                              PrismContainerValueMessage message) throws SchemaException {
         PrismContainerValue impl = prismContext.itemFactory().createContainerValue();
+        // Need to apply here
+        impl.applyDefinition(definition);
+
+        for (Map.Entry<String, ItemMessage> entry : message.getValueMap().entrySet()) {
+            String k = entry.getKey();
+            ItemMessage v = entry.getValue();
+
+            QName qname = toQName(v, k);
+            ItemPath path = ItemPath.create(qname);
+
+            ItemDefinition itemDefinition = definition.findItemDefinition(path);
+            if (itemDefinition == null) {
+                throw new SchemaException("No schema: " + qname);
+            }
+
+            if (itemDefinition instanceof PrismPropertyDefinition) {
+                impl.add(toPrismProperty(prismContext, (PrismPropertyDefinition) itemDefinition, v.getProperty()));
+
+            } else if (itemDefinition instanceof PrismContainerDefinition) {
+                impl.add(toPrismContainer(prismContext, (PrismContainerDefinition) itemDefinition, v.getContainer()));
+
+            } else if (itemDefinition instanceof PrismReferenceDefinition) {
+                impl.add(toPrismReference(prismContext, (PrismReferenceDefinition) itemDefinition, v.getRef()));
+
+            } else {
+                throw new UnsupportedOperationException(itemDefinition.getClass() + " is not supported");
+            }
+        }
+
+        return impl;
+    }
+
+    private static PrismObjectValue toPrismObjectValue(PrismContext prismContext, PrismContainerDefinition definition,
+                                                       PrismContainerValueMessage message, Objectable objectable) throws SchemaException {
+        PrismObjectValue impl = prismContext.itemFactory().createObjectValue(objectable);
         // Need to apply here
         impl.applyDefinition(definition);
 

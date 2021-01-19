@@ -73,13 +73,16 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     public static final String OPERATION_ADD_USER = CLASS_DOT + "addUser";
     public static final String OPERATION_MODIFY_USER = CLASS_DOT + "modifyUser";
     public static final String OPERATION_GET_USER = CLASS_DOT + "getUser";
-    public static final String OPERATION_DELETE_USER = CLASS_DOT + "deleteUser";
     public static final String OPERATION_RECOMPUTE_OBJECT = CLASS_DOT + "recomputeObject";
     public static final String OPERATION_EXECUTE_USER_UPDATE = CLASS_DOT + "executeUserUpdate";
     public static final String OPERATION_EXECUTE_CREDENTIAL_CHECK = CLASS_DOT + "executeCredentialCheck";
     public static final String OPERATION_EXECUTE_CREDENTIAL_UPDATE = CLASS_DOT + "executeCredentialUpdate";
     public static final String OPERATION_REQUEST_ASSIGNMENTS = CLASS_DOT + "requestAssignments";
     public static final String OPERATION_SEARCH_OBJECTS = CLASS_DOT + "searchObjects";
+    public static final String OPERATION_ADD_OBJECT = CLASS_DOT + "addObject";
+    public static final String OPERATION_MODIFY_OBJECT = CLASS_DOT + "modifyObject";
+    public static final String OPERATION_EXECUTE_OBJECT_UPDATE = CLASS_DOT + "executeObjectUpdate";
+    public static final String OPERATION_DELETE_OBJECT = CLASS_DOT + "deleteObject";
 
     private static final long WAIT_FOR_TASK_STOP = 2000L;
 
@@ -413,6 +416,76 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         Collection<? extends ItemDelta<?, ?>> modifications = i.asItemDeltas();
 
         modelCrudService.modifyObject(UserType.class, oid, modifications, modelExecuteOptions, task, updateResult);
+
+        updateResult.computeStatus();
+    }
+
+    private void executeChanges(Class clazz, String oid, List<ItemDeltaMessage> modifications,
+                                ModelExecuteOptions modelExecuteOptions,
+                                Task task, OperationResult result) throws SchemaException, CommunicationException,
+            ObjectNotFoundException, ObjectAlreadyExistsException, PolicyViolationException, SecurityViolationException,
+            ConfigurationException, ExpressionEvaluationException {
+
+        OperationResult updateResult = result.createSubresult(OPERATION_EXECUTE_OBJECT_UPDATE);
+
+        PrismContainerDefinition<ObjectType> definition = prismContext.getSchemaRegistry()
+                .findContainerDefinitionByCompileTimeClass(clazz);
+
+        S_ItemEntry i = prismContext.deltaFor(clazz);
+
+        // https://wiki.evolveum.com/display/midPoint/Using+Prism+Deltas
+        for (ItemDeltaMessage m : modifications) {
+            ItemPath path;
+            if (m.hasItemPath()) {
+                path = TypeConverter.toItemPathValue(m.getItemPath());
+
+            } else if (m.getPathWrapperCase() == ItemDeltaMessage.PathWrapperCase.PATH) {
+                path = TypeConverter.toItemPath(m.getPath());
+
+            } else {
+                StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                        .withDescription("invalid_path")
+                        .asRuntimeException();
+                throw exception;
+            }
+
+            ItemDefinition itemDef = definition.findItemDefinition(path);
+            if (itemDef == null) {
+                StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                        .withDescription("invalid_path")
+                        .asRuntimeException();
+                throw exception;
+            }
+
+            S_ValuesEntry v = i.item(path);
+
+            S_ItemEntry entry = null;
+
+            // PrismValue
+            if (!m.getPrismValuesToAddList().isEmpty()) {
+                S_MaybeDelete av = v.add(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToAddList()));
+
+                if (!m.getPrismValuesToDeleteList().isEmpty()) {
+                    entry = av.delete(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToDeleteList()));
+                } else {
+                    entry = av;
+                }
+            } else if (!m.getPrismValuesToReplaceList().isEmpty()) {
+                entry = v.replace(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToReplaceList()));
+
+            } else if (!m.getPrismValuesToDeleteList().isEmpty()) {
+                entry = v.delete(TypeConverter.toPrismValueList(prismContext, itemDef, m.getPrismValuesToDeleteList()));
+            }
+
+            if (entry == null) {
+                LOGGER.warn("Invalid argument. No values for modification.");
+                throw new StatusRuntimeException(Status.INVALID_ARGUMENT);
+            }
+            i = entry;
+        }
+        Collection<? extends ItemDelta<?, ?>> mods = i.asItemDeltas();
+
+        modelCrudService.modifyObject(definition.getCompileTimeClass(), oid, mods, modelExecuteOptions, task, updateResult);
 
         updateResult.computeStatus();
     }
@@ -889,6 +962,36 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     }
 
     @Override
+    public void searchServices(SearchRequest request, StreamObserver<SearchServicesResponse> responseObserver) {
+        LOGGER.debug("Start searchServices");
+
+        List<String> options = request.getOptionsList();
+        List<String> include = request.getIncludeList();
+        List<String> exclude = request.getExcludeList();
+        List<String> resolveNames = request.getResolveNamesList();
+
+        Collection<SelectorOptions<GetOperationOptions>> searchOptions = GetOperationOptions.fromRestOptions(options, include,
+                exclude, resolveNames, DefinitionProcessingOption.FULL, prismContext);
+
+        SearchResultList<PrismObject<ServiceType>> result = search(request, ServiceType.class, searchOptions);
+
+        Integer total = result.getMetadata().getApproxNumberOfAllResults();
+        List<ServiceTypeMessage> services = result.stream()
+                .map(x -> TypeConverter.toServiceTypeMessage(x.asObjectable(), searchOptions))
+                .collect(Collectors.toList());
+
+        SearchServicesResponse res = SearchServicesResponse.newBuilder()
+                .setNumberOfAllResults(total)
+                .addAllResults(services)
+                .build();
+
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End searchServices");
+    }
+
+    @Override
     public void searchObjectsAsStream(SearchObjectsRequest request, StreamObserver<SearchObjectsResponse> responseObserver) {
         runTask(ctx -> {
             Task task = ctx.task;
@@ -975,11 +1078,96 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     }
 
     @Override
+    public void addObject(AddObjectRequest request, StreamObserver<AddObjectResponse> responseObserver) {
+        LOGGER.debug("Start addObject");
+
+        String resultOid = runTask(ctx -> {
+            Task task = ctx.task;
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_ADD_USER);
+            ModelExecuteOptions modelExecuteOptions = ModelExecuteOptions.fromRestOptions(request.getOptionsList());
+
+            Class<? extends ObjectType> clazz;
+            if (request.hasType()) {
+                QName qname = toQNameValue(request.getType());
+                clazz = ObjectTypes.getObjectTypeClass(qname);
+            } else {
+                QName qname = toQNameValue(request.getObjectType());
+                clazz = ObjectTypes.getObjectTypeClass(qname);
+            }
+            PrismContainerMessage message = request.getObject();
+            PrismObject object = toPrismObject(prismContext, clazz, message);
+
+            // To handle error to resolve reference, call resolveReferences here.
+            try {
+                ModelImplUtils.resolveReferences(object, repositoryService, false,
+                        false, EvaluationTimeType.IMPORT, true, prismContext, parentResult);
+            } catch (SystemException e) {
+                StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                        .withDescription("invalid_reference")
+                        .asRuntimeException();
+                throw exception;
+            }
+
+            String oid = modelCrudService.addObject(object, modelExecuteOptions, task, parentResult);
+            LOGGER.debug("returned oid :  {}", oid);
+
+            parentResult.computeStatus();
+            return oid;
+        });
+
+        AddObjectResponse.Builder builder = AddObjectResponse.newBuilder();
+        // If the create process is suspended by workflow, oid is null
+        if (resultOid != null) {
+            builder.setOid(resultOid);
+        }
+        AddObjectResponse res = builder.build();
+
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End addObject");
+    }
+
+    @Override
+    public void modifyObject(ModifyObjectRequest request, StreamObserver<ModifyObjectResponse> responseObserver) {
+        LOGGER.debug("Start modifyObject");
+
+        runTask(ctx -> {
+            Task task = ctx.task;
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_MODIFY_OBJECT);
+
+            Class<? extends ObjectType> clazz;
+            if (request.hasType()) {
+                QName qname = toQNameValue(request.getType());
+                clazz = ObjectTypes.getObjectTypeClass(qname);
+            } else {
+                QName qname = toQNameValue(request.getObjectType());
+                clazz = ObjectTypes.getObjectTypeClass(qname);
+            }
+
+            String oid = resolveOid(clazz, request.getOid(), request.getName(), task, parentResult);
+            ModelExecuteOptions modelExecuteOptions = ModelExecuteOptions.fromRestOptions(request.getOptionsList());
+
+            executeChanges(clazz, oid, request.getModificationsList(), modelExecuteOptions, task, parentResult);
+
+            parentResult.computeStatus();
+            return null;
+        });
+
+        ModifyObjectResponse res = ModifyObjectResponse.newBuilder().build();
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End modifyObject");
+    }
+
+    @Override
     public void deleteObject(DeleteObjectRequest request, StreamObserver<DeleteObjectResponse> responseObserver) {
         runTask(ctx -> {
             Task task = ctx.task;
 
-            OperationResult parentResult = task.getResult().createSubresult(OPERATION_DELETE_USER);
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_DELETE_OBJECT);
 
             Class<? extends ObjectType> clazz;
             if (request.hasType()) {
