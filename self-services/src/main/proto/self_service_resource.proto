@@ -149,6 +149,8 @@ message UserTypeMessage {
     repeated string subtype = 5;
     // lifecycleState
     string lifecycle_state = 6;
+    // parentOrgRef
+    repeated ReferenceMessage parentOrgRef = 7;
 
     // AssignmentHolderType
 
@@ -156,6 +158,8 @@ message UserTypeMessage {
     repeated AssignmentMessage assignment = 10;
     // archetypeRef
     repeated ReferenceMessage archetype_ref = 11;
+    // roleMembershipRef
+    repeated ReferenceMessage role_membership_ref = 12;
 
     // FocusType
     BytesMessage jpeg_photo = 20;
@@ -220,6 +224,8 @@ message RoleTypeMessage {
     repeated string subtype = 5;
     // lifecycleState
     string lifecycle_state = 6;
+    // parentOrgRef
+    repeated ReferenceMessage parentOrgRef = 7;
 
     // AssignmentHolderType
 
@@ -227,6 +233,8 @@ message RoleTypeMessage {
     repeated AssignmentMessage assignment = 10;
     // archetypeRef
     repeated ReferenceMessage archetype_ref = 11;
+    // roleMembershipRef
+    repeated ReferenceMessage role_membership_ref = 12;
 
     // FocusType
 
@@ -284,6 +292,8 @@ message OrgTypeMessage {
     repeated string subtype = 5;
     // lifecycleState
     string lifecycle_state = 6;
+    // parentOrgRef
+    repeated ReferenceMessage parentOrgRef = 7;
 
     // AssignmentHolderType
 
@@ -291,6 +301,8 @@ message OrgTypeMessage {
     repeated AssignmentMessage assignment = 10;
     // archetypeRef
     repeated ReferenceMessage archetype_ref = 11;
+    // roleMembershipRef
+    repeated ReferenceMessage role_membership_ref = 12;
 
     // FocusType
 
@@ -357,6 +369,8 @@ message ServiceTypeMessage {
     repeated string subtype = 5;
     // lifecycleState
     string lifecycle_state = 6;
+    // parentOrgRef
+    repeated ReferenceMessage parentOrgRef = 7;
 
     // AssignmentHolderType
 
@@ -364,6 +378,8 @@ message ServiceTypeMessage {
     repeated AssignmentMessage assignment = 10;
     // archetypeRef
     repeated ReferenceMessage archetype_ref = 11;
+    // roleMembershipRef
+    repeated ReferenceMessage role_membership_ref = 12;
 
     // FocusType
 
