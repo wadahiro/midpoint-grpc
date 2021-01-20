@@ -988,6 +988,11 @@ public class TypeConverter {
                 .nullSafeWithRetrieve(UserType.F_DESCRIPTION, u.getDescription(), (b, v) -> b.setDescription(v))
                 .nullSafeWithRetrieve(UserType.F_SUBTYPE, u.getSubtype(), (b, v) -> b.addAllSubtype(v))
                 .nullSafeWithRetrieve(UserType.F_LIFECYCLE_STATE, u.getLifecycleState(), (b, v) -> b.setLifecycleState(v))
+                .nullSafeWithRetrieve(UserType.F_PARENT_ORG_REF, u.getParentOrgRef(), (b, v) -> {
+                    return b.addAllParentOrgRef(v.stream().map(a -> {
+                        return toReferenceMessage(a, null);
+                    }).collect(Collectors.toList()));
+                })
                 // AssignmentHolderType
                 .nullSafeWithRetrieve(UserType.F_ASSIGNMENT, u.getAssignment(), (b, v) -> {
                     return b.addAllAssignment(v.stream().map(a -> {
@@ -1024,7 +1029,7 @@ public class TypeConverter {
                 .nullSafeWithRetrieve(UserType.F_ORGANIZATION, toPolyStringMessageList(u.getOrganization()), (b, v) -> b.addAllOrganization(v))
                 .nullSafeWithRetrieve(UserType.F_ORGANIZATIONAL_UNIT, toPolyStringMessageList(u.getOrganizationalUnit()), (b, v) -> b.addAllOrganizationalUnit(v))
                 // Extension
-                .nullSafeWithRetrieve(OrgType.F_EXTENSION, u.getExtension(),
+                .nullSafeWithRetrieve(UserType.F_EXTENSION, u.getExtension(),
                         (v, ops, hasInclude) -> toItemMessageMap(v, ops, hasInclude),
                         (b, v) -> b.putAllExtension(v))
                 .unwrap()
@@ -1041,8 +1046,13 @@ public class TypeConverter {
                 .nullSafeWithRetrieve(RoleType.F_DESCRIPTION, u.getDescription(), (b, v) -> b.setDescription(v))
                 .nullSafeWithRetrieve(RoleType.F_SUBTYPE, u.getSubtype(), (b, v) -> b.addAllSubtype(v))
                 .nullSafeWithRetrieve(RoleType.F_LIFECYCLE_STATE, u.getLifecycleState(), (b, v) -> b.setLifecycleState(v))
+                .nullSafeWithRetrieve(RoleType.F_PARENT_ORG_REF, u.getParentOrgRef(), (b, v) -> {
+                    return b.addAllParentOrgRef(v.stream().map(a -> {
+                        return toReferenceMessage(a, null);
+                    }).collect(Collectors.toList()));
+                })
                 // AssignmentHolderType
-                .nullSafeWithRetrieve(UserType.F_ASSIGNMENT, u.getAssignment(), (b, v) -> {
+                .nullSafeWithRetrieve(RoleType.F_ASSIGNMENT, u.getAssignment(), (b, v) -> {
                     return b.addAllAssignment(v.stream().map(a -> {
                         return AssignmentMessage.newBuilder()
                                 .setTargetRef(
@@ -1050,7 +1060,7 @@ public class TypeConverter {
                                 ).build();
                     }).collect(Collectors.toList()));
                 })
-                .nullSafeWithRetrieve(UserType.F_ARCHETYPE_REF, u.getArchetypeRef(), (b, v) -> {
+                .nullSafeWithRetrieve(RoleType.F_ARCHETYPE_REF, u.getArchetypeRef(), (b, v) -> {
                     return b.addAllArchetypeRef(v.stream().map(a -> {
                         return toReferenceMessage(a, null);
                     }).collect(Collectors.toList()));
@@ -1073,7 +1083,7 @@ public class TypeConverter {
                 // RoleType
                 .nullSafeWithRetrieve(RoleType.F_ROLE_TYPE, u.getRoleType(), (b, v) -> b.setRoleType(v))
                 // Extension
-                .nullSafeWithRetrieve(OrgType.F_EXTENSION, u.getExtension(),
+                .nullSafeWithRetrieve(RoleType.F_EXTENSION, u.getExtension(),
                         (v, ops, hasInclude) -> toItemMessageMap(v, ops, hasInclude),
                         (b, v) -> b.putAllExtension(v))
                 .unwrap()
@@ -1090,8 +1100,13 @@ public class TypeConverter {
                 .nullSafeWithRetrieve(OrgType.F_DESCRIPTION, u.getDescription(), (b, v) -> b.setDescription(v))
                 .nullSafeWithRetrieve(OrgType.F_SUBTYPE, u.getSubtype(), (b, v) -> b.addAllSubtype(v))
                 .nullSafeWithRetrieve(OrgType.F_LIFECYCLE_STATE, u.getLifecycleState(), (b, v) -> b.setLifecycleState(v))
+                .nullSafeWithRetrieve(OrgType.F_PARENT_ORG_REF, u.getParentOrgRef(), (b, v) -> {
+                    return b.addAllParentOrgRef(v.stream().map(a -> {
+                        return toReferenceMessage(a, null);
+                    }).collect(Collectors.toList()));
+                })
                 // AssignmentHolderType
-                .nullSafeWithRetrieve(UserType.F_ASSIGNMENT, u.getAssignment(), (b, v) -> {
+                .nullSafeWithRetrieve(OrgType.F_ASSIGNMENT, u.getAssignment(), (b, v) -> {
                     return b.addAllAssignment(v.stream().map(a -> {
                         return AssignmentMessage.newBuilder()
                                 .setTargetRef(
@@ -1099,7 +1114,7 @@ public class TypeConverter {
                                 ).build();
                     }).collect(Collectors.toList()));
                 })
-                .nullSafeWithRetrieve(UserType.F_ARCHETYPE_REF, u.getArchetypeRef(), (b, v) -> {
+                .nullSafeWithRetrieve(OrgType.F_ARCHETYPE_REF, u.getArchetypeRef(), (b, v) -> {
                     return b.addAllArchetypeRef(v.stream().map(a -> {
                         return toReferenceMessage(a, null);
                     }).collect(Collectors.toList()));
@@ -1142,8 +1157,13 @@ public class TypeConverter {
                 .nullSafeWithRetrieve(ServiceType.F_DESCRIPTION, u.getDescription(), (b, v) -> b.setDescription(v))
                 .nullSafeWithRetrieve(ServiceType.F_SUBTYPE, u.getSubtype(), (b, v) -> b.addAllSubtype(v))
                 .nullSafeWithRetrieve(ServiceType.F_LIFECYCLE_STATE, u.getLifecycleState(), (b, v) -> b.setLifecycleState(v))
+                .nullSafeWithRetrieve(ServiceType.F_PARENT_ORG_REF, u.getParentOrgRef(), (b, v) -> {
+                    return b.addAllParentOrgRef(v.stream().map(a -> {
+                        return toReferenceMessage(a, null);
+                    }).collect(Collectors.toList()));
+                })
                 // AssignmentHolderType
-                .nullSafeWithRetrieve(UserType.F_ASSIGNMENT, u.getAssignment(), (b, v) -> {
+                .nullSafeWithRetrieve(ServiceType.F_ASSIGNMENT, u.getAssignment(), (b, v) -> {
                     return b.addAllAssignment(v.stream().map(a -> {
                         return AssignmentMessage.newBuilder()
                                 .setTargetRef(
@@ -1151,7 +1171,7 @@ public class TypeConverter {
                                 ).build();
                     }).collect(Collectors.toList()));
                 })
-                .nullSafeWithRetrieve(UserType.F_ARCHETYPE_REF, u.getArchetypeRef(), (b, v) -> {
+                .nullSafeWithRetrieve(ServiceType.F_ARCHETYPE_REF, u.getArchetypeRef(), (b, v) -> {
                     return b.addAllArchetypeRef(v.stream().map(a -> {
                         return toReferenceMessage(a, null);
                     }).collect(Collectors.toList()));

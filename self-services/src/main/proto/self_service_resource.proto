@@ -149,6 +149,8 @@ message UserTypeMessage {
     repeated string subtype = 5;
     // lifecycleState
     string lifecycle_state = 6;
+    // parentOrgRef
+    repeated ReferenceMessage parentOrgRef = 7;
 
     // AssignmentHolderType
 
@@ -220,6 +222,8 @@ message RoleTypeMessage {
     repeated string subtype = 5;
     // lifecycleState
     string lifecycle_state = 6;
+    // parentOrgRef
+    repeated ReferenceMessage parentOrgRef = 7;
 
     // AssignmentHolderType
 
@@ -284,6 +288,8 @@ message OrgTypeMessage {
     repeated string subtype = 5;
     // lifecycleState
     string lifecycle_state = 6;
+    // parentOrgRef
+    repeated ReferenceMessage parentOrgRef = 7;
 
     // AssignmentHolderType
 
@@ -357,6 +363,8 @@ message ServiceTypeMessage {
     repeated string subtype = 5;
     // lifecycleState
     string lifecycle_state = 6;
+    // parentOrgRef
+    repeated ReferenceMessage parentOrgRef = 7;
 
     // AssignmentHolderType
 
