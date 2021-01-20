@@ -824,6 +824,9 @@ message ObjectFilterMessage {
         FilterEntryMessage starts_with_poly_string = 11;
         FilterEntryMessage contains_poly_string = 12;
         FilterEntryMessage ends_with_poly_string = 13;
+
+        // Reference
+        FilterReferenceMessage ref = 20;
     }
 }
 
@@ -845,3 +848,7 @@ message FilterEntryMessage {
     string value = 3;
 }
 
+message FilterReferenceMessage {
+    string full_path = 1;
+    ReferenceMessage value = 2;
+}
