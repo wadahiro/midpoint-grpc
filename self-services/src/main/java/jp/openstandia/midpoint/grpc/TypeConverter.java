@@ -1007,6 +1007,11 @@ public class TypeConverter {
                         return toReferenceMessage(a, null);
                     }).collect(Collectors.toList()));
                 })
+                .nullSafeWithRetrieve(UserType.F_ROLE_MEMBERSHIP_REF, u.getRoleMembershipRef(), (b, v) -> {
+                    return b.addAllRoleMembershipRef(v.stream().map(a -> {
+                        return toReferenceMessage(a, null);
+                    }).collect(Collectors.toList()));
+                })
                 // FocusType
                 .nullSafeWithRetrieve(UserType.F_JPEG_PHOTO, toBytesMessage(u.getJpegPhoto()), (b, v) -> b.setJpegPhoto(v))
                 .nullSafeWithRetrieve(UserType.F_COST_CENTER, u.getCostCenter(), (b, v) -> b.setCostCenter(v))
@@ -1065,6 +1070,11 @@ public class TypeConverter {
                         return toReferenceMessage(a, null);
                     }).collect(Collectors.toList()));
                 })
+                .nullSafeWithRetrieve(RoleType.F_ROLE_MEMBERSHIP_REF, u.getRoleMembershipRef(), (b, v) -> {
+                    return b.addAllRoleMembershipRef(v.stream().map(a -> {
+                        return toReferenceMessage(a, null);
+                    }).collect(Collectors.toList()));
+                })
                 // FocusType
                 .nullSafeWithRetrieve(RoleType.F_JPEG_PHOTO, toBytesMessage(u.getJpegPhoto()), (b, v) -> b.setJpegPhoto(v))
                 .nullSafeWithRetrieve(RoleType.F_COST_CENTER, u.getCostCenter(), (b, v) -> b.setCostCenter(v))
@@ -1116,6 +1126,11 @@ public class TypeConverter {
                 })
                 .nullSafeWithRetrieve(OrgType.F_ARCHETYPE_REF, u.getArchetypeRef(), (b, v) -> {
                     return b.addAllArchetypeRef(v.stream().map(a -> {
+                        return toReferenceMessage(a, null);
+                    }).collect(Collectors.toList()));
+                })
+                .nullSafeWithRetrieve(OrgType.F_ROLE_MEMBERSHIP_REF, u.getRoleMembershipRef(), (b, v) -> {
+                    return b.addAllRoleMembershipRef(v.stream().map(a -> {
                         return toReferenceMessage(a, null);
                     }).collect(Collectors.toList()));
                 })
@@ -1173,6 +1188,11 @@ public class TypeConverter {
                 })
                 .nullSafeWithRetrieve(ServiceType.F_ARCHETYPE_REF, u.getArchetypeRef(), (b, v) -> {
                     return b.addAllArchetypeRef(v.stream().map(a -> {
+                        return toReferenceMessage(a, null);
+                    }).collect(Collectors.toList()));
+                })
+                .nullSafeWithRetrieve(ServiceType.F_ROLE_MEMBERSHIP_REF, u.getRoleMembershipRef(), (b, v) -> {
+                    return b.addAllRoleMembershipRef(v.stream().map(a -> {
                         return toReferenceMessage(a, null);
                     }).collect(Collectors.toList()));
                 })
