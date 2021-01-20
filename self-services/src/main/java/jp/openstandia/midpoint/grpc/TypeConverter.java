@@ -248,15 +248,21 @@ public class TypeConverter {
         }
 
         if (ref.getOid() == null) {
-            System.out.println("ref oid is null" + ref);
+            LOGGER.warn("ref's oid is null, ref: {}", ref);
             return null;
         }
 
+        QName type = ref.getType();
         QName relation = ref.getRelation();
         ReferenceMessage.Builder builder = BuilderWrapper.wrap(ReferenceMessage.newBuilder())
                 .nullSafe(toPolyStringMessage(ref.getTargetName()), (b, v) -> b.setName(v))
                 .unwrap()
                 .setOid(ref.getOid())
+                .setType(QNameMessage.newBuilder()
+                        .setNamespaceURI(type.getNamespaceURI())
+                        .setLocalPart(type.getLocalPart())
+                        .setPrefix(type.getPrefix())
+                )
                 .setRelation(
                         QNameMessage.newBuilder()
                                 .setNamespaceURI(relation.getNamespaceURI())

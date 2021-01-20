@@ -228,6 +228,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                             resolvedOrgRef = cache.get(orgRef.getOid());
                         }
 
+                        QName type = x.getTargetRef().getType();
                         QName relation = x.getTargetRef().getRelation();
 
                         if (request.getIncludeIndirect()) {
@@ -246,6 +247,12 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                                                 .nullSafe(toReferenceMessageList(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
                                                 .nullSafe(o.getSubtype(), (b, v) -> b.addAllSubtype(v))
                                                 .unwrap()
+                                                .setType(
+                                                        QNameMessage.newBuilder()
+                                                                .setNamespaceURI(type.getNamespaceURI())
+                                                                .setLocalPart(type.getLocalPart())
+                                                                .setPrefix(type.getPrefix())
+                                                )
                                                 .setRelation(
                                                         QNameMessage.newBuilder()
                                                                 .setNamespaceURI(relation.getNamespaceURI())
@@ -263,6 +270,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                         .filter(x -> !directAssignment.contains(x.getOid() + "#" + x.getRelation().toString()))
                         .map(x -> {
                             AbstractRoleType o = cache.get(x.getOid());
+                            QName type = x.getType();
                             QName relation = x.getRelation();
 
                             return BuilderWrapper.wrap(AssignmentMessage.newBuilder())
@@ -277,6 +285,12 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                                                     .nullSafe(toReferenceMessageList(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
                                                     .nullSafe(o.getSubtype(), (b, v) -> b.addAllSubtype(v))
                                                     .unwrap()
+                                                    .setType(
+                                                            QNameMessage.newBuilder()
+                                                                    .setNamespaceURI(type.getNamespaceURI())
+                                                                    .setLocalPart(type.getLocalPart())
+                                                                    .setPrefix(type.getPrefix())
+                                                    )
                                                     .setRelation(
                                                             QNameMessage.newBuilder()
                                                                     .setNamespaceURI(relation.getNamespaceURI())
