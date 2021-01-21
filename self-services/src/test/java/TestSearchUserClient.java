@@ -24,10 +24,20 @@ public class TestSearchUserClient {
         stub = MetadataUtils.attachHeaders(stub, headers);
 
         SearchRequest req = SearchRequest.newBuilder()
+                .addInclude("roleMembershipRef")
                 .setQuery(
                         QueryMessage.newBuilder()
                                 .setFilter(
                                         ObjectFilterMessage.newBuilder()
+//                                                .setRef(
+//                                                        FilterReferenceMessage.newBuilder()
+//                                                                .setFullPath("assignment/targetRef")
+//                                                                .setValue(
+//                                                                        ReferenceMessage.newBuilder()
+//                                                                                .setObjectType(DefaultObjectType.ROLE_TYPE)
+//                                                                                .setOid("00000000-0000-0000-0000-000000000004")
+//                                                                )
+//                                                )
 //                                                .setEqPolyString(
 //                                                        FilterEntryMessage.newBuilder()
 //                                                        .setFullPath("name")
@@ -44,11 +54,11 @@ public class TestSearchUserClient {
 //                                                                                )
 //                                                                )
 //                                                )
-                                                .setContains(
-                                                        FilterEntryMessage.newBuilder()
-                                                                .setFullPath("extension/singleString")
-                                                                .setValue("foobar")
-                                                )
+//                                                .setContains(
+//                                                        FilterEntryMessage.newBuilder()
+//                                                                .setFullPath("extension/singleString")
+//                                                                .setValue("foobar")
+//                                                )
                                 )
                                 .setPaging(
                                         PagingMessage.newBuilder()

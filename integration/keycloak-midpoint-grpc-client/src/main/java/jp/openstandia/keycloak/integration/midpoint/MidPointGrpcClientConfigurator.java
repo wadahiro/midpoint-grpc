@@ -41,7 +41,7 @@ public class MidPointGrpcClientConfigurator extends AbstractClientAuthenticator 
 
     @Override
     public AuthenticationExecutionModel.Requirement[] getRequirementChoices() {
-        return new AuthenticationExecutionModel.Requirement[]{ AuthenticationExecutionModel.Requirement.DISABLED};
+        return new AuthenticationExecutionModel.Requirement[]{AuthenticationExecutionModel.Requirement.DISABLED};
     }
 
     @Override
@@ -87,7 +87,7 @@ public class MidPointGrpcClientConfigurator extends AbstractClientAuthenticator 
 
     @Override
     public Set<String> getProtocolAuthenticatorMethods(String loginProtocol) {
-            return Collections.emptySet();
+        return Collections.emptySet();
     }
 
     @Override

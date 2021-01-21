@@ -26,6 +26,12 @@ public class TestSearchServiceClient {
         SearchRequest req = SearchRequest.newBuilder()
                 .setQuery(
                         QueryMessage.newBuilder()
+                                .setFilter(ObjectFilterMessage.newBuilder()
+                                        .setEq(FilterEntryMessage.newBuilder()
+                                                .setFullPath("name")
+                                                .setValue("abc")
+                                        )
+                                )
                                 .setPaging(
                                         PagingMessage.newBuilder()
                                                 .setMaxSize(2)
@@ -36,6 +42,6 @@ public class TestSearchServiceClient {
 
         SearchServicesResponse res = stub.searchServices(req);
 
-        System.out.println(res);
+        System.out.println(res.getResultsList());
     }
 }

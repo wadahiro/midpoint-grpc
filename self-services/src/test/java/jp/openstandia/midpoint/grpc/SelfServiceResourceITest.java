@@ -223,7 +223,7 @@ class SelfServiceResourceITest {
     }
 
     @Test
-    void addUser() throws Exception {
+    void user() throws Exception {
         SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
 
         String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
@@ -233,13 +233,210 @@ class SelfServiceResourceITest {
 
         stub = MetadataUtils.attachHeaders(stub, headers);
 
+        // Add
         AddUserRequest request = AddUserRequest.newBuilder()
                 .setProfile(UserTypeMessage.newBuilder()
-                        .setName(PolyStringMessage.newBuilder().setOrig("foo")))
+                        .setName(PolyStringMessage.newBuilder().setOrig("user001"))
+                        .setEmployeeNumber("emp001")
+                )
                 .build();
 
         AddUserResponse response = stub.addUser(request);
 
         assertNotNull(response.getOid());
+
+        // Get
+        GetUserRequest req2 = GetUserRequest.newBuilder()
+                .setOid(response.getOid())
+                .build();
+
+        GetUserResponse res2 = stub.getUser(req2);
+
+        assertEquals("user001", res2.getResult().getName().getOrig());
+        assertEquals("emp001", res2.getResult().getEmployeeNumber());
+
+        // Search
+        SearchUsersResponse res3 = stub.searchUsers(SearchRequest.newBuilder()
+                .setQuery(QueryMessage.newBuilder()
+                        .setFilter(ObjectFilterMessage.newBuilder()
+                                .setEq(FilterEntryMessage.newBuilder()
+                                        .setFullPath("employeeNumber")
+                                        .setValue("emp001"))))
+                .build());
+
+        assertEquals(1, res3.getNumberOfAllResults());
+        assertEquals("emp001", res3.getResults(0).getEmployeeNumber());
+
+        // Delete
+        DeleteObjectResponse res4 = stub.deleteObject(DeleteObjectRequest.newBuilder()
+                .setOid(response.getOid())
+                .setObjectType(DefaultObjectType.USER_TYPE)
+                .build());
+
+        assertNotNull(res4);
+    }
+
+    @Test
+    void role() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Add
+        AddRoleRequest request = AddRoleRequest.newBuilder()
+                .setObject(RoleTypeMessage.newBuilder()
+                        .setName(PolyStringMessage.newBuilder().setOrig("role001"))
+                        .setRoleType("testRole")
+                )
+                .build();
+
+        AddObjectResponse response = stub.addRole(request);
+
+        assertNotNull(response.getOid());
+
+        // Get
+        GetRoleRequest req2 = GetRoleRequest.newBuilder()
+                .setOid(response.getOid())
+                .build();
+
+        GetRoleResponse res2 = stub.getRole(req2);
+
+        assertEquals("role001", res2.getResult().getName().getOrig());
+        assertEquals("testRole", res2.getResult().getRoleType());
+
+        // Search
+        SearchRolesResponse res3 = stub.searchRoles(SearchRequest.newBuilder()
+                .setQuery(QueryMessage.newBuilder()
+                        .setFilter(ObjectFilterMessage.newBuilder()
+                                .setEq(FilterEntryMessage.newBuilder()
+                                        .setFullPath("roleType")
+                                        .setValue("testRole"))))
+                .build());
+
+        assertEquals(1, res3.getNumberOfAllResults());
+        assertEquals("testRole", res3.getResults(0).getRoleType());
+
+        // Delete
+        DeleteObjectResponse res4 = stub.deleteObject(DeleteObjectRequest.newBuilder()
+                .setOid(response.getOid())
+                .setObjectType(DefaultObjectType.ROLE_TYPE)
+                .build());
+
+        assertNotNull(res4);
+    }
+
+    @Test
+    void org() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Add
+        AddOrgRequest request = AddOrgRequest.newBuilder()
+                .setObject(OrgTypeMessage.newBuilder()
+                        .setName(PolyStringMessage.newBuilder().setOrig("org001"))
+                        .addOrgType("testOrg")
+                        .setDisplayOrder(1)
+                )
+                .build();
+
+        AddObjectResponse response = stub.addOrg(request);
+
+        assertNotNull(response.getOid());
+
+        // Get
+        GetOrgRequest req2 = GetOrgRequest.newBuilder()
+                .setOid(response.getOid())
+                .build();
+
+        GetOrgResponse res2 = stub.getOrg(req2);
+
+        assertEquals("org001", res2.getResult().getName().getOrig());
+        assertEquals(1, res2.getResult().getDisplayOrder());
+
+        // Search
+        SearchOrgsResponse res3 = stub.searchOrgs(SearchRequest.newBuilder()
+                .setQuery(QueryMessage.newBuilder()
+                        .setFilter(ObjectFilterMessage.newBuilder()
+                                .setEq(FilterEntryMessage.newBuilder()
+                                        .setFullPath("orgType")
+                                        .setValue("testOrg"))))
+                .build());
+
+        assertEquals(1, res3.getNumberOfAllResults());
+        assertEquals(1, res3.getResults(0).getDisplayOrder());
+
+        // Delete
+        DeleteObjectResponse res4 = stub.deleteObject(DeleteObjectRequest.newBuilder()
+                .setOid(response.getOid())
+                .setObjectType(DefaultObjectType.ORG_TYPE)
+                .build());
+
+        assertNotNull(res4);
+    }
+
+    @Test
+    void service() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Add
+        AddServiceRequest request = AddServiceRequest.newBuilder()
+                .setObject(ServiceTypeMessage.newBuilder()
+                        .setName(PolyStringMessage.newBuilder().setOrig("service001"))
+                        .addServiceType("testService")
+                        .setUrl("https://example.com")
+                )
+                .build();
+
+        AddObjectResponse response = stub.addService(request);
+
+        assertNotNull(response.getOid());
+
+        // Get
+        GetServiceRequest req2 = GetServiceRequest.newBuilder()
+                .setOid(response.getOid())
+                .build();
+
+        GetServiceResponse res2 = stub.getService(req2);
+
+        assertEquals("service001", res2.getResult().getName().getOrig());
+        assertEquals("https://example.com", res2.getResult().getUrl());
+
+        // Search
+        SearchServicesResponse res3 = stub.searchServices(SearchRequest.newBuilder()
+                .setQuery(QueryMessage.newBuilder()
+                        .setFilter(ObjectFilterMessage.newBuilder()
+                                .setEq(FilterEntryMessage.newBuilder()
+                                        .setFullPath("serviceType")
+                                        .setValue("testService"))))
+                .build());
+
+        assertEquals(1, res3.getNumberOfAllResults());
+        assertEquals("https://example.com", res3.getResults(0).getUrl());
+
+        // Delete
+        DeleteObjectResponse res4 = stub.deleteObject(DeleteObjectRequest.newBuilder()
+                .setOid(response.getOid())
+                .setObjectType(DefaultObjectType.SERVICE_TYPE)
+                .build());
+
+        assertNotNull(res4);
     }
 }

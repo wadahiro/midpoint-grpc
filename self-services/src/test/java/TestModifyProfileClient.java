@@ -20,7 +20,8 @@ public class TestModifyProfileClient {
 
         Metadata headers = new Metadata();
         headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
-//        headers.put(Constant.SwitchToPrincipalByNameMetadataKey, "test");
+        headers.put(Constant.SwitchToPrincipalByNameMetadataKey, "test");
+        headers.put(Constant.RunPrivilegedMetadataKey, "true");
 
         stub = MetadataUtils.attachHeaders(stub, headers);
 
@@ -33,16 +34,47 @@ public class TestModifyProfileClient {
                 )
                 .addModifications(
                         UserItemDeltaMessage.newBuilder()
-//                                .setUserTypePath(DefaultUserTypePath.F_FAMILY_NAME)
-                                .setPath("extension/singleString")
-//                                .setPath("familyName")
-//                                .setItemPath(
-//                                        ItemPathMessage.newBuilder()
-//                                                .addPath(QNameMessage.newBuilder().setLocalPart("extension"))
-//                                                .addPath(QNameMessage.newBuilder().setLocalPart("singleString"))
-//                                )
-                                .addValuesToAdd("hoge2")
+                                .setPath("assignment")
+                                .addPrismValuesToAdd(
+                                        PrismValueMessage.newBuilder()
+                                                .setContainer(
+                                                        PrismContainerValueMessage.newBuilder()
+                                                                .putValue("subtype",
+                                                                        ItemMessage.newBuilder()
+                                                                                .setProperty(
+                                                                                        PrismPropertyMessage.newBuilder()
+                                                                                                .addValues(
+                                                                                                        PrismPropertyValueMessage.newBuilder()
+                                                                                                                .setString("client-certificate-binding")
+                                                                                                )
+                                                                                ).build()
+                                                                )
+                                                                .putValue("targetRef",
+                                                                        ItemMessage.newBuilder()
+                                                                                .setRef(
+                                                                                        PrismReferenceMessage.newBuilder()
+                                                                                                .addValues(
+                                                                                                        ReferenceMessage.newBuilder()
+                                                                                                                .setObjectType(DefaultObjectType.ROLE_TYPE)
+                                                                                                                .setOid("fa14f888-b23e-4547-99a9-667b9095c9ca")
+                                                                                                )
+
+                                                                                ).build()
+                                                                ))
+                                )
                 )
+//                .addModifications(
+//                        UserItemDeltaMessage.newBuilder()
+////                                .setUserTypePath(DefaultUserTypePath.F_FAMILY_NAME)
+//                                .setPath("extension/singleString")
+////                                .setPath("familyName")
+////                                .setItemPath(
+////                                        ItemPathMessage.newBuilder()
+////                                                .addPath(QNameMessage.newBuilder().setLocalPart("extension"))
+////                                                .addPath(QNameMessage.newBuilder().setLocalPart("singleString"))
+////                                )
+//                                .addValuesToAdd("hoge2")
+//                )
                 .build();
 
         ModifyProfileResponse response = stub.modifyProfile(request);
