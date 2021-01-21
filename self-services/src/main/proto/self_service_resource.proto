@@ -843,6 +843,10 @@ message ObjectFilterMessage {
 
         // Reference
         FilterReferenceMessage ref = 20;
+
+        // Org
+        FilterOrgRootMessage org_root = 30;
+        FilterOrgReferenceMessage org_ref = 31;
     }
 }
 
@@ -867,4 +871,19 @@ message FilterEntryMessage {
 message FilterReferenceMessage {
     string full_path = 1;
     ReferenceMessage value = 2;
+}
+
+message FilterOrgRootMessage {
+    bool is_root = 1;
+}
+
+message FilterOrgReferenceMessage {
+    ReferenceMessage value = 1;
+    OrgFilterScope scope = 2;
+}
+
+enum OrgFilterScope {
+    ONE_LEVEL = 0;
+    SUBTREE = 1;
+    ANCESTORS = 2;
 }

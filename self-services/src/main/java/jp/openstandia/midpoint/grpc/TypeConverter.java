@@ -450,7 +450,13 @@ public class TypeConverter {
 
         } else if (message.hasRef()) {
             return toRefFilter(prismContext, builder, message.getRef());
+
+        } else if (message.hasOrgRoot()) {
+            return toOrgRootFilter(prismContext, builder, message.getOrgRoot());
+        } else if (message.hasOrgRef()) {
+            return toOrgRefFilter(prismContext, builder, message.getOrgRef());
         }
+
         return null;
     }
 
@@ -652,6 +658,32 @@ public class TypeConverter {
                 .ref(ref.asReferenceValue());
     }
 
+    public static S_AtomicFilterExit toOrgRootFilter(PrismContext prismContext, S_FilterEntryOrEmpty builder, FilterOrgRootMessage message) {
+        if (message.getIsRoot()) {
+            return builder.isRoot();
+        }
+        // TODO Need fix? This is not same behaviour with midPoint isRoot filter which returns
+        // "No organization reference defined in the search query." error.
+        return builder.undefined();
+    }
+
+    public static S_AtomicFilterExit toOrgRefFilter(PrismContext prismContext, S_FilterEntryOrEmpty builder, FilterOrgReferenceMessage message) {
+        ObjectReferenceType ref = toObjectReferenceTypeValue(prismContext, message.getValue());
+        return builder.isInScopeOf(ref.asReferenceValue(), toOrgFilterScope(message.getScope()));
+    }
+
+    public static OrgFilter.Scope toOrgFilterScope(OrgFilterScope scope) {
+        switch (scope) {
+            case ONE_LEVEL:
+                return OrgFilter.Scope.ONE_LEVEL;
+            case SUBTREE:
+                return OrgFilter.Scope.SUBTREE;
+            case ANCESTORS:
+                return OrgFilter.Scope.ANCESTORS;
+        }
+        return null;
+    }
+
     public static ItemPath toItemPath(FilterReferenceMessage message) {
         return toItemPath(message.getFullPath());
     }
@@ -664,10 +696,7 @@ public class TypeConverter {
         } else if (message.getTypeWrapperCase() == ReferenceMessage.TypeWrapperCase.OBJECT_TYPE) {
             ref.setType(toQNameValue(message.getObjectType()));
         } else {
-            StatusRuntimeException exception = Status.INVALID_ARGUMENT
-                    .withDescription("invalid_type_of_object_reference_type")
-                    .asRuntimeException();
-            throw exception;
+            // Don't set reference type
         }
 
         QName type = ref.getType();
