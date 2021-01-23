@@ -998,6 +998,13 @@ public class TypeConverter {
         object.setEmailAddress(toStringValue(message.getEmailAddress()));
         object.setTelephoneNumber(toStringValue(message.getTelephoneNumber()));
 
+        // AbstractRoleType
+        object.setDisplayName(toPolyStringTypeValue(message.getDisplayName()));
+        object.setIdentifier(toStringValue(message.getIdentifier()));
+        object.setRequestable(toBooleanValue(message.getRequestable()));
+        object.setDelegable(toBooleanValue(message.getDelegable()));
+        object.setRiskLevel(toStringValue(message.getRiskLevel()));
+
         // RoleType
         object.setRoleType(toStringValue(message.getRoleType()));
 
@@ -1029,6 +1036,13 @@ public class TypeConverter {
         object.setTimezone(toStringValue(message.getTimezone()));
         object.setEmailAddress(toStringValue(message.getEmailAddress()));
         object.setTelephoneNumber(toStringValue(message.getTelephoneNumber()));
+
+        // AbstractRoleType
+        object.setDisplayName(toPolyStringTypeValue(message.getDisplayName()));
+        object.setIdentifier(toStringValue(message.getIdentifier()));
+        object.setRequestable(toBooleanValue(message.getRequestable()));
+        object.setDelegable(toBooleanValue(message.getDelegable()));
+        object.setRiskLevel(toStringValue(message.getRiskLevel()));
 
         // OrgType
         object.createOrgTypeList().addAll(message.getOrgTypeList());
@@ -1065,6 +1079,13 @@ public class TypeConverter {
         object.setEmailAddress(toStringValue(message.getEmailAddress()));
         object.setTelephoneNumber(toStringValue(message.getTelephoneNumber()));
 
+        // AbstractRoleType
+        object.setDisplayName(toPolyStringTypeValue(message.getDisplayName()));
+        object.setIdentifier(toStringValue(message.getIdentifier()));
+        object.setRequestable(toBooleanValue(message.getRequestable()));
+        object.setDelegable(toBooleanValue(message.getDelegable()));
+        object.setRiskLevel(toStringValue(message.getRiskLevel()));
+
         // ServiceType
         object.createServiceTypeList().addAll(message.getServiceTypeList());
         object.setDisplayOrder(toIntValue(message.getDisplayOrder()));
@@ -1083,8 +1104,8 @@ public class TypeConverter {
         return displayOrder;
     }
 
-    private static Boolean toBooleanValue(boolean tenant) {
-        if (!tenant) {
+    private static Boolean toBooleanValue(boolean value) {
+        if (!value) {
             return null;
         }
         return true;
