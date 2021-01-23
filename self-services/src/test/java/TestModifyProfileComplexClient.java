@@ -31,7 +31,7 @@ public class TestModifyProfileComplexClient {
                                 .addPrismValuesToReplace(PrismValueMessage.newBuilder()
                                         .setProperty(
                                                 PrismPropertyValueMessage.newBuilder()
-                                                .setString("aiueo")
+                                                        .setString("aiueo")
                                         )
                                 )
 

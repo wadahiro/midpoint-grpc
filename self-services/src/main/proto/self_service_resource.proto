@@ -55,6 +55,41 @@ service SelfServiceResource {
     rpc getUser (GetUserRequest) returns (GetUserResponse);
 
     /**
+     * Add new org.
+     */
+    rpc addOrg (AddOrgRequest) returns (AddObjectResponse);
+
+    /**
+     * Get an org.
+     */
+    rpc getOrg (GetOrgRequest) returns (GetOrgResponse);
+
+    /**
+     * Add new role.
+     */
+    rpc addRole (AddRoleRequest) returns (AddObjectResponse);
+
+    /**
+     * Get an role.
+     */
+    rpc getRole (GetRoleRequest) returns (GetRoleResponse);
+
+    /**
+     * Add service role.
+     */
+    rpc addService (AddServiceRequest) returns (AddObjectResponse);
+
+    /**
+     * Get an service.
+     */
+    rpc getService (GetServiceRequest) returns (GetServiceResponse);
+
+    /**
+     * Get an object.
+     */
+    rpc getObject (GetObjectRequest) returns (GetObjectResponse);
+
+    /**
      * Add object.
      */
     rpc addObject (AddObjectRequest) returns (AddObjectResponse);
@@ -96,6 +131,11 @@ service SelfServiceResource {
 
     /**
      * Search objects.
+     */
+    rpc searchObjects (SearchObjectsRequest) returns (SearchObjectsResponse);
+
+    /**
+     * Search objects as stream.
      */
     rpc searchObjectsAsStream (SearchObjectsRequest) returns (stream SearchObjectsResponse);
 }
@@ -698,6 +738,85 @@ message GetUserResponse {
     UserTypeMessage result = 1;
 }
 
+message AddOrgRequest {
+    repeated string options = 1;
+    OrgTypeMessage object = 2;
+}
+
+message AddRoleRequest {
+    repeated string options = 1;
+    RoleTypeMessage object = 2;
+}
+
+message AddServiceRequest {
+    repeated string options = 1;
+    ServiceTypeMessage object = 2;
+}
+
+message GetOrgRequest {
+    oneof id_wrapper {
+        string oid = 10;
+        string name = 11;
+    }
+    repeated string options = 20;
+    repeated string include = 21;
+    repeated string exclude = 22;
+    repeated string resolve_names = 23;
+}
+
+message GetRoleRequest {
+    oneof id_wrapper {
+        string oid = 10;
+        string name = 11;
+    }
+    repeated string options = 20;
+    repeated string include = 21;
+    repeated string exclude = 22;
+    repeated string resolve_names = 23;
+}
+
+message GetServiceRequest {
+    oneof id_wrapper {
+        string oid = 10;
+        string name = 11;
+    }
+    repeated string options = 20;
+    repeated string include = 21;
+    repeated string exclude = 22;
+    repeated string resolve_names = 23;
+}
+
+message GetOrgResponse {
+    OrgTypeMessage result = 1;
+}
+
+message GetRoleResponse {
+    RoleTypeMessage result = 1;
+}
+
+message GetServiceResponse {
+    ServiceTypeMessage result = 1;
+}
+
+message GetObjectRequest {
+    oneof type_wrapper {
+        QNameMessage type = 1;
+        DefaultObjectType object_type = 2;
+    }
+    oneof id_wrapper {
+        string oid = 10;
+        string name = 11;
+    }
+    repeated string options = 20;
+    repeated string include = 21;
+    repeated string exclude = 22;
+    repeated string resolve_names = 23;
+}
+
+message GetObjectResponse {
+    ItemMessage result = 1;
+}
+
 message AddObjectRequest {
     repeated string options = 1;
     oneof type_wrapper {
@@ -798,6 +917,7 @@ message SearchObjectsRequest {
 
 message SearchObjectsResponse {
     repeated ItemMessage results = 1;
+    int32 number_of_all_results = 2;
 }
 
 message QueryMessage {

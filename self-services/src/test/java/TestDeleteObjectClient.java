@@ -6,7 +6,6 @@ import jp.openstandia.midpoint.grpc.*;
 
 import java.io.UnsupportedEncodingException;
 import java.util.Base64;
-import java.util.Iterator;
 
 public class TestDeleteObjectClient {
 

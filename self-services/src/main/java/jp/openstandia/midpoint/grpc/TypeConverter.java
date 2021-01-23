@@ -975,6 +975,121 @@ public class TypeConverter {
         return user.asPrismObject();
     }
 
+    public static PrismObject<RoleType> toPrismObject(PrismContext prismContext, RepositoryService repo, RoleTypeMessage message) throws SchemaException {
+        RoleType object = new RoleType(prismContext);
+
+        // ObjectType
+        object.setName(toPolyStringTypeValue(message.getName()));
+        object.setDescription(toStringValue(message.getDescription()));
+        object.createSubtypeList().addAll(message.getSubtypeList());
+        object.setLifecycleState(toStringValue(message.getLifecycleState()));
+
+        // AssignmentHolderType
+        object.createAssignmentList().addAll(toAssignmentTypeListValue(prismContext, message.getAssignmentList()));
+        // can't set Archetype here directly because it throws policy error always.
+
+        // FocusType
+        object.setJpegPhoto(toByteArrayValue(message.getJpegPhoto()));
+        object.setCostCenter(toStringValue(message.getCostCenter()));
+        object.setLocality((toPolyStringTypeValue(message.getLocality())));
+        object.setPreferredLanguage(toStringValue(message.getPreferredLanguage()));
+        object.setLocale(toStringValue(message.getLocale()));
+        object.setTimezone(toStringValue(message.getTimezone()));
+        object.setEmailAddress(toStringValue(message.getEmailAddress()));
+        object.setTelephoneNumber(toStringValue(message.getTelephoneNumber()));
+
+        // RoleType
+        object.setRoleType(toStringValue(message.getRoleType()));
+
+        // Extension
+        addExtensionType(prismContext, object, message.getExtensionMap());
+
+        return object.asPrismObject();
+    }
+
+    public static PrismObject<OrgType> toPrismObject(PrismContext prismContext, RepositoryService repo, OrgTypeMessage message) throws SchemaException {
+        OrgType object = new OrgType(prismContext);
+
+        // ObjectType
+        object.setName(toPolyStringTypeValue(message.getName()));
+        object.setDescription(toStringValue(message.getDescription()));
+        object.createSubtypeList().addAll(message.getSubtypeList());
+        object.setLifecycleState(toStringValue(message.getLifecycleState()));
+
+        // AssignmentHolderType
+        object.createAssignmentList().addAll(toAssignmentTypeListValue(prismContext, message.getAssignmentList()));
+        // can't set Archetype here directly because it throws policy error always.
+
+        // FocusType
+        object.setJpegPhoto(toByteArrayValue(message.getJpegPhoto()));
+        object.setCostCenter(toStringValue(message.getCostCenter()));
+        object.setLocality((toPolyStringTypeValue(message.getLocality())));
+        object.setPreferredLanguage(toStringValue(message.getPreferredLanguage()));
+        object.setLocale(toStringValue(message.getLocale()));
+        object.setTimezone(toStringValue(message.getTimezone()));
+        object.setEmailAddress(toStringValue(message.getEmailAddress()));
+        object.setTelephoneNumber(toStringValue(message.getTelephoneNumber()));
+
+        // OrgType
+        object.createOrgTypeList().addAll(message.getOrgTypeList());
+        object.setTenant(toBooleanValue(message.getTenant()));
+        object.createMailDomainList().addAll(message.getMailDomainList());
+        object.setDisplayOrder(toIntValue(message.getDisplayOrder()));
+
+        // Extension
+        addExtensionType(prismContext, object, message.getExtensionMap());
+
+        return object.asPrismObject();
+    }
+
+    public static PrismObject<ServiceType> toPrismObject(PrismContext prismContext, RepositoryService repo, ServiceTypeMessage message) throws SchemaException {
+        ServiceType object = new ServiceType(prismContext);
+
+        // ObjectType
+        object.setName(toPolyStringTypeValue(message.getName()));
+        object.setDescription(toStringValue(message.getDescription()));
+        object.createSubtypeList().addAll(message.getSubtypeList());
+        object.setLifecycleState(toStringValue(message.getLifecycleState()));
+
+        // AssignmentHolderType
+        object.createAssignmentList().addAll(toAssignmentTypeListValue(prismContext, message.getAssignmentList()));
+        // can't set Archetype here directly because it throws policy error always.
+
+        // FocusType
+        object.setJpegPhoto(toByteArrayValue(message.getJpegPhoto()));
+        object.setCostCenter(toStringValue(message.getCostCenter()));
+        object.setLocality((toPolyStringTypeValue(message.getLocality())));
+        object.setPreferredLanguage(toStringValue(message.getPreferredLanguage()));
+        object.setLocale(toStringValue(message.getLocale()));
+        object.setTimezone(toStringValue(message.getTimezone()));
+        object.setEmailAddress(toStringValue(message.getEmailAddress()));
+        object.setTelephoneNumber(toStringValue(message.getTelephoneNumber()));
+
+        // ServiceType
+        object.createServiceTypeList().addAll(message.getServiceTypeList());
+        object.setDisplayOrder(toIntValue(message.getDisplayOrder()));
+        object.setUrl(toStringValue(message.getUrl()));
+
+        // Extension
+        addExtensionType(prismContext, object, message.getExtensionMap());
+
+        return object.asPrismObject();
+    }
+
+    private static Integer toIntValue(int displayOrder) {
+        if (displayOrder == 0) {
+            return null;
+        }
+        return displayOrder;
+    }
+
+    private static Boolean toBooleanValue(boolean tenant) {
+        if (!tenant) {
+            return null;
+        }
+        return true;
+    }
+
     public static PrismObject toPrismObject(PrismContext prismContext, Class clazz,
                                             PrismContainerMessage message) throws SchemaException {
 

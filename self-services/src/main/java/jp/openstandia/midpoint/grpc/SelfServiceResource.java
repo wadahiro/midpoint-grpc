@@ -73,6 +73,12 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     public static final String OPERATION_ADD_USER = CLASS_DOT + "addUser";
     public static final String OPERATION_MODIFY_USER = CLASS_DOT + "modifyUser";
     public static final String OPERATION_GET_USER = CLASS_DOT + "getUser";
+    public static final String OPERATION_ADD_ROLE = CLASS_DOT + "addRole";
+    public static final String OPERATION_GET_ROLE = CLASS_DOT + "getRole";
+    public static final String OPERATION_ADD_ORG = CLASS_DOT + "addOrg";
+    public static final String OPERATION_GET_ORG = CLASS_DOT + "getOrg";
+    public static final String OPERATION_ADD_SERVICE = CLASS_DOT + "addService";
+    public static final String OPERATION_GET_SERVICE = CLASS_DOT + "getService";
     public static final String OPERATION_RECOMPUTE_OBJECT = CLASS_DOT + "recomputeObject";
     public static final String OPERATION_EXECUTE_USER_UPDATE = CLASS_DOT + "executeUserUpdate";
     public static final String OPERATION_EXECUTE_CREDENTIAL_CHECK = CLASS_DOT + "executeCredentialCheck";
@@ -857,14 +863,14 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         }
     }
 
-    private <T extends ObjectType> SearchResultList<PrismObject<T>> search(SearchRequest request, Class<T> clazz,
+    private <T extends ObjectType> SearchResultList<PrismObject<T>> search(QueryMessage queryMessage, Class<T> clazz,
                                                                            Collection<SelectorOptions<GetOperationOptions>> searchOptions) {
         SearchResultList<PrismObject<T>> result = runTask(ctx -> {
             Task task = ctx.task;
 
             OperationResult parentResult = task.getResult().createSubresult(OPERATION_SEARCH_OBJECTS);
 
-            ObjectQuery query = TypeConverter.toObjectQuery(prismContext, clazz, request.getQuery());
+            ObjectQuery query = TypeConverter.toObjectQuery(prismContext, clazz, queryMessage);
 
             Integer total = modelService.countObjects(clazz, query, searchOptions,
                     task, parentResult);
@@ -897,7 +903,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         Collection<SelectorOptions<GetOperationOptions>> searchOptions = GetOperationOptions.fromRestOptions(options, include,
                 exclude, resolveNames, DefinitionProcessingOption.FULL, prismContext);
 
-        SearchResultList<PrismObject<UserType>> result = search(request, UserType.class, searchOptions);
+        SearchResultList<PrismObject<UserType>> result = search(request.getQuery(), UserType.class, searchOptions);
 
         Integer total = result.getMetadata().getApproxNumberOfAllResults();
         List<UserTypeMessage> users = result.stream()
@@ -916,6 +922,225 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     }
 
     @Override
+    public void addRole(AddRoleRequest request, StreamObserver<AddObjectResponse> responseObserver) {
+        LOGGER.debug("Start addRole");
+
+        String resultOid = runTask(ctx -> {
+            Task task = ctx.task;
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_ADD_ROLE);
+            ModelExecuteOptions modelExecuteOptions = ModelExecuteOptions.fromRestOptions(request.getOptionsList());
+
+            RoleTypeMessage message = request.getObject();
+            PrismObject<RoleType> object = toPrismObject(prismContext, repositoryService, message);
+
+            // To handle error to resolve reference, call resolveReferences here.
+            try {
+                ModelImplUtils.resolveReferences(object, repositoryService, false, false, EvaluationTimeType.IMPORT, true, prismContext, parentResult);
+            } catch (SystemException e) {
+                StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                        .withDescription("invalid_reference")
+                        .asRuntimeException();
+                throw exception;
+            }
+
+            String oid = modelCrudService.addObject(object, modelExecuteOptions, task, parentResult);
+            LOGGER.debug("returned oid :  {}", oid);
+
+            parentResult.computeStatus();
+            return oid;
+        });
+
+        AddObjectResponse.Builder builder = AddObjectResponse.newBuilder();
+        // If the create process is suspended by workflow, oid is null
+        if (resultOid != null) {
+            builder.setOid(resultOid);
+        }
+        AddObjectResponse res = builder.build();
+
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End addRole");
+    }
+
+    @Override
+    public void getRole(GetRoleRequest request, StreamObserver<GetRoleResponse> responseObserver) {
+        RoleTypeMessage found = runTask(ctx -> {
+            Task task = ctx.task;
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_GET_ROLE);
+
+            String oid = resolveOid(UserType.class, request.getOid(), request.getName(), task, parentResult);
+
+            List<String> options = request.getOptionsList();
+            List<String> include = request.getIncludeList();
+            List<String> exclude = request.getExcludeList();
+            List<String> resolveNames = request.getResolveNamesList();
+
+            Collection<SelectorOptions<GetOperationOptions>> getOptions = GetOperationOptions.fromRestOptions(options, include,
+                    exclude, resolveNames, null, prismContext);
+
+            PrismObject<RoleType> object = modelCrudService.getObject(RoleType.class, oid, getOptions, task, parentResult);
+
+            parentResult.computeStatus();
+
+            return toRoleTypeMessage(object.asObjectable(), getOptions);
+        });
+
+        responseObserver.onNext(GetRoleResponse.newBuilder()
+                .setResult(found)
+                .build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void addOrg(AddOrgRequest request, StreamObserver<AddObjectResponse> responseObserver) {
+        LOGGER.debug("Start addOrg");
+
+        String resultOid = runTask(ctx -> {
+            Task task = ctx.task;
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_ADD_ORG);
+            ModelExecuteOptions modelExecuteOptions = ModelExecuteOptions.fromRestOptions(request.getOptionsList());
+
+            OrgTypeMessage message = request.getObject();
+            PrismObject<OrgType> object = toPrismObject(prismContext, repositoryService, message);
+
+            // To handle error to resolve reference, call resolveReferences here.
+            try {
+                ModelImplUtils.resolveReferences(object, repositoryService, false, false, EvaluationTimeType.IMPORT, true, prismContext, parentResult);
+            } catch (SystemException e) {
+                StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                        .withDescription("invalid_reference")
+                        .asRuntimeException();
+                throw exception;
+            }
+
+            String oid = modelCrudService.addObject(object, modelExecuteOptions, task, parentResult);
+            LOGGER.debug("returned oid :  {}", oid);
+
+            parentResult.computeStatus();
+            return oid;
+        });
+
+        AddObjectResponse.Builder builder = AddObjectResponse.newBuilder();
+        // If the create process is suspended by workflow, oid is null
+        if (resultOid != null) {
+            builder.setOid(resultOid);
+        }
+        AddObjectResponse res = builder.build();
+
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End addOrg");
+    }
+
+    @Override
+    public void getOrg(GetOrgRequest request, StreamObserver<GetOrgResponse> responseObserver) {
+        OrgTypeMessage found = runTask(ctx -> {
+            Task task = ctx.task;
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_GET_ORG);
+
+            String oid = resolveOid(UserType.class, request.getOid(), request.getName(), task, parentResult);
+
+            List<String> options = request.getOptionsList();
+            List<String> include = request.getIncludeList();
+            List<String> exclude = request.getExcludeList();
+            List<String> resolveNames = request.getResolveNamesList();
+
+            Collection<SelectorOptions<GetOperationOptions>> getOptions = GetOperationOptions.fromRestOptions(options, include,
+                    exclude, resolveNames, null, prismContext);
+
+            PrismObject<OrgType> object = modelCrudService.getObject(OrgType.class, oid, getOptions, task, parentResult);
+
+            parentResult.computeStatus();
+
+            return toOrgTypeMessage(object.asObjectable(), getOptions);
+        });
+
+        responseObserver.onNext(GetOrgResponse.newBuilder()
+                .setResult(found)
+                .build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void addService(AddServiceRequest request, StreamObserver<AddObjectResponse> responseObserver) {
+        LOGGER.debug("Start addService");
+
+        String resultOid = runTask(ctx -> {
+            Task task = ctx.task;
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_ADD_SERVICE);
+            ModelExecuteOptions modelExecuteOptions = ModelExecuteOptions.fromRestOptions(request.getOptionsList());
+
+            ServiceTypeMessage message = request.getObject();
+            PrismObject<ServiceType> object = toPrismObject(prismContext, repositoryService, message);
+
+            // To handle error to resolve reference, call resolveReferences here.
+            try {
+                ModelImplUtils.resolveReferences(object, repositoryService, false, false, EvaluationTimeType.IMPORT, true, prismContext, parentResult);
+            } catch (SystemException e) {
+                StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                        .withDescription("invalid_reference")
+                        .asRuntimeException();
+                throw exception;
+            }
+
+            String oid = modelCrudService.addObject(object, modelExecuteOptions, task, parentResult);
+            LOGGER.debug("returned oid :  {}", oid);
+
+            parentResult.computeStatus();
+            return oid;
+        });
+
+        AddObjectResponse.Builder builder = AddObjectResponse.newBuilder();
+        // If the create process is suspended by workflow, oid is null
+        if (resultOid != null) {
+            builder.setOid(resultOid);
+        }
+        AddObjectResponse res = builder.build();
+
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End addService");
+    }
+
+    @Override
+    public void getService(GetServiceRequest request, StreamObserver<GetServiceResponse> responseObserver) {
+        ServiceTypeMessage found = runTask(ctx -> {
+            Task task = ctx.task;
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_GET_SERVICE);
+
+            String oid = resolveOid(UserType.class, request.getOid(), request.getName(), task, parentResult);
+
+            List<String> options = request.getOptionsList();
+            List<String> include = request.getIncludeList();
+            List<String> exclude = request.getExcludeList();
+            List<String> resolveNames = request.getResolveNamesList();
+
+            Collection<SelectorOptions<GetOperationOptions>> getOptions = GetOperationOptions.fromRestOptions(options, include,
+                    exclude, resolveNames, null, prismContext);
+
+            PrismObject<ServiceType> object = modelCrudService.getObject(ServiceType.class, oid, getOptions, task, parentResult);
+
+            parentResult.computeStatus();
+
+            return toServiceTypeMessage(object.asObjectable(), getOptions);
+        });
+
+        responseObserver.onNext(GetServiceResponse.newBuilder()
+                .setResult(found)
+                .build());
+        responseObserver.onCompleted();
+    }
+
+    @Override
     public void searchRoles(SearchRequest request, StreamObserver<SearchRolesResponse> responseObserver) {
         LOGGER.debug("Start searchRols");
 
@@ -927,7 +1152,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         Collection<SelectorOptions<GetOperationOptions>> searchOptions = GetOperationOptions.fromRestOptions(options, include,
                 exclude, resolveNames, DefinitionProcessingOption.FULL, prismContext);
 
-        SearchResultList<PrismObject<RoleType>> result = search(request, RoleType.class, searchOptions);
+        SearchResultList<PrismObject<RoleType>> result = search(request.getQuery(), RoleType.class, searchOptions);
 
         Integer total = result.getMetadata().getApproxNumberOfAllResults();
         List<RoleTypeMessage> roles = result.stream()
@@ -957,7 +1182,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         Collection<SelectorOptions<GetOperationOptions>> searchOptions = GetOperationOptions.fromRestOptions(options, include,
                 exclude, resolveNames, DefinitionProcessingOption.FULL, prismContext);
 
-        SearchResultList<PrismObject<OrgType>> result = search(request, OrgType.class, searchOptions);
+        SearchResultList<PrismObject<OrgType>> result = search(request.getQuery(), OrgType.class, searchOptions);
 
         Integer total = result.getMetadata().getApproxNumberOfAllResults();
         List<OrgTypeMessage> orgs = result.stream()
@@ -987,7 +1212,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         Collection<SelectorOptions<GetOperationOptions>> searchOptions = GetOperationOptions.fromRestOptions(options, include,
                 exclude, resolveNames, DefinitionProcessingOption.FULL, prismContext);
 
-        SearchResultList<PrismObject<ServiceType>> result = search(request, ServiceType.class, searchOptions);
+        SearchResultList<PrismObject<ServiceType>> result = search(request.getQuery(), ServiceType.class, searchOptions);
 
         Integer total = result.getMetadata().getApproxNumberOfAllResults();
         List<ServiceTypeMessage> services = result.stream()
@@ -1003,6 +1228,56 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         responseObserver.onCompleted();
 
         LOGGER.debug("End searchServices");
+    }
+
+    @Override
+    public void searchObjects(SearchObjectsRequest request, StreamObserver<SearchObjectsResponse> responseObserver) {
+        LOGGER.debug("Start searchObjects");
+
+        List<String> options = request.getOptionsList();
+        List<String> include = request.getIncludeList();
+        List<String> exclude = request.getExcludeList();
+        List<String> resolveNames = request.getResolveNamesList();
+
+        Collection<SelectorOptions<GetOperationOptions>> searchOptions = GetOperationOptions.fromRestOptions(options, include,
+                exclude, resolveNames, DefinitionProcessingOption.FULL, prismContext);
+
+        Class<? extends ObjectType> clazz;
+        if (request.hasType()) {
+            QName qname = toQNameValue(request.getType());
+            clazz = ObjectTypes.getObjectTypeClass(qname);
+        } else {
+            QName qname = toQNameValue(request.getObjectType());
+            clazz = ObjectTypes.getObjectTypeClass(qname);
+        }
+
+        SearchResultList<? extends PrismObject<? extends ObjectType>> result = search(request.getQuery(), clazz, searchOptions);
+
+        Integer total = result.getMetadata().getApproxNumberOfAllResults();
+
+        List<ItemMessage> itemMessage = result.stream()
+                .map(x -> {
+                    try {
+                        return toItemMessage(x.getDefinition(), x);
+                    } catch (SchemaException e) {
+                        LOGGER.error("Failed to convert the object", e);
+                        StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                                .withDescription("invalid_schema")
+                                .asRuntimeException();
+                        throw exception;
+                    }
+                })
+                .collect(Collectors.toList());
+
+        SearchObjectsResponse res = SearchObjectsResponse.newBuilder()
+                .setNumberOfAllResults(total)
+                .addAllResults(itemMessage)
+                .build();
+
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End searchObjects");
     }
 
     @Override
@@ -1037,6 +1312,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                             ItemMessage itemMessage = toItemMessage(object.getDefinition(), object);
 
                             SearchObjectsResponse response = SearchObjectsResponse.newBuilder()
+                                    // Unknown all count yet
+                                    .setNumberOfAllResults(-1)
                                     .addResults(itemMessage)
                                     .build();
                             responseObserver.onNext(response);

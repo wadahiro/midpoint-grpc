@@ -70,9 +70,9 @@ public class TestSearchObjectsAsStreamClient {
                     System.out.println(x.getContainer().getValues(0)
                             .getValueMap().get("name")
                             .getProperty()
-                    .getValues(0)
-                    .getPolyString()
-                    .getOrig()));
+                            .getValues(0)
+                            .getPolyString()
+                            .getOrig()));
         }
 
         System.out.println(res);
