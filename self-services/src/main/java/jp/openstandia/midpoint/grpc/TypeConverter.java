@@ -1,6 +1,8 @@
 package jp.openstandia.midpoint.grpc;
 
 import com.evolveum.midpoint.prism.*;
+import com.evolveum.midpoint.prism.crypto.EncryptionException;
+import com.evolveum.midpoint.prism.crypto.Protector;
 import com.evolveum.midpoint.prism.impl.PrismPropertyValueImpl;
 import com.evolveum.midpoint.prism.impl.query.builder.QueryBuilder;
 import com.evolveum.midpoint.prism.path.ItemName;
@@ -22,6 +24,7 @@ import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.*;
 import com.evolveum.prism.xml.ns._public.query_3.SearchFilterType;
 import com.evolveum.prism.xml.ns._public.types_3.PolyStringType;
+import com.evolveum.prism.xml.ns._public.types_3.ProtectedStringType;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -78,6 +81,11 @@ public class TypeConverter {
         }
         if (clazz.isAssignableFrom(Long.class)) {
             return Long.parseLong(value);
+        }
+        if (clazz.isAssignableFrom(ProtectedStringType.class)) {
+            ProtectedStringType p = new ProtectedStringType();
+            p.setClearValue(value);
+            return p;
         }
         // TODO more type
 
@@ -1584,6 +1592,17 @@ public class TypeConverter {
             builder.setInteger(toIntegerMessage((Integer) value.getValue()));
         } else if (definition.getTypeClass() == long.class) {
             builder.setLong(toLongMessage((Long) value.getValue()));
+        } else if (definition.getTypeName().equals(ProtectedStringType.COMPLEX_TYPE)) {
+            Protector protector = definition.getPrismContext().getDefaultProtector();
+            ProtectedStringType p = (ProtectedStringType) value.getValue();
+            try {
+                builder.setString(protector.decryptString(p));
+            } catch (EncryptionException e) {
+                StatusRuntimeException exception = Status.INTERNAL
+                        .withDescription("invalid_schema: Can't decrypt " + definition.getItemName())
+                        .asRuntimeException();
+                throw exception;
+            }
         }
         return builder.build();
     }
@@ -1730,10 +1749,10 @@ public class TypeConverter {
     }
 
     private static PrismPropertyValue toPrismPropertyValue(PrismContext prismContext, PrismPropertyDefinition definition, PrismPropertyValueMessage property) {
-        return new PrismPropertyValueImpl(toRealValue(prismContext, property));
+        return new PrismPropertyValueImpl(toRealValue(prismContext, definition, property));
     }
 
-    private static Object toRealValue(PrismContext prismContext, PrismPropertyValueMessage message) {
+    private static Object toRealValue(PrismContext prismContext, PrismPropertyDefinition definition, PrismPropertyValueMessage message) {
         if (message.hasInteger()) {
             return toIntegerValue(message.getInteger());
         }
@@ -1745,7 +1764,16 @@ public class TypeConverter {
             return toPolyString(message.getPolyString());
         }
         // string case
-        return message.getString();
+        String s = message.getString();
+
+        // ProtectedStringType case
+        if (definition.getTypeName().equals(ProtectedStringType.COMPLEX_TYPE)) {
+            ProtectedStringType p = new ProtectedStringType();
+            p.setClearValue(s);
+            return p;
+        }
+
+        return s;
     }
 
     private static PolyString toPolyString(PolyStringMessage message) {
