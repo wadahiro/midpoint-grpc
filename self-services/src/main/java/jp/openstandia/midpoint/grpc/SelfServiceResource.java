@@ -389,6 +389,12 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             }
 
             Class itemClass = itemDef.getTypeClass();
+            if (itemClass == null) {
+                QName typeName = itemDef.getTypeName();
+                if (typeName.equals(ProtectedStringType.COMPLEX_TYPE)) {
+                    itemClass = ProtectedStringType.class;
+                }
+            }
 
             S_ValuesEntry v = i.item(path);
 
