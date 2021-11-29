@@ -30,8 +30,11 @@ public class MidPointGrpcTestRunner implements BeforeAllCallback, AfterAllCallba
     }
 
     public void setProperites() {
+        System.setProperty("xml.catalog.className", "com.evolveum.midpoint.prism.impl.schema.CatalogImpl");
         System.setProperty("file.encoding", "UTF-8");
         System.setProperty("midpoint.home", "./target/midpoint");
         System.setProperty("midpoint.logging.alt.enabled", "true");
+        System.setProperty("spring.config.additional-location", "${midpoint.home}/");
+        System.setProperty("wicket.ioc.useByteBuddy", "true");
     }
 }

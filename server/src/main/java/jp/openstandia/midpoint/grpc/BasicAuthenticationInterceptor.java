@@ -9,6 +9,7 @@ import com.evolveum.midpoint.security.api.MidPointPrincipal;
 import com.evolveum.midpoint.task.api.Task;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.FocusType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 import io.grpc.Metadata;
 import io.grpc.Status;
@@ -47,7 +48,7 @@ public class BasicAuthenticationInterceptor extends AbstractGrpcAuthenticationIn
     @Override
     protected void authorizeClient(Authentication auth, ConnectionEnvironment connEnv, Task task) {
         MidPointPrincipal p = (MidPointPrincipal) auth.getPrincipal();
-        UserType user = p.getUser();
+        FocusType user = p.getFocus();
         authenticateUser(user.asPrismObject(), connEnv, task);
         authorizeUser(auth, AuthorizationConstants.AUTZ_REST_ALL_URL, user, null, connEnv);
     }
@@ -58,7 +59,7 @@ public class BasicAuthenticationInterceptor extends AbstractGrpcAuthenticationIn
         String switchUserByName = headers.get(Constant.SwitchToPrincipalByNameMetadataKey);
 
         // Find proxy user
-        PrismObject<UserType> authorizedUser;
+        PrismObject<FocusType> authorizedUser;
         if (StringUtils.isNotBlank(switchUser)) {
             authorizedUser = findByOid(switchUser, task);
         } else if (StringUtils.isNotBlank(switchUserByName)) {
@@ -69,7 +70,7 @@ public class BasicAuthenticationInterceptor extends AbstractGrpcAuthenticationIn
         }
 
         // Authorization proxy user
-        UserType client = ((MidPointPrincipal) auth.getPrincipal()).getUser();
+        FocusType client = ((MidPointPrincipal) auth.getPrincipal()).getFocus();
         authorizeUser(auth, AuthorizationConstants.AUTZ_REST_PROXY_URL, client, authorizedUser, connEnv);
 
         return authenticateUser(authorizedUser, connEnv, task);
@@ -91,7 +92,7 @@ public class BasicAuthenticationInterceptor extends AbstractGrpcAuthenticationIn
     private UsernamePasswordAuthenticationToken authenticateUser(ConnectionEnvironment connEnv, String username, String password) {
         try {
             // login session is recorded here
-            UsernamePasswordAuthenticationToken token = passwordAuthenticationEvaluator.authenticate(connEnv, new PasswordAuthenticationContext(username, password));
+            UsernamePasswordAuthenticationToken token = passwordAuthenticationEvaluator.authenticate(connEnv, new PasswordAuthenticationContext(username, password, UserType.class));
             return token;
         } catch (AuthenticationException ex) {
             LOGGER.info("Not authenticated. user: {}, reason: {}", username, ex.getMessage());

@@ -50,13 +50,14 @@
     </distributionManagement>
 
     <properties>
-        <version.midpoint>4.0.2</version.midpoint>
-        <version.spring-boot>2.1.8.RELEASE</version.spring-boot>
-        <version.grpc-java>1.25.0</version.grpc-java>
+        <version.midpoint>4.4</version.midpoint>
+        <version.spring-boot>2.5.2</version.spring-boot>
+        <version.grpc-java>1.42.0</version.grpc-java>
         <version.protoc>3.10.0</version.protoc>
 
         <java.version>1.8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <junit.jupiter.version>5.8.1</junit.jupiter.version>
 
         <github.global.server>github</github.global.server>
     </properties>
@@ -70,30 +71,28 @@
 
     <repositories>
         <repository>
+            <id>central</id>
+            <name>Maven Central</name>
+            <url>https://repo1.maven.org/maven2</url>
+        </repository>
+        <repository>
             <id>evolveum</id>
             <name>Evolveum Public Releases</name>
-            <url>http://nexus.evolveum.com/nexus/content/groups/public</url>
+            <url>https://nexus.evolveum.com/nexus/content/groups/public</url>
         </repository>
         <repository>
             <id>evolveum-snapshots</id>
             <name>Evolveum Snapshots</name>
-            <url>http://nexus.evolveum.com/nexus/content/repositories/snapshots/</url>
+            <url>https://nexus.evolveum.com/nexus/content/repositories/snapshots/</url>
         </repository>
     </repositories>
 
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <artifactId>parent</artifactId>
-                <groupId>com.evolveum.midpoint</groupId>
-                <version>${version.midpoint}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
                 <groupId>io.github.lognet</groupId>
                 <artifactId>grpc-spring-boot-starter</artifactId>
-                <version>3.5.0</version>
+                <version>4.5.10</version>
                 <exclusions>
                     <exclusion>
                         <groupId>org.springframework.boot</groupId>
@@ -163,7 +162,19 @@
             <dependency>
                 <groupId>org.junit.jupiter</groupId>
                 <artifactId>junit-jupiter</artifactId>
-                <version>5.7.0</version>
+                <version>${junit.jupiter.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter-engine</artifactId>
+                <version>${junit.jupiter.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter-api</artifactId>
+                <version>${junit.jupiter.version}</version>
                 <scope>test</scope>
             </dependency>
         </dependencies>
