@@ -53,7 +53,7 @@
         <version.midpoint>4.4</version.midpoint>
         <version.spring-boot>2.5.2</version.spring-boot>
         <version.grpc-java>1.42.0</version.grpc-java>
-        <version.protoc>3.10.0</version.protoc>
+        <version.protoc>3.16.1</version.protoc>
 
         <java.version>1.8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
