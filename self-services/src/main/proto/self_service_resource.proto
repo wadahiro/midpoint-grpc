@@ -238,8 +238,8 @@ message UserTypeMessage {
     PolyStringMessage title = 57;
     // employee number.
     string employee_number = 58;
-    // employee type.
-    repeated string employee_type = 59;
+    // employee type. (removed in 4.4)
+    // repeated string employee_type = 59;
     // organization.
     repeated PolyStringMessage organization = 60;
     // organizational unit.
@@ -310,8 +310,8 @@ message RoleTypeMessage {
 
     // RoleType
 
-    // role type.
-    string role_type = 70;
+    // role type. (removed in 4.4)
+    // string role_type = 70;
 
     // extension. the key is "localPart" format of the QName.
     map<string, ItemMessage> extension = 100;
@@ -378,8 +378,8 @@ message OrgTypeMessage {
 
     // OrgType
 
-    // org type.
-    repeated string org_type = 70;
+    // org type. (removed in 4.4)
+    // repeated string org_type = 70;
     // Is tenant.
     bool tenant = 71;
     // mail domain.
@@ -455,8 +455,8 @@ message ServiceTypeMessage {
 
     // ServiceType
 
-    // service type.
-    repeated string service_type = 70;
+    // service type. (removed in 4.4)
+    // repeated string service_type = 70;
     // display order.
     int32 display_order = 71;
     // url

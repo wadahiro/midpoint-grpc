@@ -6,8 +6,8 @@ import com.evolveum.midpoint.task.api.Task;
 import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.web.security.MidPointApplication;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.FocusType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.NodeType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 import com.evolveum.prism.xml.ns._public.types_3.PolyStringType;
 import io.grpc.Metadata;
 import io.grpc.Status;
@@ -109,7 +109,7 @@ public class JWTAuthenticationInterceptor extends AbstractGrpcAuthenticationInte
         String switchUserByName = headers.get(Constant.SwitchToPrincipalByNameMetadataKey);
 
         // Find proxy user
-        PrismObject<UserType> authorizedUser;
+        PrismObject<FocusType> authorizedUser;
         if (StringUtils.isNotBlank(switchUser)) {
             authorizedUser = findByOid(switchUser, task);
         } else if (StringUtils.isNotBlank(switchUserByName)) {

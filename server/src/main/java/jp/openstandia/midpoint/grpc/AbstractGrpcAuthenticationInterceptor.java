@@ -18,7 +18,7 @@ import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.web.boot.GrpcServerConfiguration;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.AuthorizationType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.FocusType;
 import io.grpc.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
@@ -47,6 +47,8 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
     protected static final String INSUFFICIENT_SCOPE = "insufficient_scope"; // PERMISSION_DENIED (403)
 
     protected static final String INTERNAL_ERROR = "internal_error"; // INTERNAL (500)
+
+    private final String opNamePrefix = getClass().getName() + ".";
 
     @Autowired
     PrismContext prismContext;
@@ -116,7 +118,7 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
 
         auth = switchToUser(auth, headers, connEnv, task);
 
-        UserType user = ((MidPointPrincipal) auth.getPrincipal()).getUser();
+        FocusType user = ((MidPointPrincipal) auth.getPrincipal()).getFocus();
         task.setOwner(user.asPrismObject());
 
         // Run Privileged
@@ -124,6 +126,8 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
         if (Boolean.parseBoolean(runPrivileged)) {
             auth = runPrivileged(auth);
         }
+
+        OperationResult result = task.getResult().createSubresult("grpcService");
 
         Context ctx = Context.current()
                 .withValue(ServerConstant.ConnectionContextKey, connection)
@@ -154,12 +158,16 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
                 }
                 // TODO Check REST API implementation
 //                task.setOwner(user.asPrismObject());
-                finishRequest(task, connEnv);
+                finishRequest(task, connEnv, result);
                 super.close(status, trailers);
             }
         };
 
         return Contexts.interceptCall(ctx, serverCall, headers, next);
+    }
+
+    protected OperationResult createSubresult(Task task, String operation) {
+        return task.getResult().createSubresult(opNamePrefix + operation);
     }
 
     private Authentication runPrivileged(Authentication origAuthentication) {
@@ -199,7 +207,7 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
 
     protected abstract Authentication switchToUser(Authentication auth, Metadata headers, ConnectionEnvironment connEnv, Task task);
 
-    protected Authentication authenticateUser(PrismObject<UserType> user, ConnectionEnvironment connEnv, Task task) {
+    protected Authentication authenticateUser(PrismObject<? extends FocusType> user, ConnectionEnvironment connEnv, Task task) {
         try {
             // Don't use securityContextManager.setupPreAuthenticatedSecurityContext(user) here because
             // it sets the authentication into thread-local area.
@@ -219,7 +227,7 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
         }
     }
 
-    protected void authorizeUser(Authentication auth, String authorization, UserType user, PrismObject<UserType> proxyUser, ConnectionEnvironment connEnv) {
+    protected void authorizeUser(Authentication auth, String authorization, FocusType user, PrismObject<FocusType> proxyUser, ConnectionEnvironment connEnv) {
         Task task = taskManager.createTaskInstance(AbstractGrpcAuthenticationInterceptor.class.getName() + ".authorizeUser");
         try {
             // SeuciryEnforcer#authorize needs authentication in SecurityContext.
@@ -242,10 +250,10 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
         }
     }
 
-    protected PrismObject<UserType> findByOid(String oid, Task task) {
+    protected PrismObject<FocusType> findByOid(String oid, Task task) {
         OperationResult result = task.getResult();
         try {
-            PrismObject<UserType> user = modelService.getObject(UserType.class, oid, null, task, result);
+            PrismObject<FocusType> user = modelService.getObject(FocusType.class, oid, null, task, result);
             return user;
         } catch (SchemaException | ObjectNotFoundException | SecurityViolationException | CommunicationException | ConfigurationException | ExpressionEvaluationException e) {
             LOGGER.trace("Exception while authenticating user identified with oid: '{}' to gRPC service: {}", oid, e.getMessage(), e);
@@ -255,14 +263,14 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
         }
     }
 
-    protected PrismObject<UserType> findByUsername(String username, Task task) {
+    protected PrismObject<FocusType> findByUsername(String username, Task task) {
         OperationResult result = task.getResult();
         try {
             PolyString usernamePoly = new PolyString(username);
             ObjectQuery query = ObjectQueryUtil.createNormNameQuery(usernamePoly, prismContext);
             LOGGER.trace("Looking for user, query:\n" + query.debugDump());
 
-            List<PrismObject<UserType>> list = GrpcServerConfiguration.getApplication().getRepositoryService().searchObjects(UserType.class, query, null, result);
+            List<PrismObject<FocusType>> list = GrpcServerConfiguration.getApplication().getRepositoryService().searchObjects(FocusType.class, query, null, result);
             LOGGER.trace("Users found: {}.", list.size());
             if (list.size() != 1) {
                 throw Status.UNAUTHENTICATED
@@ -311,19 +319,19 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
     }
 
     protected Authentication authenticateSwitchUser(String oid, ConnectionEnvironment connEnv, Task task) {
-        PrismObject<UserType> user = findByOid(oid, task);
+        PrismObject<FocusType> user = findByOid(oid, task);
         return authenticateUser(user, connEnv, task);
     }
 
     protected Authentication authenticateSwitchUserByName(String username, ConnectionEnvironment connEnv, Task task) {
-        PrismObject<UserType> user = findByUsername(username, task);
+        PrismObject<FocusType> user = findByUsername(username, task);
         return authenticateUser(user, connEnv, task);
     }
 
 
-    protected void finishRequest(Task task, ConnectionEnvironment connEnv) {
+    protected void finishRequest(Task task, ConnectionEnvironment connEnv, OperationResult result) {
         task.getResult().computeStatus();
         connEnv.setSessionIdOverride(task.getTaskIdentifier());
-        GrpcServerConfiguration.getSecurityHelper().auditLogout(connEnv, task);
+        GrpcServerConfiguration.getSecurityHelper().auditLogout(connEnv, task, result);
     }
 }

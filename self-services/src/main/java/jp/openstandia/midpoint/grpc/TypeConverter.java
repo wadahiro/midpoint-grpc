@@ -1014,7 +1014,7 @@ public class TypeConverter {
         object.setRiskLevel(toStringValue(message.getRiskLevel()));
 
         // RoleType
-        object.setRoleType(toStringValue(message.getRoleType()));
+//        object.setRoleType(toStringValue(message.getRoleType()));
 
         // Extension
         addExtensionType(prismContext, object, message.getExtensionMap());
@@ -1053,7 +1053,7 @@ public class TypeConverter {
         object.setRiskLevel(toStringValue(message.getRiskLevel()));
 
         // OrgType
-        object.createOrgTypeList().addAll(message.getOrgTypeList());
+//        object.createOrgTypeList().addAll(message.getOrgTypeList());
         object.setTenant(toBooleanValue(message.getTenant()));
         object.createMailDomainList().addAll(message.getMailDomainList());
         object.setDisplayOrder(toIntValue(message.getDisplayOrder()));
@@ -1095,7 +1095,7 @@ public class TypeConverter {
         object.setRiskLevel(toStringValue(message.getRiskLevel()));
 
         // ServiceType
-        object.createServiceTypeList().addAll(message.getServiceTypeList());
+//        object.createServiceTypeList().addAll(message.getServiceTypeList());
         object.setDisplayOrder(toIntValue(message.getDisplayOrder()));
         object.setUrl(toStringValue(message.getUrl()));
 
@@ -1264,7 +1264,6 @@ public class TypeConverter {
                 .nullSafeWithRetrieve(RoleType.F_DELEGABLE, u.isDelegable(), (b, v) -> b.setDelegable(v))
                 .nullSafeWithRetrieve(RoleType.F_RISK_LEVEL, u.getRiskLevel(), (b, v) -> b.setRiskLevel(v))
                 // RoleType
-                .nullSafeWithRetrieve(RoleType.F_ROLE_TYPE, u.getRoleType(), (b, v) -> b.setRoleType(v))
                 // Extension
                 .nullSafeWithRetrieve(RoleType.F_EXTENSION, u.getExtension(),
                         (v, ops, hasInclude) -> toItemMessageMap(v, ops, hasInclude),
@@ -1323,7 +1322,6 @@ public class TypeConverter {
                 .nullSafeWithRetrieve(OrgType.F_DELEGABLE, u.isDelegable(), (b, v) -> b.setDelegable(v))
                 .nullSafeWithRetrieve(OrgType.F_RISK_LEVEL, u.getRiskLevel(), (b, v) -> b.setRiskLevel(v))
                 // OrgType
-                .nullSafeWithRetrieve(OrgType.F_ORG_TYPE, u.getOrgType(), (b, v) -> b.addAllOrgType(v))
                 .nullSafeWithRetrieve(OrgType.F_TENANT, u.isTenant(), (b, v) -> b.setTenant(v))
                 .nullSafeWithRetrieve(OrgType.F_MAIL_DOMAIN, u.getMailDomain(), (b, v) -> b.addAllMailDomain(v))
                 .nullSafeWithRetrieve(OrgType.F_DISPLAY_ORDER, u.getDisplayOrder(), (b, v) -> b.setDisplayOrder(v))
@@ -1385,7 +1383,6 @@ public class TypeConverter {
                 .nullSafeWithRetrieve(ServiceType.F_DELEGABLE, u.isDelegable(), (b, v) -> b.setDelegable(v))
                 .nullSafeWithRetrieve(ServiceType.F_RISK_LEVEL, u.getRiskLevel(), (b, v) -> b.setRiskLevel(v))
                 // ServiceType
-                .nullSafeWithRetrieve(ServiceType.F_SERVICE_TYPE, u.getServiceType(), (b, v) -> b.addAllServiceType(v))
                 .nullSafeWithRetrieve(ServiceType.F_DISPLAY_ORDER, u.getDisplayOrder(), (b, v) -> b.setDisplayOrder(v))
                 .nullSafeWithRetrieve(ServiceType.F_URL, u.getUrl(), (b, v) -> b.setUrl(v))
                 // Extension
@@ -1516,7 +1513,7 @@ public class TypeConverter {
         ItemDefinition definition = item.getDefinition();
         if (definition instanceof PrismPropertyDefinition) {
             return PrismValueMessage.newBuilder()
-                    .setProperty(toPrismPropertyValueMessage((PrismPropertyDefinition) definition, ((PrismProperty) item).getValue()))
+                    .setProperty(toPrismPropertyValueMessage((PrismPropertyDefinition) definition, ((PrismProperty) item).getValue(Object.class)))
                     .build();
 
         } else if (definition instanceof PrismContainerDefinition) {

@@ -291,7 +291,7 @@ class SelfServiceResourceITest {
         AddRoleRequest request = AddRoleRequest.newBuilder()
                 .setObject(RoleTypeMessage.newBuilder()
                         .setName(PolyStringMessage.newBuilder().setOrig("role001"))
-                        .setRoleType("testRole")
+                        .addSubtype("testRole")
                 )
                 .build();
 
@@ -307,19 +307,19 @@ class SelfServiceResourceITest {
         GetRoleResponse res2 = stub.getRole(req2);
 
         assertEquals("role001", res2.getResult().getName().getOrig());
-        assertEquals("testRole", res2.getResult().getRoleType());
+        assertEquals("testRole", res2.getResult().getSubtype(0));
 
         // Search
         SearchRolesResponse res3 = stub.searchRoles(SearchRequest.newBuilder()
                 .setQuery(QueryMessage.newBuilder()
                         .setFilter(ObjectFilterMessage.newBuilder()
                                 .setEq(FilterEntryMessage.newBuilder()
-                                        .setFullPath("roleType")
+                                        .setFullPath("subtype")
                                         .setValue("testRole"))))
                 .build());
 
         assertEquals(1, res3.getNumberOfAllResults());
-        assertEquals("testRole", res3.getResults(0).getRoleType());
+        assertEquals("testRole", res3.getResults(0).getSubtype(0));
 
         // Delete
         DeleteObjectResponse res4 = stub.deleteObject(DeleteObjectRequest.newBuilder()
@@ -345,7 +345,7 @@ class SelfServiceResourceITest {
         AddOrgRequest request = AddOrgRequest.newBuilder()
                 .setObject(OrgTypeMessage.newBuilder()
                         .setName(PolyStringMessage.newBuilder().setOrig("org001"))
-                        .addOrgType("testOrg")
+                        .addSubtype("testOrg")
                         .setDisplayOrder(1)
                 )
                 .build();
@@ -369,7 +369,7 @@ class SelfServiceResourceITest {
                 .setQuery(QueryMessage.newBuilder()
                         .setFilter(ObjectFilterMessage.newBuilder()
                                 .setEq(FilterEntryMessage.newBuilder()
-                                        .setFullPath("orgType")
+                                        .setFullPath("subtype")
                                         .setValue("testOrg"))))
                 .build());
 
@@ -400,7 +400,7 @@ class SelfServiceResourceITest {
         AddServiceRequest request = AddServiceRequest.newBuilder()
                 .setObject(ServiceTypeMessage.newBuilder()
                         .setName(PolyStringMessage.newBuilder().setOrig("service001"))
-                        .addServiceType("testService")
+                        .addSubtype("testService")
                         .setUrl("https://example.com")
                 )
                 .build();
@@ -424,7 +424,7 @@ class SelfServiceResourceITest {
                 .setQuery(QueryMessage.newBuilder()
                         .setFilter(ObjectFilterMessage.newBuilder()
                                 .setEq(FilterEntryMessage.newBuilder()
-                                        .setFullPath("serviceType")
+                                        .setFullPath("subtype")
                                         .setValue("testService"))))
                 .build());
 
