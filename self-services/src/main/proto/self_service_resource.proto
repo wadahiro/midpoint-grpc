@@ -138,6 +138,11 @@ service SelfServiceResource {
      * Search objects as stream.
      */
     rpc searchObjectsAsStream (SearchObjectsRequest) returns (stream SearchObjectsResponse);
+
+    /**
+     * Search assignments.
+     */
+    rpc searchAssignments (SearchAssignmentsRequest) returns (SearchObjectsResponse);
 }
 
 message GetSelfRequest {
@@ -551,6 +556,14 @@ message PrismValueMessage {
     }
 }
 
+message PrismObjectMessage {
+    string oid = 1;
+    QNameMessage itemName = 2;
+    QNameMessage typeName = 3;
+    // the key is "localPart" format of the QName.
+    map<string, ItemMessage> value = 10;
+}
+
 message PrismContainerValueMessage {
     int64 id = 1;
     // the key is "localPart" format of the QName.
@@ -567,7 +580,6 @@ message PrismPropertyValueMessage {
 }
 
 message ItemMessage {
-    string namespace_URI = 1;
     bool multiple = 2;
     oneof value_wrapper {
         PrismContainerMessage container = 3;
@@ -575,6 +587,8 @@ message ItemMessage {
         // TODO: Rename to PrismReferenceValueMessage
         PrismReferenceMessage ref = 5;
     }
+    QNameMessage itemName = 10;
+    QNameMessage typeName = 11;
 }
 
 message PrismContainerMessage {
@@ -916,8 +930,17 @@ message SearchObjectsRequest {
 }
 
 message SearchObjectsResponse {
-    repeated ItemMessage results = 1;
+    repeated PrismObjectMessage results = 1;
     int32 number_of_all_results = 2;
+}
+
+message SearchAssignmentsRequest {
+    oneof id_wrapper {
+        string oid = 1;
+        string name = 2;
+    }
+    SearchObjectsRequest search = 3;
+    bool include_indirect = 4;
 }
 
 message QueryMessage {
@@ -961,6 +984,9 @@ message ObjectFilterMessage {
         FilterEntryMessage contains_poly_string = 12;
         FilterEntryMessage ends_with_poly_string = 13;
 
+        // inOid
+        FilterInOidMessage in_oid = 15;
+
         // Reference
         FilterReferenceMessage ref = 20;
 
@@ -986,6 +1012,10 @@ message FilterEntryMessage {
     string full_path = 1;
     QNameMessage matching_rule = 2;
     string value = 3;
+}
+
+message FilterInOidMessage {
+    repeated string value = 1;
 }
 
 message FilterReferenceMessage {

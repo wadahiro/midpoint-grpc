@@ -26,6 +26,7 @@ public class TestSearchObjectsClient {
 
         SearchObjectsRequest req = SearchObjectsRequest.newBuilder()
                 .setObjectType(DefaultObjectType.OBJECT_TYPE)
+                .addInclude("activation/effectiveStatus")
                 .setQuery(
                         QueryMessage.newBuilder()
                                 .setFilter(ObjectFilterMessage.newBuilder()
@@ -41,17 +42,8 @@ public class TestSearchObjectsClient {
                 )
                 .build();
 
-        Iterator<SearchObjectsResponse> res = stub.searchObjectsAsStream(req);
+        SearchObjectsResponse res = stub.searchObjects(req);
 
-        while (res.hasNext()) {
-            SearchObjectsResponse next = res.next();
-            next.getResultsList().stream().forEach(x ->
-                    System.out.println(x.getContainer().getValues(0)
-                            .getValueMap().get("name")
-                            .getProperty()
-                            .getValues(0)
-                            .getPolyString()
-                            .getOrig()));
-        }
+        System.out.println(res);
     }
 }

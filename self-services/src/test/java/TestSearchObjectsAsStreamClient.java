@@ -67,12 +67,8 @@ public class TestSearchObjectsAsStreamClient {
         while (res.hasNext()) {
             SearchObjectsResponse next = res.next();
             next.getResultsList().stream().forEach(x ->
-                    System.out.println(x.getContainer().getValues(0)
-                            .getValueMap().get("name")
-                            .getProperty()
-                            .getValues(0)
-                            .getPolyString()
-                            .getOrig()));
+                    System.out.println(x)
+            );
         }
 
         System.out.println(res);
