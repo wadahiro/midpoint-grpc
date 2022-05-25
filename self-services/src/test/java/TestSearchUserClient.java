@@ -24,7 +24,7 @@ public class TestSearchUserClient {
         stub = MetadataUtils.attachHeaders(stub, headers);
 
         SearchRequest req = SearchRequest.newBuilder()
-                .addInclude("roleMembershipRef")
+//                .addInclude("activation")
                 .setQuery(
                         QueryMessage.newBuilder()
                                 .setFilter(

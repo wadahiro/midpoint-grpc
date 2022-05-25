@@ -84,6 +84,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     public static final String OPERATION_EXECUTE_CREDENTIAL_UPDATE = CLASS_DOT + "executeCredentialUpdate";
     public static final String OPERATION_REQUEST_ASSIGNMENTS = CLASS_DOT + "requestAssignments";
     public static final String OPERATION_SEARCH_OBJECTS = CLASS_DOT + "searchObjects";
+    public static final String OPERATION_SEARCH_ASSIGNMENTS = CLASS_DOT + "searchAssignments";
     public static final String OPERATION_ADD_OBJECT = CLASS_DOT + "addObject";
     public static final String OPERATION_MODIFY_OBJECT = CLASS_DOT + "modifyObject";
     public static final String OPERATION_EXECUTE_OBJECT_UPDATE = CLASS_DOT + "executeObjectUpdate";
@@ -1253,12 +1254,14 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
         SearchResultList<? extends PrismObject<? extends ObjectType>> result = search(request.getQuery(), clazz, searchOptions);
 
-        Integer total = result.getMetadata().getApproxNumberOfAllResults();
+        // Convert to ItemMessages
+        final boolean hasInclude = hasIncludeInSearchOptions(searchOptions);
+        final Collection<SelectorOptions<GetOperationOptions>> finalSearchOptions = searchOptions;
 
-        List<ItemMessage> itemMessage = result.stream()
+        List<PrismObjectMessage> itemMessage = result.stream()
                 .map(x -> {
                     try {
-                        return toItemMessage(x.getDefinition(), x);
+                        return toPrismObjectMessage(x.getDefinition(), x, finalSearchOptions, hasInclude);
                     } catch (SchemaException e) {
                         LOGGER.error("Failed to convert the object", e);
                         StatusRuntimeException exception = Status.INVALID_ARGUMENT
@@ -1269,6 +1272,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 })
                 .collect(Collectors.toList());
 
+        // Write Response
+        Integer total = result.getMetadata().getApproxNumberOfAllResults();
         SearchObjectsResponse res = SearchObjectsResponse.newBuilder()
                 .setNumberOfAllResults(total)
                 .addAllResults(itemMessage)
@@ -1309,12 +1314,12 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             SearchResultMetadata metadata = modelService.searchObjectsIterative(clazz, query,
                     (object, pr) -> {
                         try {
-                            ItemMessage itemMessage = toItemMessage(object.getDefinition(), object);
+                            PrismObjectMessage prismObjectMessage = toPrismObjectMessage(object.getDefinition(), object);
 
                             SearchObjectsResponse response = SearchObjectsResponse.newBuilder()
                                     // Unknown all count yet
                                     .setNumberOfAllResults(-1)
-                                    .addResults(itemMessage)
+                                    .addResults(prismObjectMessage)
                                     .build();
                             responseObserver.onNext(response);
 
@@ -1332,6 +1337,133 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         });
 
         responseObserver.onCompleted();
+    }
+
+    @Override
+    public void searchAssignments(SearchAssignmentsRequest request, StreamObserver<SearchObjectsResponse> responseObserver) {
+        LOGGER.debug("Start searchAssignments");
+
+        runTask(ctx -> {
+            Task task = ctx.task;
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_SEARCH_ASSIGNMENTS);
+
+            String oid = resolveOid(AssignmentHolderType.class, request.getOid(), request.getName(), task, parentResult);
+
+            PrismObject<AssignmentHolderType> object = modelCrudService.getObject(AssignmentHolderType.class, oid, null, task, parentResult);
+            AssignmentHolderType objectType = object.asObjectable();
+
+            Set<String> directOids = objectType.getAssignment().stream()
+                    .map(x -> x.getTargetRef().getOid())
+                    .collect(Collectors.toSet());
+
+            Set<String> indirectOids = Collections.emptySet();
+            if (request.getIncludeIndirect()) {
+                indirectOids = objectType.getRoleMembershipRef().stream()
+                        .map(x -> x.getOid())
+                        .collect(Collectors.toSet());
+            }
+
+            Set<String> oids = new HashSet<>();
+            oids.addAll(directOids);
+            oids.addAll(indirectOids);
+
+            ObjectFilterMessage oidFilter = ObjectFilterMessage.newBuilder()
+                    .setInOid(FilterInOidMessage.newBuilder().addAllValue(oids)).build();
+
+            QueryMessage queryMessage = QueryMessage.newBuilder()
+                    .setFilter(ObjectFilterMessage.newBuilder()
+                            .setInOid(FilterInOidMessage.newBuilder()
+                                    .addAllValue(oids)))
+                    .build();
+            Class<? extends ObjectType> clazz = null;
+            Collection<SelectorOptions<GetOperationOptions>> searchOptions = null;
+
+            SearchObjectsRequest search = request.getSearch();
+            if (request.hasSearch()) {
+                List<String> options = search.getOptionsList();
+                List<String> include = search.getIncludeList();
+                List<String> exclude = search.getExcludeList();
+                List<String> resolveNames = search.getResolveNamesList();
+
+                searchOptions = GetOperationOptions.fromRestOptions(options, include,
+                        exclude, resolveNames, DefinitionProcessingOption.FULL, prismContext);
+
+                if (search.hasType()) {
+                    QName qname = toQNameValue(search.getType());
+                    clazz = ObjectTypes.getObjectTypeClass(qname);
+                } else {
+                    QName qname = toQNameValue(search.getObjectType());
+                    clazz = ObjectTypes.getObjectTypeClass(qname);
+                }
+
+                if (search.hasQuery()) {
+                    ObjectFilterMessage.Builder filter = ObjectFilterMessage.newBuilder()
+                            .setAnd(AndFilterMessage.newBuilder()
+                                    .addConditions(oidFilter)
+                                    .addConditions(search.getQuery().getFilter())
+                            );
+                    queryMessage = search.getQuery().toBuilder().setFilter(filter).build();
+                }
+            }
+
+            if (queryMessage == null) {
+                // No filter case
+                queryMessage = QueryMessage.newBuilder()
+                        .setFilter(oidFilter)
+                        .build();
+            }
+
+            // TODO sort by something?
+
+            // Search
+            SearchResultList<? extends PrismObject<? extends ObjectType>> result = search(queryMessage, clazz, searchOptions);
+
+            // Convert to ItemMessages
+            final boolean hasInclude = hasIncludeInSearchOptions(searchOptions);
+            final Collection<SelectorOptions<GetOperationOptions>> finalSearchOptions = searchOptions;
+
+            List<PrismObjectMessage> itemMessage = result.stream()
+                    .map(x -> {
+                        try {
+                            return toPrismObjectMessage(x.getDefinition(), x, finalSearchOptions, hasInclude);
+                        } catch (SchemaException e) {
+                            LOGGER.error("Failed to convert the object", e);
+                            StatusRuntimeException exception = Status.INVALID_ARGUMENT
+                                    .withDescription("invalid_schema")
+                                    .asRuntimeException();
+                            throw exception;
+                        }
+                    })
+                    .collect(Collectors.toList());
+
+            // Write response
+            Integer total = result.getMetadata().getApproxNumberOfAllResults();
+            SearchObjectsResponse res = SearchObjectsResponse.newBuilder()
+                    .setNumberOfAllResults(total)
+                    .addAllResults(itemMessage)
+                    .build();
+
+            responseObserver.onNext(res);
+            responseObserver.onCompleted();
+
+            return null;
+        });
+
+        LOGGER.debug("End searchAssignments");
+    }
+
+    private boolean hasIncludeInSearchOptions(Collection<SelectorOptions<GetOperationOptions>> searchOptions) {
+        if (searchOptions != null) {
+            Optional<RetrieveOption> include = searchOptions.stream()
+                    .map(o -> o.getOptions().getRetrieve())
+                    .filter(r -> r == RetrieveOption.INCLUDE)
+                    .findFirst();
+            if (include.isPresent()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
