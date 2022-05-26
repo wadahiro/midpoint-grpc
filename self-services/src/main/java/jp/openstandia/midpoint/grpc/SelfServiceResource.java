@@ -162,10 +162,6 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         LOGGER.debug("End getSelf");
     }
 
-    private class A {
-
-    }
-
     /**
      * Getting self assignments API.
      *
@@ -174,7 +170,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
      */
     @Override
     public void getSelfAssignment(GetSelfAssignmentRequest request, StreamObserver<GetSelfAssignmentResponse> responseObserver) {
-        LOGGER.debug("Start getSelf");
+        LOGGER.debug("Start getSelfAssignment");
 
         List<AssignmentMessage> assignments = runTask(ctx -> {
             Task task = ctx.task;
@@ -814,6 +810,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     }
 
     protected void updateCredential(MidPointTaskContext ctx, String oldCred, String newCred, boolean validate) throws SchemaException, SecurityViolationException, CommunicationException, ConfigurationException, ExpressionEvaluationException, ObjectNotFoundException, EncryptionException, PolicyViolationException, ObjectAlreadyExistsException {
+        LOGGER.debug("Start updateCredential");
+
         Task task = ctx.task;
         UserType user = ctx.principal.getUser();
 
@@ -868,6 +866,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         } finally {
             updateResult.computeStatusIfUnknown();
         }
+
+        LOGGER.debug("End updateCredential");
     }
 
     private <T extends ObjectType> SearchResultList<PrismObject<T>> search(QueryMessage queryMessage, Class<T> clazz,
@@ -973,6 +973,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
     @Override
     public void getRole(GetRoleRequest request, StreamObserver<GetRoleResponse> responseObserver) {
+        LOGGER.debug("Start getRole");
+
         RoleTypeMessage found = runTask(ctx -> {
             Task task = ctx.task;
 
@@ -999,6 +1001,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 .setResult(found)
                 .build());
         responseObserver.onCompleted();
+
+        LOGGER.debug("End getRole");
     }
 
     @Override
@@ -1046,6 +1050,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
     @Override
     public void getOrg(GetOrgRequest request, StreamObserver<GetOrgResponse> responseObserver) {
+        LOGGER.debug("Start getOrg");
+
         OrgTypeMessage found = runTask(ctx -> {
             Task task = ctx.task;
 
@@ -1072,6 +1078,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 .setResult(found)
                 .build());
         responseObserver.onCompleted();
+
+        LOGGER.debug("End getOrg");
     }
 
     @Override
@@ -1119,6 +1127,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
     @Override
     public void getService(GetServiceRequest request, StreamObserver<GetServiceResponse> responseObserver) {
+        LOGGER.debug("Start getService");
+
         ServiceTypeMessage found = runTask(ctx -> {
             Task task = ctx.task;
 
@@ -1145,6 +1155,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 .setResult(found)
                 .build());
         responseObserver.onCompleted();
+
+        LOGGER.debug("End getService");
     }
 
     @Override
@@ -1293,6 +1305,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
     @Override
     public void searchObjectsAsStream(SearchObjectsRequest request, StreamObserver<SearchObjectsResponse> responseObserver) {
+        LOGGER.debug("Start searchObjectsAsStream");
+
         runTask(ctx -> {
             Task task = ctx.task;
 
@@ -1343,6 +1357,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         });
 
         responseObserver.onCompleted();
+
+        LOGGER.debug("End searchObjectsAsStream");
     }
 
     @Override
@@ -1474,6 +1490,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
     @Override
     public void getUser(GetUserRequest request, StreamObserver<GetUserResponse> responseObserver) {
+        LOGGER.debug("Start getUser");
+
         UserTypeMessage foundUser = runTask(ctx -> {
             Task task = ctx.task;
 
@@ -1500,6 +1518,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 .setResult(foundUser)
                 .build());
         responseObserver.onCompleted();
+
+        LOGGER.debug("End getUser");
     }
 
     private Collection<SelectorOptions<GetOperationOptions>> getDefaultGetOptionCollection() {
@@ -1593,6 +1613,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
     @Override
     public void deleteObject(DeleteObjectRequest request, StreamObserver<DeleteObjectResponse> responseObserver) {
+        LOGGER.debug("Start deleteObject");
+
         runTask(ctx -> {
             Task task = ctx.task;
 
@@ -1639,10 +1661,14 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
         responseObserver.onNext(DeleteObjectResponse.newBuilder().build());
         responseObserver.onCompleted();
+
+        LOGGER.debug("End deleteObject");
     }
 
     @Override
     public void recomputeObject(RecomputeObjectRequest request, StreamObserver<RecomputeObjectResponse> responseObserver) {
+        LOGGER.debug("Start recomputeObject");
+
         runTask(ctx -> {
             Task task = ctx.task;
 
@@ -1677,6 +1703,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
         responseObserver.onNext(RecomputeObjectResponse.newBuilder().build());
         responseObserver.onCompleted();
+
+        LOGGER.debug("End recomputeObject");
     }
 
     private String resolveOid(Class<? extends ObjectType> clazz, String oid, String name, Task task, OperationResult result) throws SecurityViolationException, ObjectNotFoundException,
