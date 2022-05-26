@@ -142,7 +142,7 @@ service SelfServiceResource {
     /**
      * Search assignments.
      */
-    rpc searchAssignments (SearchAssignmentsRequest) returns (SearchObjectsResponse);
+    rpc searchAssignments (SearchAssignmentsRequest) returns (SearchAssignmentsResponse);
 }
 
 message GetSelfRequest {
@@ -474,6 +474,8 @@ message ServiceTypeMessage {
 message GetSelfAssignmentRequest {
     bool include_org_ref_detail = 1;
     bool include_indirect = 2;
+    bool resolve_ref_names = 3;
+    QueryMessage query = 10;
 }
 
 message GetSelfAssignmentResponse {
@@ -939,8 +941,14 @@ message SearchAssignmentsRequest {
         string oid = 1;
         string name = 2;
     }
-    SearchObjectsRequest search = 3;
+    bool include_org_ref_detail = 3;
     bool include_indirect = 4;
+    bool resolve_ref_names = 5;
+    QueryMessage query = 10;
+}
+
+message SearchAssignmentsResponse {
+    repeated AssignmentMessage assignment = 1;
 }
 
 message QueryMessage {
