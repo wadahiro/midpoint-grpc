@@ -173,137 +173,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
             OperationResult parentResult = task.getResult().createSubresult(OPERATION_SELF_ASSIGNMENT);
 
-            PrismObject<UserType> user = modelCrudService.getObject(UserType.class, loggedInUser, null, task, parentResult);
-            UserType userType = user.asObjectable();
-
-            Set<String> directOids = userType.getAssignment().stream()
-                    .map(x -> x.getTargetRef().getOid())
-                    .collect(Collectors.toSet());
-
-            Set<String> orgRefOids = Collections.emptySet();
-            if (request.getIncludeOrgRefDetail()) {
-                orgRefOids = userType.getAssignment().stream()
-                        .filter(x -> x.getOrgRef() != null)
-                        .map(x -> x.getOrgRef().getOid())
-                        .collect(Collectors.toSet());
-            }
-
-            Set<String> indirectOids = Collections.emptySet();
-            if (request.getIncludeIndirect()) {
-                indirectOids = userType.getRoleMembershipRef().stream()
-                        .map(x -> x.getOid())
-                        .collect(Collectors.toSet());
-            }
-
-            // For caching detail of the target objects
-            Set<String> oids = new HashSet<>();
-            oids.addAll(directOids);
-            oids.addAll(orgRefOids);
-            oids.addAll(indirectOids);
-
-            ObjectQuery query = prismContext.queryFor(AbstractRoleType.class)
-                    .id(oids.toArray(new String[0]))
-                    .build();
-            Collection<SelectorOptions<GetOperationOptions>> options = SelectorOptions.createCollection(
-                    GetOperationOptions.createExecutionPhase().resolveNames(true));
-
-            // key: oid, value: Org/Role/Archetype etc.
-            Map<String, AbstractRoleType> cache = modelService.searchObjects(AbstractRoleType.class, query, options, task, parentResult)
-                    .stream()
-                    .collect(Collectors.toMap(a -> a.getOid(), a -> a.asObjectable()));
-
-            Set<String> directAssignment = new HashSet<>();
-
-            List<AssignmentMessage> assignmentMessages = userType.getAssignment().stream()
-                    // The user might not have permission to get the target. So filter them.
-                    .filter(x -> cache.containsKey(x.getTargetRef().getOid()))
-                    .map(x -> {
-                        AbstractRoleType o = cache.get(x.getTargetRef().getOid());
-
-                        ObjectReferenceType orgRef = x.getOrgRef();
-                        AbstractRoleType resolvedOrgRef = null;
-                        if (orgRef != null) {
-                            resolvedOrgRef = cache.get(orgRef.getOid());
-                        }
-
-                        QName type = x.getTargetRef().getType();
-                        QName relation = x.getTargetRef().getRelation();
-
-                        if (request.getIncludeIndirect()) {
-                            directAssignment.add(x.getTargetRef().getOid() + "#" + relation.toString());
-                        }
-                        return BuilderWrapper.wrap(AssignmentMessage.newBuilder())
-                                .nullSafe(toReferenceMessage(orgRef, resolvedOrgRef), (b, v) -> b.setOrgRef(v))
-                                .nullSafe(x.getSubtype(), (b, v) -> b.addAllSubtype(v))
-                                .unwrap()
-                                .setTargetRef(
-                                        BuilderWrapper.wrap(ReferenceMessage.newBuilder())
-                                                .nullSafe(o.getOid(), (b, v) -> b.setOid(v))
-                                                .nullSafe(toPolyStringMessage(o.getName()), (b, v) -> b.setName(v))
-                                                .nullSafe(toStringMessage(o.getDescription()), (b, v) -> b.setDescription(v))
-                                                .nullSafe(toPolyStringMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
-                                                .nullSafe(toReferenceMessageList(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
-                                                .nullSafe(o.getSubtype(), (b, v) -> b.addAllSubtype(v))
-                                                .unwrap()
-                                                .setType(
-                                                        QNameMessage.newBuilder()
-                                                                .setNamespaceURI(type.getNamespaceURI())
-                                                                .setLocalPart(type.getLocalPart())
-                                                                .setPrefix(type.getPrefix())
-                                                )
-                                                .setRelation(
-                                                        QNameMessage.newBuilder()
-                                                                .setNamespaceURI(relation.getNamespaceURI())
-                                                                .setLocalPart(relation.getLocalPart())
-                                                                .setPrefix(relation.getPrefix())
-                                                )
-                                                .build()
-                                ).build();
-                    })
-                    .collect(Collectors.toList());
-
-            if (request.getIncludeIndirect()) {
-                List<AssignmentMessage> indirect = userType.getRoleMembershipRef().stream()
-                        .filter(x -> cache.containsKey(x.getOid()))
-                        .filter(x -> !directAssignment.contains(x.getOid() + "#" + x.getRelation().toString()))
-                        .map(x -> {
-                            AbstractRoleType o = cache.get(x.getOid());
-                            QName type = x.getType();
-                            QName relation = x.getRelation();
-
-                            return BuilderWrapper.wrap(AssignmentMessage.newBuilder())
-                                    .unwrap()
-                                    .setIndirect(true)
-                                    .setTargetRef(
-                                            BuilderWrapper.wrap(ReferenceMessage.newBuilder())
-                                                    .nullSafe(o.getOid(), (b, v) -> b.setOid(v))
-                                                    .nullSafe(toPolyStringMessage(o.getName()), (b, v) -> b.setName(v))
-                                                    .nullSafe(toStringMessage(o.getDescription()), (b, v) -> b.setDescription(v))
-                                                    .nullSafe(toPolyStringMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
-                                                    .nullSafe(toReferenceMessageList(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
-                                                    .nullSafe(o.getSubtype(), (b, v) -> b.addAllSubtype(v))
-                                                    .unwrap()
-                                                    .setType(
-                                                            QNameMessage.newBuilder()
-                                                                    .setNamespaceURI(type.getNamespaceURI())
-                                                                    .setLocalPart(type.getLocalPart())
-                                                                    .setPrefix(type.getPrefix())
-                                                    )
-                                                    .setRelation(
-                                                            QNameMessage.newBuilder()
-                                                                    .setNamespaceURI(relation.getNamespaceURI())
-                                                                    .setLocalPart(relation.getLocalPart())
-                                                                    .setPrefix(relation.getPrefix())
-                                                    )
-                                                    .build()
-                                    ).build();
-                        })
-                        .collect(Collectors.toList());
-                assignmentMessages.addAll(indirect);
-            }
-
-            parentResult.computeStatus();
-            return assignmentMessages;
+            return searchAssignmentsByOid(loggedInUser, request.getIncludeOrgRefDetail(),
+                    request.getIncludeIndirect(), request.getResolveRefNames(), request.getQuery(), task, parentResult);
         });
 
         GetSelfAssignmentResponse res = GetSelfAssignmentResponse.newBuilder()
@@ -1356,117 +1227,186 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     }
 
     @Override
-    public void searchAssignments(SearchAssignmentsRequest request, StreamObserver<SearchObjectsResponse> responseObserver) {
+    public void searchAssignments(SearchAssignmentsRequest request, StreamObserver<SearchAssignmentsResponse> responseObserver) {
         LOGGER.debug("Start searchAssignments");
 
-        runTask(ctx -> {
+        List<AssignmentMessage> assignments = runTask(ctx -> {
             Task task = ctx.task;
 
             OperationResult parentResult = task.getResult().createSubresult(OPERATION_SEARCH_ASSIGNMENTS);
 
             String oid = resolveOid(AssignmentHolderType.class, request.getOid(), request.getName(), task, parentResult);
 
-            PrismObject<AssignmentHolderType> object = modelCrudService.getObject(AssignmentHolderType.class, oid, null, task, parentResult);
-            AssignmentHolderType objectType = object.asObjectable();
-
-            Set<String> directOids = objectType.getAssignment().stream()
-                    .map(x -> x.getTargetRef().getOid())
-                    .collect(Collectors.toSet());
-
-            Set<String> indirectOids = Collections.emptySet();
-            if (request.getIncludeIndirect()) {
-                indirectOids = objectType.getRoleMembershipRef().stream()
-                        .map(x -> x.getOid())
-                        .collect(Collectors.toSet());
-            }
-
-            Set<String> oids = new HashSet<>();
-            oids.addAll(directOids);
-            oids.addAll(indirectOids);
-
-            ObjectFilterMessage oidFilter = ObjectFilterMessage.newBuilder()
-                    .setInOid(FilterInOidMessage.newBuilder().addAllValue(oids)).build();
-
-            QueryMessage queryMessage = QueryMessage.newBuilder()
-                    .setFilter(ObjectFilterMessage.newBuilder()
-                            .setInOid(FilterInOidMessage.newBuilder()
-                                    .addAllValue(oids)))
-                    .build();
-            Class<? extends ObjectType> clazz = null;
-            Collection<SelectorOptions<GetOperationOptions>> searchOptions = null;
-
-            SearchObjectsRequest search = request.getSearch();
-            if (request.hasSearch()) {
-                List<String> options = search.getOptionsList();
-                List<String> include = search.getIncludeList();
-                List<String> exclude = search.getExcludeList();
-                List<String> resolveNames = search.getResolveNamesList();
-
-                searchOptions = GetOperationOptions.fromRestOptions(options, include,
-                        exclude, resolveNames, DefinitionProcessingOption.FULL, prismContext);
-
-                if (search.hasType()) {
-                    QName qname = toQNameValue(search.getType());
-                    clazz = ObjectTypes.getObjectTypeClass(qname);
-                } else {
-                    QName qname = toQNameValue(search.getObjectType());
-                    clazz = ObjectTypes.getObjectTypeClass(qname);
-                }
-
-                if (search.hasQuery()) {
-                    ObjectFilterMessage.Builder filter = ObjectFilterMessage.newBuilder()
-                            .setAnd(AndFilterMessage.newBuilder()
-                                    .addConditions(oidFilter)
-                                    .addConditions(search.getQuery().getFilter())
-                            );
-                    queryMessage = search.getQuery().toBuilder().setFilter(filter).build();
-                }
-            }
-
-            if (queryMessage == null) {
-                // No filter case
-                queryMessage = QueryMessage.newBuilder()
-                        .setFilter(oidFilter)
-                        .build();
-            }
-
-            // TODO sort by something?
-
-            // Search
-            SearchResultList<? extends PrismObject<? extends ObjectType>> result = search(queryMessage, clazz, searchOptions);
-
-            // Convert to ItemMessages
-            final boolean hasInclude = hasIncludeInSearchOptions(searchOptions);
-            final Collection<SelectorOptions<GetOperationOptions>> finalSearchOptions = searchOptions;
-
-            List<PrismObjectMessage> itemMessage = result.stream()
-                    .map(x -> {
-                        try {
-                            return toPrismObjectMessage(x.getDefinition(), x, finalSearchOptions, hasInclude);
-                        } catch (SchemaException e) {
-                            LOGGER.error("Failed to convert the object", e);
-                            StatusRuntimeException exception = Status.INVALID_ARGUMENT
-                                    .withDescription("invalid_schema")
-                                    .asRuntimeException();
-                            throw exception;
-                        }
-                    })
-                    .collect(Collectors.toList());
-
-            // Write response
-            Integer total = result.getMetadata().getApproxNumberOfAllResults();
-            SearchObjectsResponse res = SearchObjectsResponse.newBuilder()
-                    .setNumberOfAllResults(total)
-                    .addAllResults(itemMessage)
-                    .build();
-
-            responseObserver.onNext(res);
-            responseObserver.onCompleted();
-
-            return null;
+            return searchAssignmentsByOid(oid, request.getIncludeOrgRefDetail(),
+                    request.getIncludeIndirect(), request.getResolveRefNames(), request.getQuery(), task, parentResult);
         });
 
+        // Write response
+        SearchAssignmentsResponse res = SearchAssignmentsResponse.newBuilder()
+                .addAllAssignment(assignments)
+                .build();
+
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+
         LOGGER.debug("End searchAssignments");
+    }
+
+    private List<AssignmentMessage> searchAssignmentsByOid(String oid, boolean includeOrgRefDetail, boolean includeIndirect, boolean resolveRefName,
+                                                           QueryMessage query, Task task, OperationResult parentResult)
+            throws SchemaException, ExpressionEvaluationException, CommunicationException, SecurityViolationException,
+            ConfigurationException, ObjectNotFoundException {
+        PrismObject<UserType> user = modelCrudService.getObject(UserType.class, oid, null, task, parentResult);
+        UserType userType = user.asObjectable();
+
+        Set<String> directOids = userType.getAssignment().stream()
+                .map(x -> x.getTargetRef().getOid())
+                .collect(Collectors.toSet());
+
+        Set<String> orgRefOids = Collections.emptySet();
+        if (includeOrgRefDetail) {
+            orgRefOids = userType.getAssignment().stream()
+                    .filter(x -> x.getOrgRef() != null)
+                    .map(x -> x.getOrgRef().getOid())
+                    .collect(Collectors.toSet());
+        }
+
+        Set<String> indirectOids = Collections.emptySet();
+        if (includeIndirect) {
+            indirectOids = userType.getRoleMembershipRef().stream()
+                    .map(x -> x.getOid())
+                    .collect(Collectors.toSet());
+        }
+
+        // For caching detail of the target objects
+        Set<String> oids = new HashSet<>();
+        oids.addAll(directOids);
+        oids.addAll(orgRefOids);
+        oids.addAll(indirectOids);
+
+        ObjectFilterMessage oidFilter = ObjectFilterMessage.newBuilder()
+                .setInOid(FilterInOidMessage.newBuilder().addAllValue(oids)).build();
+
+        ObjectQuery searchQuery;
+        if (query.hasFilter()) {
+            // Combine oid filter query and requested query
+            ObjectFilterMessage.Builder filter = ObjectFilterMessage.newBuilder()
+                    .setAnd(AndFilterMessage.newBuilder()
+                            .addConditions(oidFilter)
+                            .addConditions(query.getFilter())
+                    );
+            QueryMessage queryMessage = query.toBuilder().setFilter(filter).build();
+            searchQuery = TypeConverter.toObjectQuery(prismContext, AbstractRoleType.class, queryMessage);
+        } else {
+            // No requested query case
+            searchQuery = prismContext.queryFor(AbstractRoleType.class)
+                    .id(oids.toArray(new String[0]))
+                    .build();
+        }
+
+        GetOperationOptions getOperationOptions = GetOperationOptions.createExecutionPhase();
+        if (resolveRefName) {
+            getOperationOptions.resolveNames(true);
+        }
+        Collection<SelectorOptions<GetOperationOptions>> options = SelectorOptions.createCollection(getOperationOptions);
+
+        // key: oid, value: Org/Role/Archetype etc.
+        Map<String, AbstractRoleType> cache = modelService.searchObjects(AbstractRoleType.class, searchQuery, options, task, parentResult)
+                .stream()
+                .collect(Collectors.toMap(a -> a.getOid(), a -> a.asObjectable()));
+
+        Set<String> directAssignment = new HashSet<>();
+
+        List<AssignmentMessage> assignmentMessages = userType.getAssignment().stream()
+                // The user might not have permission to get the target. So filter them.
+                .filter(x -> cache.containsKey(x.getTargetRef().getOid()))
+                .map(x -> {
+                    AbstractRoleType o = cache.get(x.getTargetRef().getOid());
+
+                    ObjectReferenceType orgRef = x.getOrgRef();
+                    AbstractRoleType resolvedOrgRef = null;
+                    if (orgRef != null) {
+                        resolvedOrgRef = cache.get(orgRef.getOid());
+                    }
+
+                    QName type = x.getTargetRef().getType();
+                    QName relation = x.getTargetRef().getRelation();
+
+                    if (includeIndirect) {
+                        directAssignment.add(x.getTargetRef().getOid() + "#" + relation.toString());
+                    }
+                    return BuilderWrapper.wrap(AssignmentMessage.newBuilder())
+                            .nullSafe(toReferenceMessage(orgRef, resolvedOrgRef), (b, v) -> b.setOrgRef(v))
+                            .nullSafe(x.getSubtype(), (b, v) -> b.addAllSubtype(v))
+                            .unwrap()
+                            .setTargetRef(
+                                    BuilderWrapper.wrap(ReferenceMessage.newBuilder())
+                                            .nullSafe(o.getOid(), (b, v) -> b.setOid(v))
+                                            .nullSafe(toPolyStringMessage(o.getName()), (b, v) -> b.setName(v))
+                                            .nullSafe(toStringMessage(o.getDescription()), (b, v) -> b.setDescription(v))
+                                            .nullSafe(toPolyStringMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                                            .nullSafe(toReferenceMessageList(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
+                                            .nullSafe(o.getSubtype(), (b, v) -> b.addAllSubtype(v))
+                                            .unwrap()
+                                            .setType(
+                                                    QNameMessage.newBuilder()
+                                                            .setNamespaceURI(type.getNamespaceURI())
+                                                            .setLocalPart(type.getLocalPart())
+                                                            .setPrefix(type.getPrefix())
+                                            )
+                                            .setRelation(
+                                                    QNameMessage.newBuilder()
+                                                            .setNamespaceURI(relation.getNamespaceURI())
+                                                            .setLocalPart(relation.getLocalPart())
+                                                            .setPrefix(relation.getPrefix())
+                                            )
+                                            .build()
+                            ).build();
+                })
+                .collect(Collectors.toList());
+
+        if (includeIndirect) {
+            List<AssignmentMessage> indirect = userType.getRoleMembershipRef().stream()
+                    .filter(x -> cache.containsKey(x.getOid()))
+                    .filter(x -> !directAssignment.contains(x.getOid() + "#" + x.getRelation().toString()))
+                    .map(x -> {
+                        AbstractRoleType o = cache.get(x.getOid());
+                        QName type = x.getType();
+                        QName relation = x.getRelation();
+
+                        return BuilderWrapper.wrap(AssignmentMessage.newBuilder())
+                                .unwrap()
+                                .setIndirect(true)
+                                .setTargetRef(
+                                        BuilderWrapper.wrap(ReferenceMessage.newBuilder())
+                                                .nullSafe(o.getOid(), (b, v) -> b.setOid(v))
+                                                .nullSafe(toPolyStringMessage(o.getName()), (b, v) -> b.setName(v))
+                                                .nullSafe(toStringMessage(o.getDescription()), (b, v) -> b.setDescription(v))
+                                                .nullSafe(toPolyStringMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                                                .nullSafe(toReferenceMessageList(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
+                                                .nullSafe(o.getSubtype(), (b, v) -> b.addAllSubtype(v))
+                                                .unwrap()
+                                                .setType(
+                                                        QNameMessage.newBuilder()
+                                                                .setNamespaceURI(type.getNamespaceURI())
+                                                                .setLocalPart(type.getLocalPart())
+                                                                .setPrefix(type.getPrefix())
+                                                )
+                                                .setRelation(
+                                                        QNameMessage.newBuilder()
+                                                                .setNamespaceURI(relation.getNamespaceURI())
+                                                                .setLocalPart(relation.getLocalPart())
+                                                                .setPrefix(relation.getPrefix())
+                                                )
+                                                .build()
+                                ).build();
+                    })
+                    .collect(Collectors.toList());
+            assignmentMessages.addAll(indirect);
+        }
+
+        parentResult.computeStatus();
+        return assignmentMessages;
     }
 
     private boolean hasIncludeInSearchOptions(Collection<SelectorOptions<GetOperationOptions>> searchOptions) {
