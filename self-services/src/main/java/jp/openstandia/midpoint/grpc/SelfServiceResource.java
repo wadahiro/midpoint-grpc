@@ -1724,9 +1724,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             throws SecurityViolationException, ObjectNotFoundException, CommunicationException, ConfigurationException,
             SchemaException, ExpressionEvaluationException {
         ObjectQuery nameQuery = ObjectQueryUtil.createNameQuery(name, prismContext);
-        List<PrismObject<T>> foundObjects = modelService
-                .searchObjects(type, nameQuery,
-                        getDefaultGetOptionCollection(), task, result);
+        List<PrismObject<T>> foundObjects = repositoryService
+                .searchObjects(type, nameQuery, null, result);
         if (foundObjects.isEmpty()) {
             return null;
         }
