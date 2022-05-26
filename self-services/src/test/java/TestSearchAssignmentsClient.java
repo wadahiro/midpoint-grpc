@@ -25,26 +25,20 @@ public class TestSearchAssignmentsClient {
 
         SearchAssignmentsRequest req = SearchAssignmentsRequest.newBuilder()
                 .setOid("8a1335af-f89d-4840-9c2d-0016f48dcc91")
-                .setSearch(
-                        SearchObjectsRequest.newBuilder()
-                                .setObjectType(DefaultObjectType.ABSTRACT_ROLE_TYPE)
-                                .addInclude("name")
-                                .addInclude("displayName")
-                                .addInclude("archetypeRef")
-                                .setQuery(
-                                        QueryMessage.newBuilder()
-                                                .setFilter(ObjectFilterMessage.newBuilder()
-                                                        .setRef(FilterReferenceMessage.newBuilder()
-                                                                .setFullPath("archetypeRef")
-                                                                .setValue(ReferenceMessage.newBuilder()
-                                                                        .setObjectType(DefaultObjectType.ARCHETYPE_TYPE)
-                                                                        .setOid("50d27f24-18c2-4d60-9004-19ae4884ebf8")))
-                                                )
+//                .setResolveRefNames(true)
+                .setQuery(
+                        QueryMessage.newBuilder()
+                                .setFilter(ObjectFilterMessage.newBuilder()
+                                        .setRef(FilterReferenceMessage.newBuilder()
+                                                .setFullPath("archetypeRef")
+                                                .setValue(ReferenceMessage.newBuilder()
+                                                        .setObjectType(DefaultObjectType.ARCHETYPE_TYPE)
+                                                        .setOid("50d27f24-18c2-4d60-9004-19ae4884ebf8")))
                                 )
                 )
                 .build();
 
-        SearchObjectsResponse res = stub.searchAssignments(req);
+        SearchAssignmentsResponse res = stub.searchAssignments(req);
 
         System.out.println(res);
     }
