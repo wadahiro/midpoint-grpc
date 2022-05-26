@@ -6,9 +6,8 @@ import jp.openstandia.midpoint.grpc.*;
 
 import java.io.UnsupportedEncodingException;
 import java.util.Base64;
-import java.util.Iterator;
 
-public class TestSearchObjectsClient {
+public class TestSearchAssignmentsClient {
 
     public static void main(String[] args) throws UnsupportedEncodingException {
         ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", 6565)
@@ -24,25 +23,22 @@ public class TestSearchObjectsClient {
 
         stub = MetadataUtils.attachHeaders(stub, headers);
 
-        SearchObjectsRequest req = SearchObjectsRequest.newBuilder()
-                .setObjectType(DefaultObjectType.OBJECT_TYPE)
-                .addInclude("activation/effectiveStatus")
+        SearchAssignmentsRequest req = SearchAssignmentsRequest.newBuilder()
+                .setOid("8a1335af-f89d-4840-9c2d-0016f48dcc91")
+//                .setResolveRefNames(true)
                 .setQuery(
                         QueryMessage.newBuilder()
                                 .setFilter(ObjectFilterMessage.newBuilder()
-//                                                .setOrgRoot(FilterOrgRootMessage.newBuilder()
-//                                                        .setIsRoot(true))
-                                                .setOrgRef(FilterOrgReferenceMessage.newBuilder()
-                                                        .setValue(ReferenceMessage.newBuilder()
-                                                                .setOid("21c3ba43-83b5-49bb-b6e3-dc415a7e3d24")
-                                                        )
-                                                        .setScope(OrgFilterScope.SUBTREE)
-                                                )
+                                        .setRef(FilterReferenceMessage.newBuilder()
+                                                .setFullPath("archetypeRef")
+                                                .setValue(ReferenceMessage.newBuilder()
+                                                        .setObjectType(DefaultObjectType.ARCHETYPE_TYPE)
+                                                        .setOid("50d27f24-18c2-4d60-9004-19ae4884ebf8")))
                                 )
                 )
                 .build();
 
-        SearchObjectsResponse res = stub.searchObjects(req);
+        SearchAssignmentsResponse res = stub.searchAssignments(req);
 
         System.out.println(res);
     }

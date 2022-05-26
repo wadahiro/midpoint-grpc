@@ -84,6 +84,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     public static final String OPERATION_EXECUTE_CREDENTIAL_UPDATE = CLASS_DOT + "executeCredentialUpdate";
     public static final String OPERATION_REQUEST_ASSIGNMENTS = CLASS_DOT + "requestAssignments";
     public static final String OPERATION_SEARCH_OBJECTS = CLASS_DOT + "searchObjects";
+    public static final String OPERATION_SEARCH_ASSIGNMENTS = CLASS_DOT + "searchAssignments";
     public static final String OPERATION_ADD_OBJECT = CLASS_DOT + "addObject";
     public static final String OPERATION_MODIFY_OBJECT = CLASS_DOT + "modifyObject";
     public static final String OPERATION_EXECUTE_OBJECT_UPDATE = CLASS_DOT + "executeObjectUpdate";
@@ -156,10 +157,6 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         LOGGER.debug("End getSelf");
     }
 
-    private class A {
-
-    }
-
     /**
      * Getting self assignments API.
      *
@@ -168,7 +165,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
      */
     @Override
     public void getSelfAssignment(GetSelfAssignmentRequest request, StreamObserver<GetSelfAssignmentResponse> responseObserver) {
-        LOGGER.debug("Start getSelf");
+        LOGGER.debug("Start getSelfAssignment");
 
         List<AssignmentMessage> assignments = runTask(ctx -> {
             Task task = ctx.task;
@@ -176,137 +173,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
             OperationResult parentResult = task.getResult().createSubresult(OPERATION_SELF_ASSIGNMENT);
 
-            PrismObject<UserType> user = modelCrudService.getObject(UserType.class, loggedInUser, null, task, parentResult);
-            UserType userType = user.asObjectable();
-
-            Set<String> directOids = userType.getAssignment().stream()
-                    .map(x -> x.getTargetRef().getOid())
-                    .collect(Collectors.toSet());
-
-            Set<String> orgRefOids = Collections.emptySet();
-            if (request.getIncludeOrgRefDetail()) {
-                orgRefOids = userType.getAssignment().stream()
-                        .filter(x -> x.getOrgRef() != null)
-                        .map(x -> x.getOrgRef().getOid())
-                        .collect(Collectors.toSet());
-            }
-
-            Set<String> indirectOids = Collections.emptySet();
-            if (request.getIncludeIndirect()) {
-                indirectOids = userType.getRoleMembershipRef().stream()
-                        .map(x -> x.getOid())
-                        .collect(Collectors.toSet());
-            }
-
-            // For caching detail of the target objects
-            Set<String> oids = new HashSet<>();
-            oids.addAll(directOids);
-            oids.addAll(orgRefOids);
-            oids.addAll(indirectOids);
-
-            ObjectQuery query = prismContext.queryFor(AbstractRoleType.class)
-                    .id(oids.toArray(new String[0]))
-                    .build();
-            Collection<SelectorOptions<GetOperationOptions>> options = SelectorOptions.createCollection(
-                    GetOperationOptions.createExecutionPhase().resolveNames(true));
-
-            // key: oid, value: Org/Role/Archetype etc.
-            Map<String, AbstractRoleType> cache = modelService.searchObjects(AbstractRoleType.class, query, options, task, parentResult)
-                    .stream()
-                    .collect(Collectors.toMap(a -> a.getOid(), a -> a.asObjectable()));
-
-            Set<String> directAssignment = new HashSet<>();
-
-            List<AssignmentMessage> assignmentMessages = userType.getAssignment().stream()
-                    // The user might not have permission to get the target. So filter them.
-                    .filter(x -> cache.containsKey(x.getTargetRef().getOid()))
-                    .map(x -> {
-                        AbstractRoleType o = cache.get(x.getTargetRef().getOid());
-
-                        ObjectReferenceType orgRef = x.getOrgRef();
-                        AbstractRoleType resolvedOrgRef = null;
-                        if (orgRef != null) {
-                            resolvedOrgRef = cache.get(orgRef.getOid());
-                        }
-
-                        QName type = x.getTargetRef().getType();
-                        QName relation = x.getTargetRef().getRelation();
-
-                        if (request.getIncludeIndirect()) {
-                            directAssignment.add(x.getTargetRef().getOid() + "#" + relation.toString());
-                        }
-                        return BuilderWrapper.wrap(AssignmentMessage.newBuilder())
-                                .nullSafe(toReferenceMessage(orgRef, resolvedOrgRef), (b, v) -> b.setOrgRef(v))
-                                .nullSafe(x.getSubtype(), (b, v) -> b.addAllSubtype(v))
-                                .unwrap()
-                                .setTargetRef(
-                                        BuilderWrapper.wrap(ReferenceMessage.newBuilder())
-                                                .nullSafe(o.getOid(), (b, v) -> b.setOid(v))
-                                                .nullSafe(toPolyStringMessage(o.getName()), (b, v) -> b.setName(v))
-                                                .nullSafe(toStringMessage(o.getDescription()), (b, v) -> b.setDescription(v))
-                                                .nullSafe(toPolyStringMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
-                                                .nullSafe(toReferenceMessageList(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
-                                                .nullSafe(o.getSubtype(), (b, v) -> b.addAllSubtype(v))
-                                                .unwrap()
-                                                .setType(
-                                                        QNameMessage.newBuilder()
-                                                                .setNamespaceURI(type.getNamespaceURI())
-                                                                .setLocalPart(type.getLocalPart())
-                                                                .setPrefix(type.getPrefix())
-                                                )
-                                                .setRelation(
-                                                        QNameMessage.newBuilder()
-                                                                .setNamespaceURI(relation.getNamespaceURI())
-                                                                .setLocalPart(relation.getLocalPart())
-                                                                .setPrefix(relation.getPrefix())
-                                                )
-                                                .build()
-                                ).build();
-                    })
-                    .collect(Collectors.toList());
-
-            if (request.getIncludeIndirect()) {
-                List<AssignmentMessage> indirect = userType.getRoleMembershipRef().stream()
-                        .filter(x -> cache.containsKey(x.getOid()))
-                        .filter(x -> !directAssignment.contains(x.getOid() + "#" + x.getRelation().toString()))
-                        .map(x -> {
-                            AbstractRoleType o = cache.get(x.getOid());
-                            QName type = x.getType();
-                            QName relation = x.getRelation();
-
-                            return BuilderWrapper.wrap(AssignmentMessage.newBuilder())
-                                    .unwrap()
-                                    .setIndirect(true)
-                                    .setTargetRef(
-                                            BuilderWrapper.wrap(ReferenceMessage.newBuilder())
-                                                    .nullSafe(o.getOid(), (b, v) -> b.setOid(v))
-                                                    .nullSafe(toPolyStringMessage(o.getName()), (b, v) -> b.setName(v))
-                                                    .nullSafe(toStringMessage(o.getDescription()), (b, v) -> b.setDescription(v))
-                                                    .nullSafe(toPolyStringMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
-                                                    .nullSafe(toReferenceMessageList(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
-                                                    .nullSafe(o.getSubtype(), (b, v) -> b.addAllSubtype(v))
-                                                    .unwrap()
-                                                    .setType(
-                                                            QNameMessage.newBuilder()
-                                                                    .setNamespaceURI(type.getNamespaceURI())
-                                                                    .setLocalPart(type.getLocalPart())
-                                                                    .setPrefix(type.getPrefix())
-                                                    )
-                                                    .setRelation(
-                                                            QNameMessage.newBuilder()
-                                                                    .setNamespaceURI(relation.getNamespaceURI())
-                                                                    .setLocalPart(relation.getLocalPart())
-                                                                    .setPrefix(relation.getPrefix())
-                                                    )
-                                                    .build()
-                                    ).build();
-                        })
-                        .collect(Collectors.toList());
-                assignmentMessages.addAll(indirect);
-            }
-
-            parentResult.computeStatus();
-            return assignmentMessages;
+            return searchAssignmentsByOid(loggedInUser, request.getIncludeOrgRefDetail(),
+                    request.getIncludeIndirect(), request.getResolveRefNames(), request.getQuery(), task, parentResult);
         });
 
         GetSelfAssignmentResponse res = GetSelfAssignmentResponse.newBuilder()
@@ -807,6 +675,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     }
 
     protected void updateCredential(MidPointTaskContext ctx, String oldCred, String newCred, boolean validate) throws SchemaException, SecurityViolationException, CommunicationException, ConfigurationException, ExpressionEvaluationException, ObjectNotFoundException, EncryptionException, PolicyViolationException, ObjectAlreadyExistsException {
+        LOGGER.debug("Start updateCredential");
+
         Task task = ctx.task;
         String userOid = ctx.principal.getOid();
 
@@ -861,6 +731,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         } finally {
             updateResult.computeStatusIfUnknown();
         }
+
+        LOGGER.debug("End updateCredential");
     }
 
     private <T extends ObjectType> SearchResultList<PrismObject<T>> search(QueryMessage queryMessage, Class<T> clazz,
@@ -966,6 +838,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
     @Override
     public void getRole(GetRoleRequest request, StreamObserver<GetRoleResponse> responseObserver) {
+        LOGGER.debug("Start getRole");
+
         RoleTypeMessage found = runTask(ctx -> {
             Task task = ctx.task;
 
@@ -992,6 +866,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 .setResult(found)
                 .build());
         responseObserver.onCompleted();
+
+        LOGGER.debug("End getRole");
     }
 
     @Override
@@ -1039,6 +915,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
     @Override
     public void getOrg(GetOrgRequest request, StreamObserver<GetOrgResponse> responseObserver) {
+        LOGGER.debug("Start getOrg");
+
         OrgTypeMessage found = runTask(ctx -> {
             Task task = ctx.task;
 
@@ -1065,6 +943,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 .setResult(found)
                 .build());
         responseObserver.onCompleted();
+
+        LOGGER.debug("End getOrg");
     }
 
     @Override
@@ -1112,6 +992,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
     @Override
     public void getService(GetServiceRequest request, StreamObserver<GetServiceResponse> responseObserver) {
+        LOGGER.debug("Start getService");
+
         ServiceTypeMessage found = runTask(ctx -> {
             Task task = ctx.task;
 
@@ -1138,6 +1020,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 .setResult(found)
                 .build());
         responseObserver.onCompleted();
+
+        LOGGER.debug("End getService");
     }
 
     @Override
@@ -1253,12 +1137,14 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
         SearchResultList<? extends PrismObject<? extends ObjectType>> result = search(request.getQuery(), clazz, searchOptions);
 
-        Integer total = result.getMetadata().getApproxNumberOfAllResults();
+        // Convert to ItemMessages
+        final boolean hasInclude = hasIncludeInSearchOptions(searchOptions);
+        final Collection<SelectorOptions<GetOperationOptions>> finalSearchOptions = searchOptions;
 
-        List<ItemMessage> itemMessage = result.stream()
+        List<PrismObjectMessage> itemMessage = result.stream()
                 .map(x -> {
                     try {
-                        return toItemMessage(x.getDefinition(), x);
+                        return toPrismObjectMessage(x.getDefinition(), x, finalSearchOptions, hasInclude);
                     } catch (SchemaException e) {
                         LOGGER.error("Failed to convert the object", e);
                         StatusRuntimeException exception = Status.INVALID_ARGUMENT
@@ -1269,6 +1155,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 })
                 .collect(Collectors.toList());
 
+        // Write Response
+        Integer total = result.getMetadata().getApproxNumberOfAllResults();
         SearchObjectsResponse res = SearchObjectsResponse.newBuilder()
                 .setNumberOfAllResults(total)
                 .addAllResults(itemMessage)
@@ -1282,6 +1170,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
     @Override
     public void searchObjectsAsStream(SearchObjectsRequest request, StreamObserver<SearchObjectsResponse> responseObserver) {
+        LOGGER.debug("Start searchObjectsAsStream");
+
         runTask(ctx -> {
             Task task = ctx.task;
 
@@ -1309,12 +1199,12 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             SearchResultMetadata metadata = modelService.searchObjectsIterative(clazz, query,
                     (object, pr) -> {
                         try {
-                            ItemMessage itemMessage = toItemMessage(object.getDefinition(), object);
+                            PrismObjectMessage prismObjectMessage = toPrismObjectMessage(object.getDefinition(), object);
 
                             SearchObjectsResponse response = SearchObjectsResponse.newBuilder()
                                     // Unknown all count yet
                                     .setNumberOfAllResults(-1)
-                                    .addResults(itemMessage)
+                                    .addResults(prismObjectMessage)
                                     .build();
                             responseObserver.onNext(response);
 
@@ -1332,10 +1222,210 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         });
 
         responseObserver.onCompleted();
+
+        LOGGER.debug("End searchObjectsAsStream");
+    }
+
+    @Override
+    public void searchAssignments(SearchAssignmentsRequest request, StreamObserver<SearchAssignmentsResponse> responseObserver) {
+        LOGGER.debug("Start searchAssignments");
+
+        List<AssignmentMessage> assignments = runTask(ctx -> {
+            Task task = ctx.task;
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_SEARCH_ASSIGNMENTS);
+
+            String oid = resolveOid(AssignmentHolderType.class, request.getOid(), request.getName(), task, parentResult);
+
+            return searchAssignmentsByOid(oid, request.getIncludeOrgRefDetail(),
+                    request.getIncludeIndirect(), request.getResolveRefNames(), request.getQuery(), task, parentResult);
+        });
+
+        // Write response
+        SearchAssignmentsResponse res = SearchAssignmentsResponse.newBuilder()
+                .addAllAssignment(assignments)
+                .build();
+
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End searchAssignments");
+    }
+
+    private List<AssignmentMessage> searchAssignmentsByOid(String oid, boolean includeOrgRefDetail, boolean includeIndirect, boolean resolveRefName,
+                                                           QueryMessage query, Task task, OperationResult parentResult)
+            throws SchemaException, ExpressionEvaluationException, CommunicationException, SecurityViolationException,
+            ConfigurationException, ObjectNotFoundException {
+        PrismObject<UserType> user = modelCrudService.getObject(UserType.class, oid, null, task, parentResult);
+        UserType userType = user.asObjectable();
+
+        Set<String> directOids = userType.getAssignment().stream()
+                .map(x -> x.getTargetRef().getOid())
+                .collect(Collectors.toSet());
+
+        Set<String> orgRefOids = Collections.emptySet();
+        if (includeOrgRefDetail) {
+            orgRefOids = userType.getAssignment().stream()
+                    .filter(x -> x.getOrgRef() != null)
+                    .map(x -> x.getOrgRef().getOid())
+                    .collect(Collectors.toSet());
+        }
+
+        Set<String> indirectOids = Collections.emptySet();
+        if (includeIndirect) {
+            indirectOids = userType.getRoleMembershipRef().stream()
+                    .map(x -> x.getOid())
+                    .collect(Collectors.toSet());
+        }
+
+        // For caching detail of the target objects
+        Set<String> oids = new HashSet<>();
+        oids.addAll(directOids);
+        oids.addAll(orgRefOids);
+        oids.addAll(indirectOids);
+
+        ObjectFilterMessage oidFilter = ObjectFilterMessage.newBuilder()
+                .setInOid(FilterInOidMessage.newBuilder().addAllValue(oids)).build();
+
+        ObjectQuery searchQuery;
+        if (query.hasFilter()) {
+            // Combine oid filter query and requested query
+            ObjectFilterMessage.Builder filter = ObjectFilterMessage.newBuilder()
+                    .setAnd(AndFilterMessage.newBuilder()
+                            .addConditions(oidFilter)
+                            .addConditions(query.getFilter())
+                    );
+            QueryMessage queryMessage = query.toBuilder().setFilter(filter).build();
+            searchQuery = TypeConverter.toObjectQuery(prismContext, AbstractRoleType.class, queryMessage);
+        } else {
+            // No requested query case
+            searchQuery = prismContext.queryFor(AbstractRoleType.class)
+                    .id(oids.toArray(new String[0]))
+                    .build();
+        }
+
+        GetOperationOptions getOperationOptions = GetOperationOptions.createExecutionPhase();
+        if (resolveRefName) {
+            getOperationOptions.resolveNames(true);
+        }
+        Collection<SelectorOptions<GetOperationOptions>> options = SelectorOptions.createCollection(getOperationOptions);
+
+        // key: oid, value: Org/Role/Archetype etc.
+        Map<String, AbstractRoleType> cache = modelService.searchObjects(AbstractRoleType.class, searchQuery, options, task, parentResult)
+                .stream()
+                .collect(Collectors.toMap(a -> a.getOid(), a -> a.asObjectable()));
+
+        Set<String> directAssignment = new HashSet<>();
+
+        List<AssignmentMessage> assignmentMessages = userType.getAssignment().stream()
+                // The user might not have permission to get the target. So filter them.
+                .filter(x -> cache.containsKey(x.getTargetRef().getOid()))
+                .map(x -> {
+                    AbstractRoleType o = cache.get(x.getTargetRef().getOid());
+
+                    ObjectReferenceType orgRef = x.getOrgRef();
+                    AbstractRoleType resolvedOrgRef = null;
+                    if (orgRef != null) {
+                        resolvedOrgRef = cache.get(orgRef.getOid());
+                    }
+
+                    QName type = x.getTargetRef().getType();
+                    QName relation = x.getTargetRef().getRelation();
+
+                    if (includeIndirect) {
+                        directAssignment.add(x.getTargetRef().getOid() + "#" + relation.toString());
+                    }
+                    return BuilderWrapper.wrap(AssignmentMessage.newBuilder())
+                            .nullSafe(toReferenceMessage(orgRef, resolvedOrgRef), (b, v) -> b.setOrgRef(v))
+                            .nullSafe(x.getSubtype(), (b, v) -> b.addAllSubtype(v))
+                            .unwrap()
+                            .setTargetRef(
+                                    BuilderWrapper.wrap(ReferenceMessage.newBuilder())
+                                            .nullSafe(o.getOid(), (b, v) -> b.setOid(v))
+                                            .nullSafe(toPolyStringMessage(o.getName()), (b, v) -> b.setName(v))
+                                            .nullSafe(toStringMessage(o.getDescription()), (b, v) -> b.setDescription(v))
+                                            .nullSafe(toPolyStringMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                                            .nullSafe(toReferenceMessageList(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
+                                            .nullSafe(o.getSubtype(), (b, v) -> b.addAllSubtype(v))
+                                            .unwrap()
+                                            .setType(
+                                                    QNameMessage.newBuilder()
+                                                            .setNamespaceURI(type.getNamespaceURI())
+                                                            .setLocalPart(type.getLocalPart())
+                                                            .setPrefix(type.getPrefix())
+                                            )
+                                            .setRelation(
+                                                    QNameMessage.newBuilder()
+                                                            .setNamespaceURI(relation.getNamespaceURI())
+                                                            .setLocalPart(relation.getLocalPart())
+                                                            .setPrefix(relation.getPrefix())
+                                            )
+                                            .build()
+                            ).build();
+                })
+                .collect(Collectors.toList());
+
+        if (includeIndirect) {
+            List<AssignmentMessage> indirect = userType.getRoleMembershipRef().stream()
+                    .filter(x -> cache.containsKey(x.getOid()))
+                    .filter(x -> !directAssignment.contains(x.getOid() + "#" + x.getRelation().toString()))
+                    .map(x -> {
+                        AbstractRoleType o = cache.get(x.getOid());
+                        QName type = x.getType();
+                        QName relation = x.getRelation();
+
+                        return BuilderWrapper.wrap(AssignmentMessage.newBuilder())
+                                .unwrap()
+                                .setIndirect(true)
+                                .setTargetRef(
+                                        BuilderWrapper.wrap(ReferenceMessage.newBuilder())
+                                                .nullSafe(o.getOid(), (b, v) -> b.setOid(v))
+                                                .nullSafe(toPolyStringMessage(o.getName()), (b, v) -> b.setName(v))
+                                                .nullSafe(toStringMessage(o.getDescription()), (b, v) -> b.setDescription(v))
+                                                .nullSafe(toPolyStringMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
+                                                .nullSafe(toReferenceMessageList(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
+                                                .nullSafe(o.getSubtype(), (b, v) -> b.addAllSubtype(v))
+                                                .unwrap()
+                                                .setType(
+                                                        QNameMessage.newBuilder()
+                                                                .setNamespaceURI(type.getNamespaceURI())
+                                                                .setLocalPart(type.getLocalPart())
+                                                                .setPrefix(type.getPrefix())
+                                                )
+                                                .setRelation(
+                                                        QNameMessage.newBuilder()
+                                                                .setNamespaceURI(relation.getNamespaceURI())
+                                                                .setLocalPart(relation.getLocalPart())
+                                                                .setPrefix(relation.getPrefix())
+                                                )
+                                                .build()
+                                ).build();
+                    })
+                    .collect(Collectors.toList());
+            assignmentMessages.addAll(indirect);
+        }
+
+        parentResult.computeStatus();
+        return assignmentMessages;
+    }
+
+    private boolean hasIncludeInSearchOptions(Collection<SelectorOptions<GetOperationOptions>> searchOptions) {
+        if (searchOptions != null) {
+            Optional<RetrieveOption> include = searchOptions.stream()
+                    .map(o -> o.getOptions().getRetrieve())
+                    .filter(r -> r == RetrieveOption.INCLUDE)
+                    .findFirst();
+            if (include.isPresent()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
     public void getUser(GetUserRequest request, StreamObserver<GetUserResponse> responseObserver) {
+        LOGGER.debug("Start getUser");
+
         UserTypeMessage foundUser = runTask(ctx -> {
             Task task = ctx.task;
 
@@ -1362,6 +1452,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 .setResult(foundUser)
                 .build());
         responseObserver.onCompleted();
+
+        LOGGER.debug("End getUser");
     }
 
     private Collection<SelectorOptions<GetOperationOptions>> getDefaultGetOptionCollection() {
@@ -1455,6 +1547,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
     @Override
     public void deleteObject(DeleteObjectRequest request, StreamObserver<DeleteObjectResponse> responseObserver) {
+        LOGGER.debug("Start deleteObject");
+
         runTask(ctx -> {
             Task task = ctx.task;
 
@@ -1501,10 +1595,14 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
         responseObserver.onNext(DeleteObjectResponse.newBuilder().build());
         responseObserver.onCompleted();
+
+        LOGGER.debug("End deleteObject");
     }
 
     @Override
     public void recomputeObject(RecomputeObjectRequest request, StreamObserver<RecomputeObjectResponse> responseObserver) {
+        LOGGER.debug("Start recomputeObject");
+
         runTask(ctx -> {
             Task task = ctx.task;
 
@@ -1539,6 +1637,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
         responseObserver.onNext(RecomputeObjectResponse.newBuilder().build());
         responseObserver.onCompleted();
+
+        LOGGER.debug("End recomputeObject");
     }
 
     private String resolveOid(Class<? extends ObjectType> clazz, String oid, String name, Task task, OperationResult result) throws SecurityViolationException, ObjectNotFoundException,
@@ -1558,9 +1658,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             throws SecurityViolationException, ObjectNotFoundException, CommunicationException, ConfigurationException,
             SchemaException, ExpressionEvaluationException {
         ObjectQuery nameQuery = ObjectQueryUtil.createNameQuery(name, prismContext);
-        List<PrismObject<T>> foundObjects = modelService
-                .searchObjects(type, nameQuery,
-                        getDefaultGetOptionCollection(), task, result);
+        List<PrismObject<T>> foundObjects = repositoryService
+                .searchObjects(type, nameQuery, null, result);
         if (foundObjects.isEmpty()) {
             return null;
         }
