@@ -49,7 +49,6 @@ public class BasicAuthenticationInterceptor extends AbstractGrpcAuthenticationIn
     protected void authorizeClient(Authentication auth, ConnectionEnvironment connEnv, Task task) {
         MidPointPrincipal p = (MidPointPrincipal) auth.getPrincipal();
         FocusType user = p.getFocus();
-        authenticateUser(user.asPrismObject(), connEnv, task);
         authorizeUser(auth, AuthorizationConstants.AUTZ_REST_ALL_URL, user, null, connEnv);
     }
 
@@ -90,8 +89,10 @@ public class BasicAuthenticationInterceptor extends AbstractGrpcAuthenticationIn
     }
 
     private UsernamePasswordAuthenticationToken authenticateUser(ConnectionEnvironment connEnv, String username, String password) {
+        LOGGER.debug("Start authenticateUser: {}", username);
         try {
             // login session is recorded here
+            // TODO Use custom evaluator here because it takes several tens of ms
             UsernamePasswordAuthenticationToken token = passwordAuthenticationEvaluator.authenticate(connEnv, new PasswordAuthenticationContext(username, password, UserType.class));
             return token;
         } catch (AuthenticationException ex) {
@@ -100,6 +101,8 @@ public class BasicAuthenticationInterceptor extends AbstractGrpcAuthenticationIn
                     .withDescription("invalid_token")
                     .withCause(ex)
                     .asRuntimeException();
+        } finally {
+            LOGGER.debug("End authenticateUser: {}", username);
         }
     }
 }

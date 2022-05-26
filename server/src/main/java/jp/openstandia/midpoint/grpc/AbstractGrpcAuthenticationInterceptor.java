@@ -1,6 +1,7 @@
 package jp.openstandia.midpoint.grpc;
 
 import com.evolveum.midpoint.model.api.ModelService;
+import com.evolveum.midpoint.model.api.authentication.GuiProfiledPrincipal;
 import com.evolveum.midpoint.model.impl.security.SecurityHelper;
 import com.evolveum.midpoint.prism.PrismContext;
 import com.evolveum.midpoint.prism.PrismObject;
@@ -67,6 +68,7 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
 
     @Override
     public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(ServerCall<ReqT, RespT> call, Metadata headers, ServerCallHandler<ReqT, RespT> next) {
+        LOGGER.trace("Start interceptCall");
         try {
             return doProcess(call, headers, next);
         } catch (StatusRuntimeException e) {
@@ -79,6 +81,8 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
             // https://github.com/grpc/grpc-java/issues/2814
             return new ServerCall.Listener() {
             };
+        } finally {
+            LOGGER.trace("End interceptCall");
         }
     }
 
@@ -208,29 +212,32 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
     protected abstract Authentication switchToUser(Authentication auth, Metadata headers, ConnectionEnvironment connEnv, Task task);
 
     protected Authentication authenticateUser(PrismObject<? extends FocusType> user, ConnectionEnvironment connEnv, Task task) {
-        try {
-            // Don't use securityContextManager.setupPreAuthenticatedSecurityContext(user) here because
-            // it sets the authentication into thread-local area.
-            OperationResult result = task.getResult();
-            MidPointPrincipal principal = GrpcServerConfiguration.getApplication().getSecurityContextManager().getUserProfileService().getPrincipal(user, null, result);
-            PreAuthenticatedAuthenticationToken token = new PreAuthenticatedAuthenticationToken(principal, null, principal.getAuthorities());
+//        try {
+        // Don't use securityContextManager.setupPreAuthenticatedSecurityContext(user) here because
+        // it sets the authentication into thread-local area.
 
-            LOGGER.trace("Authenticated to gRPC service as {}", user);
+        // Don't use UserProfileService#getPrincipal(...) here due to high processing costs for compiling user profile for GUI.
+        // We simply create MidPointUserProfilePrincipal here because user profile for GUI is not needed for gRPC.
+//            OperationResult result = task.getResult();
+        GuiProfiledPrincipal principal = new GuiProfiledPrincipal(user.asObjectable());
+        PreAuthenticatedAuthenticationToken token = new PreAuthenticatedAuthenticationToken(principal, null, principal.getAuthorities());
 
-            return token;
-        } catch (SchemaException | CommunicationException | ConfigurationException | SecurityViolationException | ExpressionEvaluationException e) {
-            securityHelper.auditLoginFailure(user.getName().getOrig(), user.asObjectable(), connEnv, "Schema error: " + e.getMessage());
-            StatusRuntimeException exception = Status.INVALID_ARGUMENT
-                    .withDescription(e.getMessage())
-                    .asRuntimeException();
-            throw exception;
-        }
+        LOGGER.trace("Authenticated to gRPC service as {}", user);
+
+        return token;
+//        } catch (SchemaException | CommunicationException | ConfigurationException | SecurityViolationException | ExpressionEvaluationException e) {
+//            securityHelper.auditLoginFailure(user.getName().getOrig(), user.asObjectable(), connEnv, "Schema error: " + e.getMessage());
+//            StatusRuntimeException exception = Status.INVALID_ARGUMENT
+//                    .withDescription(e.getMessage())
+//                    .asRuntimeException();
+//            throw exception;
+//        }
     }
 
     protected void authorizeUser(Authentication auth, String authorization, FocusType user, PrismObject<FocusType> proxyUser, ConnectionEnvironment connEnv) {
         Task task = taskManager.createTaskInstance(AbstractGrpcAuthenticationInterceptor.class.getName() + ".authorizeUser");
         try {
-            // SeuciryEnforcer#authorize needs authentication in SecurityContext.
+            // SecurityEnforcer#authorize needs authentication in SecurityContext.
             SecurityContextHolder.getContext().setAuthentication(auth);
 
             // authorize for proxy
