@@ -3,7 +3,7 @@
     <parent>
         <groupId>jp.openstandia.midpoint-grpc</groupId>
         <artifactId>midpoint-grpc-integration-parent</artifactId>
-        <version>1.10.0</version>
+        <version>1.10.1-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
