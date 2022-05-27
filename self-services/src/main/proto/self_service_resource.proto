@@ -472,9 +472,10 @@ message ServiceTypeMessage {
 }
 
 message GetSelfAssignmentRequest {
-    bool include_org_ref_detail = 1;
+    bool include_org_ref_details = 1;
     bool include_indirect = 2;
     bool resolve_ref_names = 3;
+    bool include_parent_org_ref_details = 4;
     QueryMessage query = 10;
 }
 
@@ -510,6 +511,7 @@ message ReferenceMessage {
     repeated ReferenceMessage archetype_ref = 9;
     string email_address = 10;
     repeated string subtype = 11;
+    repeated ReferenceMessage parent_org_ref = 12;
 }
 
 message QNameMessage {
@@ -941,9 +943,10 @@ message SearchAssignmentsRequest {
         string oid = 1;
         string name = 2;
     }
-    bool include_org_ref_detail = 3;
+    bool include_org_ref_details = 3;
     bool include_indirect = 4;
     bool resolve_ref_names = 5;
+    bool include_parent_org_ref_details = 6;
     QueryMessage query = 10;
 }
 
