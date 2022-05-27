@@ -178,8 +178,9 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
             OperationResult parentResult = task.getResult().createSubresult(OPERATION_SELF_ASSIGNMENT);
 
-            return searchAssignmentsByOid(loggedInUser.getOid(), request.getIncludeOrgRefDetail(),
-                    request.getIncludeIndirect(), request.getResolveRefNames(), request.getQuery(), task, parentResult);
+            return searchAssignmentsByOid(loggedInUser.getOid(), request.getIncludeOrgRefDetails(),
+                    request.getIncludeIndirect(), request.getIncludeParentOrgRefDetails(), request.getResolveRefNames(),
+                    request.getQuery(), task, parentResult);
         });
 
         GetSelfAssignmentResponse res = GetSelfAssignmentResponse.newBuilder()
@@ -1243,8 +1244,9 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
             String oid = resolveOid(AssignmentHolderType.class, request.getOid(), request.getName(), task, parentResult);
 
-            return searchAssignmentsByOid(oid, request.getIncludeOrgRefDetail(),
-                    request.getIncludeIndirect(), request.getResolveRefNames(), request.getQuery(), task, parentResult);
+            return searchAssignmentsByOid(oid, request.getIncludeOrgRefDetails(),
+                    request.getIncludeIndirect(), request.getIncludeParentOrgRefDetails(), request.getResolveRefNames(),
+                    request.getQuery(), task, parentResult);
         });
 
         // Write response
@@ -1258,7 +1260,8 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         LOGGER.debug("End searchAssignments");
     }
 
-    private List<AssignmentMessage> searchAssignmentsByOid(String oid, boolean includeOrgRefDetail, boolean includeIndirect, boolean resolveRefName,
+    private List<AssignmentMessage> searchAssignmentsByOid(String oid, boolean includeOrgRefDetails, boolean includeIndirect,
+                                                           boolean includeParentOrgRefDetails, boolean resolveRefName,
                                                            QueryMessage query, Task task, OperationResult parentResult)
             throws SchemaException, ExpressionEvaluationException, CommunicationException, SecurityViolationException,
             ConfigurationException, ObjectNotFoundException {
@@ -1270,7 +1273,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 .collect(Collectors.toSet());
 
         Set<String> orgRefOids = Collections.emptySet();
-        if (includeOrgRefDetail) {
+        if (includeOrgRefDetails) {
             orgRefOids = userType.getAssignment().stream()
                     .filter(x -> x.getOrgRef() != null)
                     .map(x -> x.getOrgRef().getOid())
@@ -1323,6 +1326,21 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
         Set<String> directAssignment = new HashSet<>();
 
+        // Resolve parentOrgRef then put them into the cache
+        if (includeParentOrgRefDetails) {
+            Set<String> parentOids = cache.values().stream()
+                    .filter(o -> o.getParentOrgRef() != null && !o.getParentOrgRef().isEmpty())
+                    .map(o -> o.getParentOrgRef().stream().map(ref -> ref.getOid()).collect(Collectors.toSet()))
+                    .flatMap(l -> l.stream())
+                    .collect(Collectors.toSet());
+            ObjectQuery parentQuery = prismContext.queryFor(AbstractRoleType.class)
+                    .id(parentOids.toArray(new String[0]))
+                    .build();
+            SearchResultList<PrismObject<AbstractRoleType>> parents = modelService.searchObjects(AbstractRoleType.class,
+                    parentQuery, SelectorOptions.createCollection(GetOperationOptions.createExecutionPhase()), task, parentResult);
+            parents.forEach(p -> cache.put(p.getOid(), p.asObjectable()));
+        }
+
         List<AssignmentMessage> assignmentMessages = userType.getAssignment().stream()
                 // The user might not have permission to get the target. So filter them.
                 .filter(x -> cache.containsKey(x.getTargetRef().getOid()))
@@ -1352,6 +1370,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                                             .nullSafe(toStringMessage(o.getDescription()), (b, v) -> b.setDescription(v))
                                             .nullSafe(toPolyStringMessage(o.getDisplayName()), (b, v) -> b.setDisplayName(v))
                                             .nullSafe(toReferenceMessageList(o.getArchetypeRef(), cache), (b, v) -> b.addAllArchetypeRef(v))
+                                            .nullSafe(toReferenceMessageList(o.getParentOrgRef(), cache), (b, v) -> b.addAllParentOrgRef(v))
                                             .nullSafe(o.getSubtype(), (b, v) -> b.addAllSubtype(v))
                                             .unwrap()
                                             .setType(
