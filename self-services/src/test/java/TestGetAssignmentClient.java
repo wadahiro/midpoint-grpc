@@ -27,13 +27,13 @@ public class TestGetAssignmentClient {
         stub = MetadataUtils.attachHeaders(stub, headers);
 
         GetSelfAssignmentRequest req = GetSelfAssignmentRequest.newBuilder()
-                .setIncludeOrgRefDetail(true)
+                .setIncludeOrgRefDetails(true)
                 .setIncludeIndirect(true)
+//                .setIncludeParentOrgRefDetail(true)
                 .build();
 
         GetSelfAssignmentResponse self = stub.getSelfAssignment(req);
 
-        List<AssignmentMessage> assignments = self.getAssignmentList();
-        System.out.println(assignments);
+        System.out.println(self);
     }
 }
