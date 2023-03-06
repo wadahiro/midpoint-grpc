@@ -161,6 +161,10 @@ public class TypeConverter {
     private static Iterable<? extends Message> toIterableMessages(Object[] args) {
         List<Message> list = new ArrayList<>();
 
+        if (args == null) {
+            return list;
+        }
+
         for (Object arg : args) {
             Message wrapper;
 
