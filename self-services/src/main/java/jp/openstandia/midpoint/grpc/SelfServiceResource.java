@@ -118,9 +118,6 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     /**
      * Getting self profile API based on
      * {@link com.evolveum.midpoint.rest.impl.ModelRestController#getSelf()}.
-     *
-     * @param request
-     * @param responseObserver
      */
     @Override
     public void getSelf(GetSelfRequest request, StreamObserver<GetSelfResponse> responseObserver) {
@@ -159,9 +156,6 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
     /**
      * Getting self assignments API.
-     *
-     * @param request
-     * @param responseObserver
      */
     @Override
     public void getSelfAssignment(GetSelfAssignmentRequest request, StreamObserver<GetSelfAssignmentResponse> responseObserver) {
