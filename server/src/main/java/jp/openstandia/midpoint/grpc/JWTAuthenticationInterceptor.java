@@ -104,12 +104,12 @@ public class JWTAuthenticationInterceptor extends AbstractGrpcAuthenticationInte
     }
 
     @Override
-    protected Authentication switchToUser(Authentication auth, Metadata headers, ConnectionEnvironment connEnv, Task task) {
+    protected Authentication switchToUser(Authentication auth, Metadata headers, boolean runPrivileged, ConnectionEnvironment connEnv, Task task) {
         String switchUser = headers.get(Constant.SwitchToPrincipalMetadataKey);
         String switchUserByName = headers.get(Constant.SwitchToPrincipalByNameMetadataKey);
 
         // Find proxy user
-        PrismObject<FocusType> authorizedUser;
+        PrismObject<? extends FocusType> authorizedUser;
         if (StringUtils.isNotBlank(switchUser)) {
             authorizedUser = findByOid(switchUser, task);
         } else if (StringUtils.isNotBlank(switchUserByName)) {
@@ -124,6 +124,6 @@ public class JWTAuthenticationInterceptor extends AbstractGrpcAuthenticationInte
 
         // Don't check authorization of client user because the bearer token doesn't bound to an user in midpoint.
 
-        return authenticateUser(authorizedUser, connEnv, task);
+        return authenticateSwitchUser(authorizedUser, runPrivileged, connEnv, task);
     }
 }

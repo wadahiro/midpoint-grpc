@@ -29,6 +29,218 @@ class SelfServiceResourceITest {
     }
 
     @Test
+    void unauthenticated() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:invalid".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        GetSelfRequest request = GetSelfRequest.newBuilder()
+                .build();
+
+        try {
+            GetSelfResponse response = stub.getSelf(request);
+            fail("No unauthenticated error");
+        } catch (StatusRuntimeException e) {
+            assertEquals(Status.Code.UNAUTHENTICATED, e.getStatus().getCode());
+            assertEquals("invalid_token", e.getStatus().getDescription());
+        }
+    }
+
+    @Test
+    void switchUserWithDuplicateName() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+        headers.put(Constant.SwitchToPrincipalByNameMetadataKey, "Administrator");
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Add org with same user's name
+        AddOrgRequest addRequest = AddOrgRequest.newBuilder()
+                .setObject(OrgTypeMessage.newBuilder()
+                        .setName(PolyStringMessage.newBuilder().setOrig("Administrator"))
+                )
+                .build();
+
+        AddObjectResponse addResponse = stub.addOrg(addRequest);
+        assertNotNull(addResponse.getOid());
+
+        // Test authentication again
+        GetSelfRequest request = GetSelfRequest.newBuilder()
+                .build();
+
+        GetSelfResponse response = stub.getSelf(request);
+        UserTypeMessage user = response.getProfile();
+
+        assertEquals("Administrator", user.getFamilyName().getOrig());
+        assertEquals("administrator", user.getFamilyName().getNorm());
+    }
+
+    @Test
+    void switchUser() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+        headers.put(Constant.SwitchToPrincipalByNameMetadataKey, "Administrator");
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        GetSelfRequest request = GetSelfRequest.newBuilder()
+                .build();
+
+        GetSelfResponse response = stub.getSelf(request);
+        UserTypeMessage user = response.getProfile();
+
+        assertEquals("Administrator", user.getFamilyName().getOrig());
+        assertEquals("administrator", user.getFamilyName().getNorm());
+    }
+
+    @Test
+    void switchUserWithNotFoundUser() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+        headers.put(Constant.SwitchToPrincipalByNameMetadataKey, "foo");
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        GetSelfRequest request = GetSelfRequest.newBuilder()
+                .build();
+
+        try {
+            GetSelfResponse response = stub.getSelf(request);
+            fail("No unauthenticated error");
+        } catch (StatusRuntimeException e) {
+            assertEquals(Status.Code.UNAUTHENTICATED, e.getStatus().getCode());
+            assertEquals("Not found user", e.getStatus().getDescription());
+        }
+    }
+
+    @Test
+    void switchUserWithRunPrivileged() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+        headers.put(Constant.SwitchToPrincipalByNameMetadataKey, "Administrator");
+        headers.put(Constant.RunPrivilegedMetadataKey, "true");
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        GetSelfRequest request = GetSelfRequest.newBuilder()
+                .build();
+
+        GetSelfResponse response = stub.getSelf(request);
+        UserTypeMessage user = response.getProfile();
+
+        assertEquals("Administrator", user.getFamilyName().getOrig());
+        assertEquals("administrator", user.getFamilyName().getNorm());
+    }
+
+    @Test
+    void switchUserWithUnAuthorizedUser() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Add a user for switch
+        AddUserRequest addRequest = AddUserRequest.newBuilder()
+                .setProfile(UserTypeMessage.newBuilder()
+                        .setName(PolyStringMessage.newBuilder().setOrig("switch001"))
+                )
+                .build();
+
+        AddUserResponse addResponse = stub.addUser(addRequest);
+        assertNotNull(addResponse.getOid());
+
+        // Test switch user
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+        headers.put(Constant.SwitchToPrincipalByNameMetadataKey, "switch001");
+
+        GetSelfRequest request = GetSelfRequest.newBuilder()
+                .build();
+
+        try {
+            GetSelfResponse response = stub.getSelf(request);
+            fail("No unauthenticated error");
+        } catch (StatusRuntimeException e) {
+            assertEquals(Status.Code.PERMISSION_DENIED, e.getStatus().getCode());
+            assertEquals("Not authorized", e.getStatus().getDescription());
+        }
+
+        // Test switch user with run privileged
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+        headers.put(Constant.SwitchToPrincipalByNameMetadataKey, "switch001");
+        headers.put(Constant.RunPrivilegedMetadataKey, "true");
+
+        request = GetSelfRequest.newBuilder()
+                .build();
+
+        GetSelfResponse response = stub.getSelf(request);
+        UserTypeMessage user = response.getProfile();
+
+        assertEquals("switch001", user.getName().getOrig());
+    }
+
+    @Test
+    void switchUserWithArchivedUser() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Add a user for switch
+        AddUserRequest addRequest = AddUserRequest.newBuilder()
+                .setProfile(UserTypeMessage.newBuilder()
+                        .setName(PolyStringMessage.newBuilder().setOrig("switch002"))
+                        .setLifecycleState("archived")
+                )
+                .build();
+
+        AddUserResponse addResponse = stub.addUser(addRequest);
+        assertNotNull(addResponse.getOid());
+
+        // Test switch user
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+        headers.put(Constant.SwitchToPrincipalByNameMetadataKey, "switch002");
+        headers.put(Constant.RunPrivilegedMetadataKey, "true");
+
+        GetSelfRequest request = GetSelfRequest.newBuilder()
+                .build();
+
+        // Currently, the authentication isn't rejected even if the switch user is archived
+        GetSelfResponse response = stub.getSelf(request);
+        UserTypeMessage user = response.getProfile();
+
+        assertEquals("switch002", user.getName().getOrig());
+    }
+
+    @Test
     void getSelf() throws Exception {
         SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
 
@@ -57,7 +269,6 @@ class SelfServiceResourceITest {
 
         Metadata headers = new Metadata();
         headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
-//        headers.put(Constant.SwitchToPrincipalByNameMetadataKey, "test");
 
         stub = MetadataUtils.attachHeaders(stub, headers);
 
