@@ -52,6 +52,39 @@ class SelfServiceResourceITest {
     }
 
     @Test
+    void switchUserWithDuplicateName() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+        headers.put(Constant.SwitchToPrincipalByNameMetadataKey, "Administrator");
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Add org with same user's name
+        AddOrgRequest addRequest = AddOrgRequest.newBuilder()
+                .setObject(OrgTypeMessage.newBuilder()
+                        .setName(PolyStringMessage.newBuilder().setOrig("Administrator"))
+                )
+                .build();
+
+        AddObjectResponse addResponse = stub.addOrg(addRequest);
+        assertNotNull(addResponse.getOid());
+
+        // Test authentication again
+        GetSelfRequest request = GetSelfRequest.newBuilder()
+                .build();
+
+        GetSelfResponse response = stub.getSelf(request);
+        UserTypeMessage user = response.getProfile();
+
+        assertEquals("Administrator", user.getFamilyName().getOrig());
+        assertEquals("administrator", user.getFamilyName().getNorm());
+    }
+
+    @Test
     void switchUser() throws Exception {
         SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
 

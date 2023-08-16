@@ -22,6 +22,7 @@ import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.web.boot.GrpcServerConfiguration;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.AuthorizationType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.FocusType;
+import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 import io.grpc.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
@@ -252,7 +253,7 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
         }
     }
 
-    protected void authorizeUser(Authentication auth, String authorization, FocusType user, PrismObject<FocusType> proxyUser, ConnectionEnvironment connEnv) {
+    protected void authorizeUser(Authentication auth, String authorization, FocusType user, PrismObject<? extends FocusType> proxyUser, ConnectionEnvironment connEnv) {
         Task task = taskManager.createTaskInstance(AbstractGrpcAuthenticationInterceptor.class.getName() + ".authorizeUser");
         try {
             // SecurityEnforcer#authorize needs authentication in SecurityContext.
@@ -275,10 +276,10 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
         }
     }
 
-    protected PrismObject<FocusType> findByOid(String oid, Task task) {
+    protected PrismObject<? extends FocusType> findByOid(String oid, Task task) {
         OperationResult result = task.getResult();
         try {
-            PrismObject<FocusType> user = modelService.getObject(FocusType.class, oid, null, task, result);
+            PrismObject<UserType> user = modelService.getObject(UserType.class, oid, null, task, result);
             return user;
         } catch (SchemaException | ObjectNotFoundException | SecurityViolationException | CommunicationException | ConfigurationException | ExpressionEvaluationException e) {
             LOGGER.trace("Exception while authenticating user identified with oid: '{}' to gRPC service: {}", oid, e.getMessage(), e);
@@ -288,14 +289,14 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
         }
     }
 
-    protected PrismObject<FocusType> findByUsername(String username, Task task) {
+    protected PrismObject<? extends FocusType> findByUsername(String username, Task task) {
         OperationResult result = task.getResult();
         try {
             PolyString usernamePoly = new PolyString(username);
             ObjectQuery query = ObjectQueryUtil.createNormNameQuery(usernamePoly, prismContext);
             LOGGER.trace("Looking for user, query:\n" + query.debugDump());
 
-            List<PrismObject<FocusType>> list = GrpcServerConfiguration.getApplication().getRepositoryService().searchObjects(FocusType.class, query, null, result);
+            List<PrismObject<UserType>> list = GrpcServerConfiguration.getApplication().getRepositoryService().searchObjects(UserType.class, query, null, result);
             LOGGER.trace("Users found: {}.", list.size());
             if (list.size() != 1) {
                 throw Status.UNAUTHENTICATED

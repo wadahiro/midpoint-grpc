@@ -58,7 +58,7 @@ public class BasicAuthenticationInterceptor extends AbstractGrpcAuthenticationIn
         String switchUserByName = headers.get(Constant.SwitchToPrincipalByNameMetadataKey);
 
         // Find proxy user
-        PrismObject<FocusType> authorizedUser;
+        PrismObject<? extends FocusType> authorizedUser;
         if (StringUtils.isNotBlank(switchUser)) {
             authorizedUser = findByOid(switchUser, task);
         } else if (StringUtils.isNotBlank(switchUserByName)) {
