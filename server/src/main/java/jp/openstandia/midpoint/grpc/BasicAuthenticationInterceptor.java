@@ -53,7 +53,7 @@ public class BasicAuthenticationInterceptor extends AbstractGrpcAuthenticationIn
     }
 
     @Override
-    protected Authentication switchToUser(Authentication auth, Metadata headers, ConnectionEnvironment connEnv, Task task) {
+    protected Authentication switchToUser(Authentication auth, Metadata headers, boolean runPrivileged, ConnectionEnvironment connEnv, Task task) {
         String switchUser = headers.get(Constant.SwitchToPrincipalMetadataKey);
         String switchUserByName = headers.get(Constant.SwitchToPrincipalByNameMetadataKey);
 
@@ -72,7 +72,7 @@ public class BasicAuthenticationInterceptor extends AbstractGrpcAuthenticationIn
         FocusType client = ((MidPointPrincipal) auth.getPrincipal()).getFocus();
         authorizeUser(auth, AuthorizationConstants.AUTZ_REST_PROXY_URL, client, authorizedUser, connEnv);
 
-        return authenticateUser(authorizedUser, connEnv, task);
+        return authenticateSwitchUser(authorizedUser, runPrivileged, connEnv, task);
     }
 
     protected String[] extractAndDecodeBasicAuthzHeader(String header) {
