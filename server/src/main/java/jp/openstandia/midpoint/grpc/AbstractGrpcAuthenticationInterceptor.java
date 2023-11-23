@@ -19,17 +19,12 @@ import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import com.evolveum.midpoint.web.boot.GrpcServerConfiguration;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.AuthorizationType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.CredentialPolicyType;
-import com.evolveum.midpoint.xml.ns._public.common.common_3.CredentialsType;
 import com.evolveum.midpoint.xml.ns._public.common.common_3.UserType;
 import io.grpc.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.authentication.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.preauth.PreAuthenticatedAuthenticationToken;
 import org.springframework.stereotype.Component;
 
@@ -255,9 +250,11 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
         }
     }
 
-    protected PrismObject<UserType> findByOid(String oid, Task task) {
+    protected PrismObject<UserType> findByOid(Authentication auth, String oid, Task task) {
         OperationResult result = task.getResult();
         try {
+            SecurityContextHolder.getContext().setAuthentication(auth);
+
             PrismObject<UserType> user = modelService.getObject(UserType.class, oid, null, task, result);
             return user;
         } catch (SchemaException | ObjectNotFoundException | SecurityViolationException | CommunicationException | ConfigurationException | ExpressionEvaluationException e) {
@@ -265,12 +262,16 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
             throw Status.UNAUTHENTICATED
                     .withDescription(e.getMessage())
                     .asRuntimeException();
+        } finally {
+            SecurityContextHolder.getContext().setAuthentication(null);
         }
     }
 
-    protected PrismObject<UserType> findByUsername(String username, Task task) {
+    protected PrismObject<UserType> findByUsername(Authentication auth, String username, Task task) {
         OperationResult result = task.getResult();
         try {
+            SecurityContextHolder.getContext().setAuthentication(auth);
+
             PolyString usernamePoly = new PolyString(username);
             ObjectQuery query = ObjectQueryUtil.createNormNameQuery(usernamePoly, prismContext);
             LOGGER.trace("Looking for user, query:\n" + query.debugDump());
@@ -288,6 +289,8 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
             throw Status.UNAUTHENTICATED
                     .withDescription(e.getMessage())
                     .asRuntimeException();
+        } finally {
+            SecurityContextHolder.getContext().setAuthentication(null);
         }
     }
 
@@ -323,13 +326,13 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
         }
     }
 
-    protected Authentication authenticateSwitchUser(String oid, ConnectionEnvironment connEnv, Task task) {
-        PrismObject<UserType> user = findByOid(oid, task);
+    protected Authentication authenticateSwitchUser(Authentication auth, String oid, ConnectionEnvironment connEnv, Task task) {
+        PrismObject<UserType> user = findByOid(auth, oid, task);
         return authenticateUser(user, connEnv, task);
     }
 
-    protected Authentication authenticateSwitchUserByName(String username, ConnectionEnvironment connEnv, Task task) {
-        PrismObject<UserType> user = findByUsername(username, task);
+    protected Authentication authenticateSwitchUserByName(Authentication auth, String username, ConnectionEnvironment connEnv, Task task) {
+        PrismObject<UserType> user = findByUsername(auth, username, task);
         return authenticateUser(user, connEnv, task);
     }
 

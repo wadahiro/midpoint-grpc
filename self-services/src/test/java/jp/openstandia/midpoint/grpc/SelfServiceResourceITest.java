@@ -1,5 +1,6 @@
 package jp.openstandia.midpoint.grpc;
 
+import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import io.grpc.*;
 import io.grpc.stub.MetadataUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -216,6 +217,402 @@ class SelfServiceResourceITest {
             String subErr2Key = subMsg2Args.getKey();
             assertEquals("ValuePolicy.minimalUniqueCharactersNotMet", subErr2Key);
         }
+    }
+
+    @Test
+    void forceUpdateCredential() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Force update password
+        ForceUpdateCredentialRequest request = ForceUpdateCredentialRequest.newBuilder()
+                .setNew("password")
+                .build();
+
+        stub.forceUpdateCredential(request);
+
+        // Check the password was changed
+        try {
+            stub.getSelf(GetSelfRequest.newBuilder().build());
+            fail("Password wasn't changed");
+        } catch (StatusRuntimeException e) {
+            assertEquals(Status.UNAUTHENTICATED.getCode(), e.getStatus().getCode());
+        }
+
+        // Update authorization header with new password
+        token = Base64.getEncoder().encodeToString("Administrator:password".getBytes("UTF-8"));
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Back to original password by forceUpdateCredential
+        ForceUpdateCredentialRequest forceReq = ForceUpdateCredentialRequest.newBuilder()
+                .setNew("5ecr3t")
+                .build();
+
+        stub.forceUpdateCredential(forceReq);
+
+        // Check the password was changed
+        try {
+            stub.getSelf(GetSelfRequest.newBuilder().build());
+            fail("Password wasn't changed");
+        } catch (StatusRuntimeException e) {
+            assertEquals(Status.UNAUTHENTICATED.getCode(), e.getStatus().getCode());
+        }
+
+        // Update authorization header with new password
+        token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Check auth with new password
+        stub.getSelf(GetSelfRequest.newBuilder().build());
+    }
+
+    @Test
+    void forceUpdateCredentialWithNonceClear() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Save nonce to the user
+        ModifyProfileRequest modifyProfileRequest = ModifyProfileRequest.newBuilder()
+                .addModifications(
+                        UserItemDeltaMessage.newBuilder()
+                                .setPath("credentials/nonce/value")
+                                .addValuesToReplace("123456")
+                                .build()
+                )
+                .build();
+
+        stub.modifyProfile(modifyProfileRequest);
+
+        // Force update password
+        ForceUpdateCredentialRequest request = ForceUpdateCredentialRequest.newBuilder()
+                .setNew("password")
+                .build();
+
+        stub.forceUpdateCredential(request);
+
+        // Check the password was changed
+        try {
+            stub.getSelf(GetSelfRequest.newBuilder().build());
+            fail("Password wasn't changed");
+        } catch (StatusRuntimeException e) {
+            assertEquals(Status.UNAUTHENTICATED.getCode(), e.getStatus().getCode());
+        }
+
+        // Update authorization header with new password
+        token = Base64.getEncoder().encodeToString("Administrator:password".getBytes("UTF-8"));
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Check nonce isn't cleared yet
+        CheckNonceRequest checkNonceRequest = CheckNonceRequest.newBuilder()
+                .setNonce("123456")
+                .build();
+
+        CheckNonceResponse checkNonceResponse = stub.checkNonce(checkNonceRequest);
+
+        System.out.println(checkNonceResponse);
+
+        assertTrue(checkNonceResponse.getValid());
+        assertTrue(checkNonceResponse.getError().isEmpty());
+
+        // Back to original password with clear nonce and active
+        ForceUpdateCredentialRequest forceReq = ForceUpdateCredentialRequest.newBuilder()
+                .setNew("5ecr3t")
+                .setClearNonce(true)
+                .build();
+
+        stub.forceUpdateCredential(forceReq);
+
+        // Check the password was changed
+        try {
+            stub.getSelf(GetSelfRequest.newBuilder().build());
+            fail("Password wasn't changed");
+        } catch (StatusRuntimeException e) {
+            assertEquals(Status.UNAUTHENTICATED.getCode(), e.getStatus().getCode());
+        }
+
+        // Update authorization header with new password
+        token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Check nonce was cleared
+        checkNonceResponse = stub.checkNonce(checkNonceRequest);
+
+        System.out.println(checkNonceResponse);
+
+        assertFalse(checkNonceResponse.getValid());
+        assertEquals("not_found", checkNonceResponse.getError());
+    }
+
+    @Test
+    void forceUpdateCredentialWithNonceClearAndActive() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Save nonce to the user
+        ModifyProfileRequest modifyProfileRequest = ModifyProfileRequest.newBuilder()
+                .addModifications(
+                        UserItemDeltaMessage.newBuilder()
+                                .setPath("credentials/nonce/value")
+                                .addValuesToReplace("123456")
+                                .build()
+                )
+                .build();
+
+        stub.modifyProfile(modifyProfileRequest);
+
+        // Force update password
+        ForceUpdateCredentialRequest request = ForceUpdateCredentialRequest.newBuilder()
+                .setNew("password")
+                .build();
+
+        stub.forceUpdateCredential(request);
+
+        // Check the password was changed
+        try {
+            stub.getSelf(GetSelfRequest.newBuilder().build());
+            fail("Password wasn't changed");
+        } catch (StatusRuntimeException e) {
+            assertEquals(Status.UNAUTHENTICATED.getCode(), e.getStatus().getCode());
+        }
+
+        // Update authorization header with new password
+        token = Base64.getEncoder().encodeToString("Administrator:password".getBytes("UTF-8"));
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Check nonce isn't cleared yet
+        CheckNonceRequest checkNonceRequest = CheckNonceRequest.newBuilder()
+                .setNonce("123456")
+                .build();
+
+        CheckNonceResponse checkNonceResponse = stub.checkNonce(checkNonceRequest);
+
+        System.out.println(checkNonceResponse);
+
+        assertTrue(checkNonceResponse.getValid());
+        assertTrue(checkNonceResponse.getError().isEmpty());
+
+        // Check lifecycleState isn't active yet
+        assertEquals("", stub.getSelf(GetSelfRequest.newBuilder().build()).getProfile().getLifecycleState());
+
+        // Back to original password with clear nonce and active
+        ForceUpdateCredentialRequest forceReq = ForceUpdateCredentialRequest.newBuilder()
+                .setNew("5ecr3t")
+                .setClearNonce(true)
+                .setActive(true)
+                .build();
+
+        stub.forceUpdateCredential(forceReq);
+
+        // Check the password was changed
+        try {
+            stub.getSelf(GetSelfRequest.newBuilder().build());
+            fail("Password wasn't changed");
+        } catch (StatusRuntimeException e) {
+            assertEquals(Status.UNAUTHENTICATED.getCode(), e.getStatus().getCode());
+        }
+
+        // Update authorization header with new password
+        token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Check nonce was cleared
+        checkNonceResponse = stub.checkNonce(checkNonceRequest);
+
+        System.out.println(checkNonceResponse);
+
+        assertFalse(checkNonceResponse.getValid());
+        assertEquals("not_found", checkNonceResponse.getError());
+
+        // Check lifecycleState was active
+        assertEquals(SchemaConstants.LIFECYCLE_ACTIVE, stub.getSelf(GetSelfRequest.newBuilder().build()).getProfile().getLifecycleState());
+
+        // Clear lifecycleState
+        ModifyProfileRequest profileRequest = ModifyProfileRequest.newBuilder()
+                .addModifications(UserItemDeltaMessage.newBuilder()
+                        .setUserTypePath(DefaultUserTypePath.F_LIFECYCLE_STATE)
+                        .addValuesToDelete(SchemaConstants.LIFECYCLE_ACTIVE))
+                .build();
+        stub.modifyProfile(profileRequest);
+    }
+
+    @Test
+    void generateNonce() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        GenerateValueRequest request = GenerateValueRequest.newBuilder()
+                .setValuePolicyOid("00000000-0000-0000-0000-000000000003")
+                .build();
+
+        GenerateValueResponse response = stub.generateValue(request);
+
+        System.out.println("Generated nonce: " + response.getValue());
+
+        assertNotNull(response.getValue());
+        assertTrue(response.getValue().length() > 0);
+    }
+
+    @Test
+    void checkNonce() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Add
+        AddUserRequest request = AddUserRequest.newBuilder()
+                .setProfile(UserTypeMessage.newBuilder()
+                        .setName(PolyStringMessage.newBuilder().setOrig("user001"))
+                        .setEmployeeNumber("emp001")
+                        .setLifecycleState("proposed")
+                )
+                .build();
+
+        AddUserResponse response = stub.addUser(request);
+
+        assertNotNull(response.getOid());
+
+        // Switch to the created user
+        headers.put(Constant.SwitchToPrincipalMetadataKey, response.getOid());
+        headers.put(Constant.RunPrivilegedMetadataKey, "true");
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Check nonce when the user doesn't have
+        CheckNonceRequest checkNonceRequest = CheckNonceRequest.newBuilder()
+                .setNonce("123456")
+                .build();
+
+        CheckNonceResponse checkNonceResponse = stub.checkNonce(checkNonceRequest);
+
+        System.out.println(checkNonceResponse);
+
+        assertFalse(checkNonceResponse.getValid());
+        assertEquals("not_found", checkNonceResponse.getError());
+
+        // Save nonce to the user
+        ModifyProfileRequest modifyProfileRequest = ModifyProfileRequest.newBuilder()
+                .addModifications(
+                        UserItemDeltaMessage.newBuilder()
+                                .setPath("credentials/nonce/value")
+                                .addValuesToReplace("123456")
+                                .build()
+                )
+                .build();
+
+        stub.modifyProfile(modifyProfileRequest);
+
+        // Check nonce again
+        checkNonceResponse = stub.checkNonce(checkNonceRequest);
+
+        System.out.println(checkNonceResponse);
+
+        assertTrue(checkNonceResponse.getValid());
+        assertTrue(checkNonceResponse.getError().isEmpty());
+
+        // Check nonce with invalid value
+        CheckNonceRequest invalidCheckNonceRequest = CheckNonceRequest.newBuilder()
+                .setNonce("invalid")
+                .build();
+        checkNonceResponse = stub.checkNonce(invalidCheckNonceRequest);
+
+        System.out.println(checkNonceResponse);
+
+        assertFalse(checkNonceResponse.getValid());
+        assertEquals("invalid", checkNonceResponse.getError());
+
+        // Update credential
+        ForceUpdateCredentialRequest forceUpdateCredentialRequest = ForceUpdateCredentialRequest.newBuilder()
+                .setNew("5ecr3t")
+                .build();
+
+        stub.forceUpdateCredential(forceUpdateCredentialRequest);
+
+        // Check nonce isn't cleared yet
+        checkNonceResponse = stub.checkNonce(checkNonceRequest);
+
+        System.out.println(checkNonceResponse);
+
+        assertTrue(checkNonceResponse.getValid());
+        assertTrue(checkNonceResponse.getError().isEmpty());
+
+        // Update credential again
+        UpdateCredentialRequest updateCredentialRequest = UpdateCredentialRequest.newBuilder()
+                .setOld("5ecr3t")
+                .setNew("P@ssw0rd")
+                .build();
+
+        stub.updateCredential(updateCredentialRequest);
+
+        // Check nonce isn't cleared yet
+        checkNonceResponse = stub.checkNonce(checkNonceRequest);
+
+        System.out.println(checkNonceResponse);
+
+        assertTrue(checkNonceResponse.getValid());
+        assertTrue(checkNonceResponse.getError().isEmpty());
+
+        // Check lifecycleState isn't active yet
+        assertEquals(SchemaConstants.LIFECYCLE_PROPOSED, stub.getSelf(GetSelfRequest.newBuilder().build()).getProfile().getLifecycleState());
+
+        // Update credential again with nonce clearing
+        ForceUpdateCredentialRequest forceUpdateCredentialRequestWithClearNonce = ForceUpdateCredentialRequest.newBuilder()
+                .setNew("5ecr3t")
+                .setClearNonce(true)
+                .setActive(true)
+                .build();
+
+        stub.forceUpdateCredential(forceUpdateCredentialRequestWithClearNonce);
+
+        // Check nonce was cleared
+        checkNonceResponse = stub.checkNonce(checkNonceRequest);
+
+        System.out.println(checkNonceResponse);
+
+        assertFalse(checkNonceResponse.getValid());
+        assertEquals("not_found", checkNonceResponse.getError());
+
+        // Check lifecycleState was active
+        assertEquals(SchemaConstants.LIFECYCLE_ACTIVE, stub.getSelf(GetSelfRequest.newBuilder().build()).getProfile().getLifecycleState());
+
+        // Delete
+        stub.deleteObject(DeleteObjectRequest.newBuilder()
+                .setOid(response.getOid())
+                .setObjectType(DefaultObjectType.USER_TYPE)
+                .build());
     }
 
     @Test
