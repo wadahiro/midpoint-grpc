@@ -276,9 +276,11 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
         }
     }
 
-    protected PrismObject<? extends FocusType> findByOid(String oid, Task task) {
+    protected PrismObject<? extends FocusType> findByOid(Authentication auth, String oid, Task task) {
         OperationResult result = task.getResult();
         try {
+            SecurityContextHolder.getContext().setAuthentication(auth);
+
             PrismObject<UserType> user = modelService.getObject(UserType.class, oid, null, task, result);
             return user;
         } catch (SchemaException | ObjectNotFoundException | SecurityViolationException | CommunicationException | ConfigurationException | ExpressionEvaluationException e) {
@@ -286,12 +288,16 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
             throw Status.UNAUTHENTICATED
                     .withDescription(e.getMessage())
                     .asRuntimeException();
+        } finally {
+            SecurityContextHolder.getContext().setAuthentication(null);
         }
     }
 
-    protected PrismObject<? extends FocusType> findByUsername(String username, Task task) {
+    protected PrismObject<? extends FocusType> findByUsername(Authentication auth, String username, Task task) {
         OperationResult result = task.getResult();
         try {
+            SecurityContextHolder.getContext().setAuthentication(auth);
+
             PolyString usernamePoly = new PolyString(username);
             ObjectQuery query = ObjectQueryUtil.createNormNameQuery(usernamePoly, prismContext);
             LOGGER.trace("Looking for user, query:\n" + query.debugDump());
@@ -309,6 +315,8 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
             throw Status.UNAUTHENTICATED
                     .withDescription(e.getMessage())
                     .asRuntimeException();
+        } finally {
+            SecurityContextHolder.getContext().setAuthentication(null);
         }
     }
 
