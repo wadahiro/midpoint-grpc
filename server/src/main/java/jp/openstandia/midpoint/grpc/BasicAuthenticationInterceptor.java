@@ -59,9 +59,9 @@ public class BasicAuthenticationInterceptor extends AbstractGrpcAuthenticationIn
         // Find proxy user
         PrismObject<UserType> authorizedUser;
         if (StringUtils.isNotBlank(switchUser)) {
-            authorizedUser = findByOid(switchUser, task);
+            authorizedUser = findByOid(auth, switchUser, task);
         } else if (StringUtils.isNotBlank(switchUserByName)) {
-            authorizedUser = findByUsername(switchUserByName, task);
+            authorizedUser = findByUsername(auth, switchUserByName, task);
         } else {
             // No switching
             return auth;

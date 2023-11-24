@@ -35,6 +35,16 @@ service SelfServiceResource {
     rpc forceUpdateCredential (ForceUpdateCredentialRequest) returns (UpdateCredentialResponse);
 
     /**
+     * Generate value by value policy.
+     */
+    rpc generateValue (GenerateValueRequest) returns (GenerateValueResponse);
+
+    /**
+     * Check user nonce.
+     */
+    rpc checkNonce (CheckNonceRequest) returns (CheckNonceResponse);
+
+    /**
      * Request assignments.
      */
     rpc requestAssignments (RequestAssignmentsRequest) returns (RequestAssignmentsResponse);
@@ -680,9 +690,31 @@ message UpdateCredentialRequest {
 message ForceUpdateCredentialRequest {
     // New credential.
     string new = 1;
+    bool clear_nonce = 2;
+    bool active = 3;
 }
 
 message UpdateCredentialResponse {
+}
+
+message GenerateValueRequest {
+    string value_policy_oid = 1;
+    int32 default_length = 2;
+    bool generate_minimal_size = 3;
+}
+
+message GenerateValueResponse {
+    string value = 1;
+}
+
+message CheckNonceRequest {
+    string nonce = 1;
+    string nonce_name = 2;
+}
+
+message CheckNonceResponse {
+    bool valid = 1;
+    string error = 2;
 }
 
 message RequestAssignmentsRequest {
