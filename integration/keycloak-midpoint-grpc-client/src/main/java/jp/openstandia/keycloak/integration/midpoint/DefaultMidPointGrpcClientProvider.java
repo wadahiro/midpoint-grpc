@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class DefaultMidPointGrpcClientProvider implements MidPointGrpcClientProvider {
@@ -30,7 +31,22 @@ public class DefaultMidPointGrpcClientProvider implements MidPointGrpcClientProv
     }
 
     @Override
+    public SelfServiceResourceGrpc.SelfServiceResourceBlockingStub getSelfServiceResource() {
+        return getSelfServiceResourceWithMetadataCustomizer(null);
+    }
+
+    @Override
     public SelfServiceResourceGrpc.SelfServiceResourceBlockingStub getSelfServiceResource(String username) {
+        return getSelfServiceResourceWithMetadataCustomizer(metadata -> metadata.put(Constant.SwitchToPrincipalByNameMetadataKey, username));
+    }
+
+    @Override
+    public SelfServiceResourceGrpc.SelfServiceResourceBlockingStub getSelfServiceResourceByOid(String oid) {
+        return getSelfServiceResourceWithMetadataCustomizer(metadata -> metadata.put(Constant.SwitchToPrincipalMetadataKey, oid));
+    }
+
+    @Override
+    public SelfServiceResourceGrpc.SelfServiceResourceBlockingStub getSelfServiceResourceWithMetadataCustomizer(Consumer<Metadata> metadataCustomizer) {
         SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
 
         Metadata headers = new Metadata();
@@ -44,8 +60,11 @@ public class DefaultMidPointGrpcClientProvider implements MidPointGrpcClientProv
 
         headers.put(Constant.AuthorizationMetadataKey, "Basic " +
                 Base64.getEncoder().encodeToString(tmp.toString().getBytes(Charset.forName("UTF-8"))));
-        headers.put(Constant.SwitchToPrincipalByNameMetadataKey, username);
         headers.put(Constant.RunPrivilegedMetadataKey, "true");
+
+        if (metadataCustomizer != null) {
+            metadataCustomizer.accept(headers);
+        }
 
         SelfServiceResourceGrpc.SelfServiceResourceBlockingStub authStub = MetadataUtils.attachHeaders(stub, headers);
 

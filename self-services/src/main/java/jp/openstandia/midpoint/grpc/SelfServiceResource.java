@@ -1,11 +1,9 @@
 package jp.openstandia.midpoint.grpc;
 
 import com.evolveum.midpoint.gui.api.util.WebComponentUtil;
-import com.evolveum.midpoint.model.api.ModelExecuteOptions;
-import com.evolveum.midpoint.model.api.ModelInteractionService;
-import com.evolveum.midpoint.model.api.ModelService;
-import com.evolveum.midpoint.model.api.TaskService;
+import com.evolveum.midpoint.model.api.*;
 import com.evolveum.midpoint.model.api.context.ModelContext;
+import com.evolveum.midpoint.model.api.context.NonceAuthenticationContext;
 import com.evolveum.midpoint.model.impl.ModelCrudService;
 import com.evolveum.midpoint.model.impl.util.ModelImplUtils;
 import com.evolveum.midpoint.prism.*;
@@ -22,15 +20,17 @@ import com.evolveum.midpoint.prism.schema.SchemaRegistry;
 import com.evolveum.midpoint.repo.api.RepositoryService;
 import com.evolveum.midpoint.schema.*;
 import com.evolveum.midpoint.schema.constants.ObjectTypes;
+import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import com.evolveum.midpoint.schema.result.OperationResult;
 import com.evolveum.midpoint.schema.util.LocalizationUtil;
+import com.evolveum.midpoint.schema.util.MiscSchemaUtil;
 import com.evolveum.midpoint.schema.util.ObjectQueryUtil;
+import com.evolveum.midpoint.security.api.ConnectionEnvironment;
+import com.evolveum.midpoint.security.api.SecurityContextManager;
 import com.evolveum.midpoint.task.api.Task;
 import com.evolveum.midpoint.task.api.TaskCategory;
-import com.evolveum.midpoint.util.LocalizableMessage;
-import com.evolveum.midpoint.util.LocalizableMessageList;
-import com.evolveum.midpoint.util.LocalizableMessageListBuilder;
-import com.evolveum.midpoint.util.MiscUtil;
+import com.evolveum.midpoint.task.api.TaskManager;
+import com.evolveum.midpoint.util.*;
 import com.evolveum.midpoint.util.exception.*;
 import com.evolveum.midpoint.util.logging.LoggingUtils;
 import com.evolveum.midpoint.util.logging.Trace;
@@ -46,6 +46,8 @@ import io.grpc.stub.StreamObserver;
 import org.apache.commons.lang3.StringUtils;
 import org.lognet.springboot.grpc.GRpcService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.*;
+import org.springframework.security.core.AuthenticationException;
 
 import javax.xml.namespace.QName;
 import java.util.*;
@@ -82,6 +84,9 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     public static final String OPERATION_EXECUTE_USER_UPDATE = CLASS_DOT + "executeUserUpdate";
     public static final String OPERATION_EXECUTE_CREDENTIAL_CHECK = CLASS_DOT + "executeCredentialCheck";
     public static final String OPERATION_EXECUTE_CREDENTIAL_UPDATE = CLASS_DOT + "executeCredentialUpdate";
+    public static final String OPERATION_GENERATE_VALUE = CLASS_DOT + "generateValue";
+    public static final String OPERATION_CHECK_NONCE = CLASS_DOT + "checkNonce";
+    public static final String OPERATION_GET_SECURITY_POLICY = CLASS_DOT + "getSecurityPolicy";
     public static final String OPERATION_REQUEST_ASSIGNMENTS = CLASS_DOT + "requestAssignments";
     public static final String OPERATION_SEARCH_OBJECTS = CLASS_DOT + "searchObjects";
     public static final String OPERATION_SEARCH_ASSIGNMENTS = CLASS_DOT + "searchAssignments";
@@ -106,6 +111,12 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     protected Protector protector;
     @Autowired
     protected TaskService taskService;
+    @Autowired
+    protected AuthenticationEvaluator<NonceAuthenticationContext> nonceAuthenticationEvaluator;
+    @Autowired
+    protected SecurityContextManager securityContextManager;
+    @Autowired
+    protected TaskManager taskManager;
 
     public static final Metadata.Key<PolicyError> PolicyErrorMetadataKey = ProtoUtils.keyForProto(PolicyError.getDefaultInstance());
 
@@ -379,7 +390,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         LOGGER.debug("Start updateCredential");
 
         runTask(ctx -> {
-            updateCredential(ctx, request.getOld(), request.getNew(), true);
+            updateCredential(ctx, request.getOld(), request.getNew(), true, false, false);
             return null;
         });
 
@@ -395,7 +406,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         LOGGER.debug("Start forceUpdateCredential");
 
         runTask(ctx -> {
-            updateCredential(ctx, null, request.getNew(), false);
+            updateCredential(ctx, null, request.getNew(), false, request.getClearNonce(), request.getActive());
             return null;
         });
 
@@ -404,6 +415,134 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         responseObserver.onCompleted();
 
         LOGGER.debug("End forceUpdateCredential");
+    }
+
+    @Override
+    public void generateValue(GenerateValueRequest request, StreamObserver<GenerateValueResponse> responseObserver) {
+        LOGGER.debug("Start generateValue");
+
+        final String value = runTask(ctx -> {
+            Task task = ctx.task;
+            FocusType focus = ctx.principal.getFocus();
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_GENERATE_VALUE);
+
+            ValuePolicyType valuePolicy = modelService.getObject(ValuePolicyType.class, request.getValuePolicyOid(), null, task, parentResult).asObjectable();
+            try {
+                String result = modelInteraction.generateValue(valuePolicy,
+                        request.getDefaultLength(), request.getGenerateMinimalSize(), focus.asPrismObject(),
+                        String.format("value generation (%s)", valuePolicy.getName().getOrig()), task, parentResult);
+                return result;
+            } catch (Exception e) {
+                LoggingUtils.logUnexpectedException(LOGGER, "Couldn't generate value", e);
+                throw e;
+            } finally {
+                parentResult.computeStatus();
+            }
+        });
+
+        GenerateValueResponse res = GenerateValueResponse.newBuilder()
+                .setValue(value)
+                .build();
+
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End generateValue");
+    }
+
+    @Override
+    public void checkNonce(CheckNonceRequest request, StreamObserver<CheckNonceResponse> responseObserver) {
+        LOGGER.debug("Start checkNonce");
+
+        final String error = runTask(ctx -> {
+            Task task = ctx.task;
+            FocusType focus = ctx.principal.getFocus();
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_CHECK_NONCE);
+
+            String result = checkUserNonce(focus, request.getNonce(), request.getNonceName(), parentResult);
+
+            parentResult.computeStatus();
+
+            return result;
+        });
+
+        CheckNonceResponse res = CheckNonceResponse.newBuilder()
+                .setValid(error == null)
+                .setError(error == null ? "" : error)
+                .build();
+
+        responseObserver.onNext(res);
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End checkNonce");
+    }
+
+    protected String checkUserNonce(FocusType focus, String nonce, String nonceName, OperationResult parentResult) throws SchemaException {
+        try {
+            SecurityPolicyType securityPolicy = resolveSecurityPolicy(focus.asPrismContainer());
+            Optional<NonceCredentialsPolicyType> noncePolicy = securityPolicy.getCredentials().getNonce().stream()
+                    .filter(p -> nonceName.equals(p.getName()))
+                    .findFirst();
+
+            ConnectionEnvironment connEnv = ConnectionEnvironment.create(SchemaConstants.CHANNEL_SELF_REGISTRATION_URI);
+            // Don't call authenticate method here because the user may not yet be active
+            nonceAuthenticationEvaluator.checkCredentials(connEnv, new NonceAuthenticationContext(focus.getName().getOrig(), focus.getClass(),
+                    nonce, noncePolicy.orElse(null)));
+
+            return null;
+        } catch (AuthenticationCredentialsNotFoundException e) {
+            LOGGER.info("Not found nonce. focus: {}, nonceName: {}", focus.getOid(), nonceName);
+            return "not_found";
+        } catch (BadCredentialsException e) {
+            LOGGER.info("Invalid nonce. focus: {}, nonceName: {}", focus.getOid(), nonceName);
+            return "invalid";
+        } catch (CredentialsExpiredException e) {
+            LOGGER.info("Expired nonce. focus: {}, nonceName: {}", focus.getOid(), nonceName);
+            return "expired";
+        } catch (LockedException e) {
+            LOGGER.info("Locked nonce. focus: {}, nonceName: {}", focus.getOid(), nonceName);
+            return "locked";
+        } catch (AuthenticationServiceException e) {
+            LOGGER.error("Invalid configuration. focus: {}, nonceName: {}", focus.getOid(), nonceName, e);
+            throw e;
+        } catch (AuthenticationException e) {
+            LOGGER.error("Unexpected checkUserNonce error. focus: {}, nonceName: {}", focus.getOid(), nonceName, e);
+            throw e;
+        }
+    }
+
+    protected SecurityPolicyType resolveSecurityPolicy(PrismObject<UserType> user) {
+        SecurityPolicyType securityPolicy = runPrivileged(new Producer<SecurityPolicyType>() {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public SecurityPolicyType run() {
+                Task task = createAnonymousTask(OPERATION_GET_SECURITY_POLICY);
+                task.setChannel(SchemaConstants.CHANNEL_SELF_REGISTRATION_URI);
+                OperationResult result = new OperationResult(OPERATION_GET_SECURITY_POLICY);
+
+                try {
+                    return modelInteraction.getSecurityPolicy(user, task, result);
+                } catch (CommonException e) {
+                    LOGGER.error("Could not retrieve security policy: {}", e.getMessage(), e);
+                    return null;
+                }
+            }
+        });
+
+        return securityPolicy;
+    }
+
+    protected <T> T runPrivileged(Producer<T> producer) {
+        return securityContextManager.runPrivileged(producer);
+    }
+
+    protected Task createAnonymousTask(String operation) {
+        Task task = taskManager.createTaskInstance(operation);
+        task.setChannel(SchemaConstants.CHANNEL_USER_URI);
+        return task;
     }
 
     private void resolveReference(ObjectDelta delta, OperationResult result) {
@@ -669,11 +808,12 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         LOGGER.debug("End modifyUser");
     }
 
-    protected void updateCredential(MidPointTaskContext ctx, String oldCred, String newCred, boolean validate) throws SchemaException, SecurityViolationException, CommunicationException, ConfigurationException, ExpressionEvaluationException, ObjectNotFoundException, EncryptionException, PolicyViolationException, ObjectAlreadyExistsException {
+    protected void updateCredential(MidPointTaskContext ctx, String oldCred, String newCred, boolean validate, boolean clearNonce, boolean active) throws SchemaException, SecurityViolationException, CommunicationException, ConfigurationException, ExpressionEvaluationException, ObjectNotFoundException, EncryptionException, PolicyViolationException, ObjectAlreadyExistsException {
         LOGGER.debug("Start updateCredential");
 
         Task task = ctx.task;
-        String userOid = ctx.principal.getOid();
+        FocusType user = ctx.principal.getFocus();
+        String userOid = user.getOid();
 
         ProtectedStringType oldPassword = null;
         if (validate) {
@@ -698,11 +838,11 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
         OperationResult updateResult = task.getResult().createSubresult(OPERATION_EXECUTE_CREDENTIAL_UPDATE);
         try {
+            // delta for password
             ProtectedStringType newProtectedCred = protector.encryptString(newCred);
             final ItemPath valuePath = ItemPath.create(SchemaConstantsGenerated.C_CREDENTIALS,
                     CredentialsType.F_PASSWORD, PasswordType.F_VALUE);
             SchemaRegistry registry = prismContext.getSchemaRegistry();
-            Collection<ObjectDelta<? extends ObjectType>> deltas = new ArrayList<>();
 
             PrismObjectDefinition objDef = registry.findObjectDefinitionByCompileTimeClass(UserType.class);
 
@@ -711,10 +851,21 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             if (oldPassword != null) {
                 delta.addEstimatedOldValue(prismContext.itemFactory().createPropertyValue(oldPassword));
             }
+            final ObjectDelta<UserType> objectDelta = prismContext.deltaFactory().object().createModifyDelta(userOid, delta, UserType.class);
 
-            deltas.add(prismContext.deltaFactory().object().createModifyDelta(userOid, delta, UserType.class));
+            // delta for nonce
+            NonceType nonce = user.getCredentials().getNonce();
+            if (clearNonce && nonce != null) {
+                objectDelta.addModificationDeleteContainer(ItemPath.create(UserType.F_CREDENTIALS, CredentialsType.F_NONCE),
+                        nonce.clone());
+            }
 
-            modelService.executeChanges(deltas, null, task, updateResult);
+            // delta for lifecycleState
+            if (active && !SchemaConstants.LIFECYCLE_ACTIVE.equals(user.getLifecycleState())) {
+                objectDelta.addModificationReplaceProperty(UserType.F_LIFECYCLE_STATE, SchemaConstants.LIFECYCLE_ACTIVE);
+            }
+
+            modelService.executeChanges(MiscSchemaUtil.createCollection(objectDelta), null, task, updateResult);
 
             updateResult.computeStatus();
         } catch (PolicyViolationException e) {
@@ -1665,6 +1816,19 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             oid = obj.getOid();
         }
         return oid;
+    }
+
+    private <T extends ObjectType> T resolveObject(Class<T> clazz, String oid, String name, Task task, OperationResult result) throws SecurityViolationException, ObjectNotFoundException,
+            CommunicationException, ConfigurationException, SchemaException, ExpressionEvaluationException {
+        if (oid.isEmpty() && !name.isEmpty()) {
+            // Fallback to search by name
+            T obj = searchObjectByName(clazz, name, task, result);
+            if (obj == null) {
+                throw new ObjectNotFoundException("Not found: " + name);
+            }
+            return obj;
+        }
+        return modelCrudService.getObject(clazz, oid, null, task, result).asObjectable();
     }
 
     private <T extends ObjectType> T searchObjectByName(Class<T> type, String name, Task task, OperationResult result)

@@ -111,9 +111,9 @@ public class JWTAuthenticationInterceptor extends AbstractGrpcAuthenticationInte
         // Find proxy user
         PrismObject<? extends FocusType> authorizedUser;
         if (StringUtils.isNotBlank(switchUser)) {
-            authorizedUser = findByOid(switchUser, task);
+            authorizedUser = findByOid(auth, switchUser, task);
         } else if (StringUtils.isNotBlank(switchUserByName)) {
-            authorizedUser = findByUsername(switchUserByName, task);
+            authorizedUser = findByUsername(auth, switchUserByName, task);
         } else {
             // JWT authentication needs proxy user always!
             StatusRuntimeException e = Status.UNAUTHENTICATED
