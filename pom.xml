@@ -51,6 +51,7 @@
 
     <properties>
         <version.midpoint>4.4</version.midpoint>
+        <version.connector-framework>1.5.0.18</version.connector-framework>
         <version.spring-boot>2.5.2</version.spring-boot>
         <version.grpc-java>1.42.0</version.grpc-java>
         <version.protoc>3.10.0</version.protoc>
@@ -114,6 +115,26 @@
                 <version>${version.midpoint}</version>
                 <type>jar</type>
                 <classifier>classes</classifier>
+                <exclusions>
+                    <exclusion>
+                        <groupId>net.tirasa.connid</groupId>
+                        <artifactId>connector-framework</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>net.tirasa.connid</groupId>
+                        <artifactId>connector-framework-internal</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>net.tirasa.connid</groupId>
+                <artifactId>connector-framework</artifactId>
+                <version>${version.connector-framework}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.tirasa.connid</groupId>
+                <artifactId>connector-framework-internal</artifactId>
+                <version>${version.connector-framework}</version>
             </dependency>
             <dependency>
                 <groupId>com.google.protobuf</groupId>
