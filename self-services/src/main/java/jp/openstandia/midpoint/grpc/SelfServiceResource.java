@@ -95,6 +95,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     public static final String OPERATION_EXECUTE_OBJECT_UPDATE = CLASS_DOT + "executeObjectUpdate";
     public static final String OPERATION_DELETE_OBJECT = CLASS_DOT + "deleteObject";
     public static final String OPERATION_GET_LOOKUP_TABLE = CLASS_DOT + "getLookupTable";
+    public static final String OPERATION_GET_SEQUENCE_COUNTER = CLASS_DOT + "getSequenceCounter";
 
     private static final long WAIT_FOR_TASK_STOP = 2000L;
 
@@ -1885,5 +1886,31 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
         responseObserver.onCompleted();
 
         LOGGER.debug("End getLookupTable");
+    }
+
+    @Override
+    public void getSequenceCounter(GetSequenceCounterRequest request, StreamObserver<GetSequenceCounterResponse> responseObserver) {
+        LOGGER.debug("Start getSequenceCounter");
+
+        long result = runTask(ctx -> {
+            Task task = ctx.task;
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_GET_SEQUENCE_COUNTER);
+
+            String oid = resolveOid(SequenceType.class, request.getOid(), request.getName(), task, parentResult);
+
+            long counter = repositoryService.advanceSequence(oid, parentResult);
+
+            parentResult.computeStatus();
+
+            return counter;
+        });
+
+        responseObserver.onNext(GetSequenceCounterResponse.newBuilder()
+                .setResult(result)
+                .build());
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End getSequenceCounter");
     }
 }
