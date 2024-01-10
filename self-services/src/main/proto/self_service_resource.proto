@@ -3,6 +3,8 @@ syntax = "proto3";
 option java_multiple_files = true;
 option java_package = "jp.openstandia.midpoint.grpc";
 
+import "google/protobuf/timestamp.proto";
+
 package midpoint;
 
 /**
@@ -153,6 +155,16 @@ service SelfServiceResource {
      * Search assignments.
      */
     rpc searchAssignments (SearchAssignmentsRequest) returns (SearchAssignmentsResponse);
+
+    /**
+     * Get lookup table.
+     */
+    rpc getLookupTable (GetLookupTableRequest) returns (GetLookupTableResponse);
+
+    /**
+     * Get sequence counter.
+     */
+    rpc getSequenceCounter (GetSequenceCounterRequest) returns (GetSequenceCounterResponse);
 }
 
 message GetSelfRequest {
@@ -632,6 +644,7 @@ enum DefaultObjectType {
     ORG_TYPE = 6;
     SERVICE_TYPE = 7;
     ARCHETYPE_TYPE = 8;
+    LOOKUP_TABLE_TYPE = 9;
     // TODO more type
 }
 
@@ -998,7 +1011,7 @@ message PagingMessage {
 }
 
 enum OrderDirectionType {
-    ASCEDING = 0;
+    ASCENDING = 0;
     DESCENDING = 1;
 }
 
@@ -1079,4 +1092,69 @@ enum OrgFilterScope {
     ONE_LEVEL = 0;
     SUBTREE = 1;
     ANCESTORS = 2;
+}
+
+message GetLookupTableRequest {
+    oneof id_wrapper {
+        string oid = 10;
+        string name = 11;
+    }
+    repeated string options = 20;
+    repeated string include = 21;
+    repeated string exclude = 22;
+    RelationalValueSearchQueryMessage relationalValueSearchQuery = 30;
+}
+
+message RelationalValueSearchQueryMessage {
+    QNameMessage column = 1;
+    string searchValue = 2;
+    RelationalValueSearch searchType = 3;
+    PagingMessage paging = 4;
+}
+
+enum RelationalValueSearch {
+    EXACT = 0;
+    STARTS_WITH = 1;
+    SUBSTRING = 2;
+}
+
+message GetLookupTableResponse {
+    LookupTableMessage result = 1;
+}
+
+message LookupTableMessage {
+    // oid
+    string oid = 1;
+    // version
+    string version = 2;
+    // name
+    PolyStringMessage name = 3;
+    // description
+    string description = 4;
+    // row
+    repeated LookupTableRowMessage row = 5;
+}
+
+message LookupTableRowMessage {
+    // id
+    int64 id = 1;
+    // key
+    string key = 2;
+    // value
+    string value = 3;
+    // label
+    PolyStringMessage label = 4;
+    // lastChangeTimestamp
+    google.protobuf.Timestamp lastChangeTimestamp = 5;
+}
+
+message GetSequenceCounterRequest {
+    oneof id_wrapper {
+        string oid = 10;
+        string name = 11;
+    }
+}
+
+message GetSequenceCounterResponse {
+    int64 result = 1;
 }

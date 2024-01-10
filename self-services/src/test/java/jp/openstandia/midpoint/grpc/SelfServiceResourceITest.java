@@ -836,4 +836,297 @@ class SelfServiceResourceITest {
 
         assertNotNull(res4);
     }
+
+    @Test
+    void lookupTable() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Get with default options
+        GetLookupTableRequest req = GetLookupTableRequest.newBuilder()
+                .setName("Languages")
+                .build();
+
+        GetLookupTableResponse res = stub.getLookupTable(req);
+
+        assertEquals("00000000-0000-0000-0000-000000000200", res.getResult().getOid());
+        assertEquals("1", res.getResult().getVersion());
+        assertEquals("Languages", res.getResult().getName().getOrig());
+        assertEquals("\n        Lookup table for languages directly supported by midPoint.\n        This lookup table contains language codes that are supported by\n        midPoint product localizations. The idea is that only the list of\n        supported languages will be presented to midPoint user.\n        For full list of language code please see lookup-languages-all.xml\n        in midPoint samples.\n    ",
+                res.getResult().getDescription());
+        assertEquals(0, res.getResult().getRowCount());
+
+        // Get with all rows
+        req = GetLookupTableRequest.newBuilder()
+                .setName("Timezones")
+                .addInclude("row")
+                .build();
+
+        res = stub.getLookupTable(req);
+
+        assertEquals("00000000-0000-0000-0000-000000000220", res.getResult().getOid());
+        assertEquals("1", res.getResult().getVersion());
+        assertEquals("Timezones", res.getResult().getName().getOrig());
+        assertEquals("", res.getResult().getDescription());
+        assertNotNull(res.getResult().getRowList());
+        List<LookupTableRowMessage> rows = res.getResult().getRowList();
+        assertEquals(419, rows.size());
+
+        assertEquals("Africa/Abidjan", rows.get(0).getKey());
+        assertEquals("Africa/Abidjan", rows.get(0).getLabel().getOrig());
+        assertEquals("117", rows.get(0).getValue());
+        assertEquals(118, rows.get(0).getId());
+        assertTrue(rows.get(0).hasLastChangeTimestamp());
+
+        // with query by key
+        req = GetLookupTableRequest.newBuilder()
+                .setName("Languages")
+                .setRelationalValueSearchQuery(RelationalValueSearchQueryMessage.newBuilder()
+                        .setColumn(QNameMessage.newBuilder()
+                                .setLocalPart("key"))
+                        .setSearchType(RelationalValueSearch.EXACT)
+                        .setSearchValue("en")
+                )
+                .build();
+
+        res = stub.getLookupTable(req);
+
+        assertEquals("00000000-0000-0000-0000-000000000200", res.getResult().getOid());
+        assertEquals("1", res.getResult().getVersion());
+        assertEquals("Languages", res.getResult().getName().getOrig());
+        assertEquals("", res.getResult().getDescription());
+        rows = res.getResult().getRowList();
+        assertEquals(1, rows.size());
+
+        assertEquals("en", rows.get(0).getKey());
+        assertEquals("English", rows.get(0).getLabel().getOrig());
+        assertEquals("", rows.get(0).getValue());
+        assertEquals(4, rows.get(0).getId());
+        assertTrue(rows.get(0).hasLastChangeTimestamp());
+
+        // with query and paging
+        req = GetLookupTableRequest.newBuilder()
+                .setName("Languages")
+                .addInclude("description")
+                .setRelationalValueSearchQuery(RelationalValueSearchQueryMessage.newBuilder()
+                        .setPaging(PagingMessage.newBuilder()
+                                .addOrdering(ObjectOrderingMessage.newBuilder()
+                                        .setOrderBy("key")
+                                        .setOrderDirection(OrderDirectionType.ASCENDING)
+                                )
+                                .setOffset(0)
+                                .setMaxSize(2)
+                        )
+                )
+                .build();
+
+        res = stub.getLookupTable(req);
+
+        assertEquals("00000000-0000-0000-0000-000000000200", res.getResult().getOid());
+        assertEquals("1", res.getResult().getVersion());
+        assertEquals("Languages", res.getResult().getName().getOrig());
+        assertEquals("\n        Lookup table for languages directly supported by midPoint.\n        This lookup table contains language codes that are supported by\n        midPoint product localizations. The idea is that only the list of\n        supported languages will be presented to midPoint user.\n        For full list of language code please see lookup-languages-all.xml\n        in midPoint samples.\n    ",
+                res.getResult().getDescription());
+        rows = res.getResult().getRowList();
+        assertEquals(2, rows.size());
+
+        assertEquals("cs", rows.get(0).getKey());
+        assertEquals("Čeština", rows.get(0).getLabel().getOrig());
+        assertEquals("", rows.get(0).getValue());
+        assertEquals(1, rows.get(0).getId());
+        assertTrue(rows.get(0).hasLastChangeTimestamp());
+
+        assertEquals("de", rows.get(1).getKey());
+        assertEquals("Deutsch", rows.get(1).getLabel().getOrig());
+        assertEquals("", rows.get(1).getValue());
+        assertEquals(2, rows.get(1).getId());
+        assertTrue(rows.get(1).hasLastChangeTimestamp());
+
+        // add new row
+        ModifyObjectRequest addRowReq = ModifyObjectRequest.newBuilder()
+                .setOid("00000000-0000-0000-0000-000000000200")
+                .setObjectType(DefaultObjectType.LOOKUP_TABLE_TYPE)
+                .addModifications(ItemDeltaMessage.newBuilder()
+                        .setPath("row")
+                        .addPrismValuesToAdd(PrismValueMessage.newBuilder()
+                                .setContainer(PrismContainerValueMessage.newBuilder()
+                                        .putValue("key", ItemMessage.newBuilder()
+                                                .setProperty(PrismPropertyMessage.newBuilder()
+                                                        .addValues(PrismPropertyValueMessage.newBuilder()
+                                                                .setString("newKey")
+                                                        )
+                                                )
+                                                .build()
+                                        )
+                                        .putValue("label", ItemMessage.newBuilder()
+                                                .setProperty(PrismPropertyMessage.newBuilder()
+                                                        .addValues(PrismPropertyValueMessage.newBuilder()
+                                                                .setPolyString(PolyStringMessage.newBuilder()
+                                                                        .setOrig("newLabel")
+                                                                )
+                                                        )
+                                                )
+                                                .build()
+                                        )
+                                        .putValue("value", ItemMessage.newBuilder()
+                                                .setProperty(PrismPropertyMessage.newBuilder()
+                                                        .addValues(PrismPropertyValueMessage.newBuilder()
+                                                                .setString("newValue")
+                                                        )
+                                                )
+                                                .build()
+                                        )
+                                )
+                        )
+                )
+                .build();
+
+        ModifyObjectResponse addRowRes = stub.modifyObject(addRowReq);
+
+        req = GetLookupTableRequest.newBuilder()
+                .setName("Languages")
+                .setRelationalValueSearchQuery(RelationalValueSearchQueryMessage.newBuilder()
+                        .setColumn(QNameMessage.newBuilder()
+                                .setLocalPart("key"))
+                        .setSearchType(RelationalValueSearch.EXACT)
+                        .setSearchValue("newKey")
+                )
+                .build();
+
+        res = stub.getLookupTable(req);
+
+        rows = res.getResult().getRowList();
+        assertEquals(1, rows.size());
+
+        assertEquals("newKey", rows.get(0).getKey());
+        assertEquals("newLabel", rows.get(0).getLabel().getOrig());
+        assertEquals("newValue", rows.get(0).getValue());
+        assertTrue(rows.get(0).getId() != 0);
+        assertTrue(rows.get(0).hasLastChangeTimestamp());
+
+        // update row
+        long id = rows.get(0).getId();
+        ModifyObjectRequest updateRowReq = ModifyObjectRequest.newBuilder()
+                .setOid("00000000-0000-0000-0000-000000000200")
+                .setObjectType(DefaultObjectType.LOOKUP_TABLE_TYPE)
+                .addModifications(ItemDeltaMessage.newBuilder()
+                        .setPath("row/[" + id + "]/label")
+                        .addPrismValuesToReplace(PrismValueMessage.newBuilder()
+                                .setProperty(PrismPropertyValueMessage.newBuilder()
+                                        .setPolyString(PolyStringMessage.newBuilder()
+                                                .setOrig("modified")
+                                        )
+                                )
+                        )
+                )
+                .addOptions("raw")
+                .build();
+
+        ModifyObjectResponse updateRowRes = stub.modifyObject(updateRowReq);
+
+        res = stub.getLookupTable(req);
+
+        rows = res.getResult().getRowList();
+        assertEquals(1, rows.size());
+
+        assertEquals("newKey", rows.get(0).getKey());
+        assertEquals("modified", rows.get(0).getLabel().getOrig());
+        assertEquals("newValue", rows.get(0).getValue());
+        assertTrue(rows.get(0).getId() != 0);
+        assertTrue(rows.get(0).hasLastChangeTimestamp());
+
+        // delete row by id
+        ModifyObjectRequest deleteRowReq = ModifyObjectRequest.newBuilder()
+                .setOid("00000000-0000-0000-0000-000000000200")
+                .setObjectType(DefaultObjectType.LOOKUP_TABLE_TYPE)
+                .addModifications(ItemDeltaMessage.newBuilder()
+                        .setPath("row")
+                        .addPrismValuesToDelete(PrismValueMessage.newBuilder()
+                                .setContainer(PrismContainerValueMessage.newBuilder()
+                                        .setId(id)
+                                )
+                        )
+                )
+                .addOptions("raw")
+                .build();
+
+        ModifyObjectResponse deleteRowRes = stub.modifyObject(deleteRowReq);
+
+        res = stub.getLookupTable(req);
+
+        rows = res.getResult().getRowList();
+        assertEquals(0, rows.size());
+    }
+
+    @Test
+    void getSequenceCounter() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // create new SequenceType
+        AddObjectRequest newSeqReq = AddObjectRequest.newBuilder()
+                .setType(QNameMessage.newBuilder().setLocalPart("SequenceType"))
+                .setObject(PrismContainerMessage.newBuilder()
+                        .addValues(PrismContainerValueMessage.newBuilder()
+                                .putValue("name", ItemMessage.newBuilder()
+                                        .setProperty(PrismPropertyMessage.newBuilder()
+                                                .addValues(PrismPropertyValueMessage.newBuilder()
+                                                        .setPolyString(PolyStringMessage.newBuilder()
+                                                                .setOrig("Unix UID numbers")
+                                                        )
+                                                )
+                                        ).build()
+                                )
+                                .putValue("counter", ItemMessage.newBuilder()
+                                        .setProperty(PrismPropertyMessage.newBuilder()
+                                                .addValues(PrismPropertyValueMessage.newBuilder()
+                                                        .setLong(LongMessage.newBuilder()
+                                                                .setValue(1001)
+                                                        )
+                                                )
+                                        )
+                                        .build()
+                                )
+                                .putValue("maxUnusedValues", ItemMessage.newBuilder()
+                                        .setProperty(PrismPropertyMessage.newBuilder()
+                                                .addValues(PrismPropertyValueMessage.newBuilder()
+                                                        .setLong(LongMessage.newBuilder()
+                                                                .setValue(10)
+                                                        )
+                                                )
+                                        )
+                                        .build()
+                                )
+                        )
+                )
+                .build();
+
+        AddObjectResponse addSeqRes = stub.addObject(newSeqReq);
+
+        // increment
+        GetSequenceCounterRequest req = GetSequenceCounterRequest.newBuilder()
+                .setName("Unix UID numbers")
+                .build();
+
+        GetSequenceCounterResponse res = stub.getSequenceCounter(req);
+
+        assertEquals(1001, res.getResult());
+
+        // increment
+        res = stub.getSequenceCounter(req);
+
+        assertEquals(1002, res.getResult());
+    }
 }
