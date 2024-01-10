@@ -450,7 +450,7 @@ public class TypeConverter {
 
     private static OrderDirection toOrderDirectionValue(OrderDirectionType message) {
         switch (message) {
-            case ASCEDING:
+            case ASCENDING:
                 return OrderDirection.ASCENDING;
             case DESCENDING:
                 return OrderDirection.DESCENDING;
