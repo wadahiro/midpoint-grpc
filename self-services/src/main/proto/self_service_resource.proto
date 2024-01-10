@@ -1006,7 +1006,7 @@ message PagingMessage {
 }
 
 enum OrderDirectionType {
-    ASCEDING = 0;
+    ASCENDING = 0;
     DESCENDING = 1;
 }
 

@@ -74,7 +74,7 @@ public class TestLookupTableClient {
                         .setPaging(PagingMessage.newBuilder()
                                 .addOrdering(ObjectOrderingMessage.newBuilder()
                                         .setOrderBy("key")
-                                        .setOrderDirection(OrderDirectionType.ASCEDING)
+                                        .setOrderDirection(OrderDirectionType.ASCENDING)
                                 )
                                 .setOffset(0)
                                 .setMaxSize(2)
