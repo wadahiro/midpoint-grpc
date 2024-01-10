@@ -160,6 +160,11 @@ service SelfServiceResource {
      * Get lookup table.
      */
     rpc getLookupTable (GetLookupTableRequest) returns (GetLookupTableResponse);
+
+    /**
+     * Get sequence counter.
+     */
+    rpc getSequenceCounter (GetSequenceCounterRequest) returns (GetSequenceCounterResponse);
 }
 
 message GetSelfRequest {
@@ -1141,4 +1146,15 @@ message LookupTableRowMessage {
     PolyStringMessage label = 4;
     // lastChangeTimestamp
     google.protobuf.Timestamp lastChangeTimestamp = 5;
+}
+
+message GetSequenceCounterRequest {
+    oneof id_wrapper {
+        string oid = 10;
+        string name = 11;
+    }
+}
+
+message GetSequenceCounterResponse {
+    int64 result = 1;
 }

@@ -1063,4 +1063,70 @@ class SelfServiceResourceITest {
         rows = res.getResult().getRowList();
         assertEquals(0, rows.size());
     }
+
+    @Test
+    void getSequenceCounter() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // create new SequenceType
+        AddObjectRequest newSeqReq = AddObjectRequest.newBuilder()
+                .setType(QNameMessage.newBuilder().setLocalPart("SequenceType"))
+                .setObject(PrismContainerMessage.newBuilder()
+                        .addValues(PrismContainerValueMessage.newBuilder()
+                                .putValue("name", ItemMessage.newBuilder()
+                                        .setProperty(PrismPropertyMessage.newBuilder()
+                                                .addValues(PrismPropertyValueMessage.newBuilder()
+                                                        .setPolyString(PolyStringMessage.newBuilder()
+                                                                .setOrig("Unix UID numbers")
+                                                        )
+                                                )
+                                        ).build()
+                                )
+                                .putValue("counter", ItemMessage.newBuilder()
+                                        .setProperty(PrismPropertyMessage.newBuilder()
+                                                .addValues(PrismPropertyValueMessage.newBuilder()
+                                                        .setLong(LongMessage.newBuilder()
+                                                                .setValue(1001)
+                                                        )
+                                                )
+                                        )
+                                        .build()
+                                )
+                                .putValue("maxUnusedValues", ItemMessage.newBuilder()
+                                        .setProperty(PrismPropertyMessage.newBuilder()
+                                                .addValues(PrismPropertyValueMessage.newBuilder()
+                                                        .setLong(LongMessage.newBuilder()
+                                                                .setValue(10)
+                                                        )
+                                                )
+                                        )
+                                        .build()
+                                )
+                        )
+                )
+                .build();
+
+        AddObjectResponse addSeqRes = stub.addObject(newSeqReq);
+
+        // increment
+        GetSequenceCounterRequest req = GetSequenceCounterRequest.newBuilder()
+                .setName("Unix UID numbers")
+                .build();
+
+        GetSequenceCounterResponse res = stub.getSequenceCounter(req);
+
+        assertEquals(1001, res.getResult());
+
+        // increment
+        res = stub.getSequenceCounter(req);
+
+        assertEquals(1002, res.getResult());
+    }
 }
