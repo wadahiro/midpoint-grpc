@@ -12,6 +12,8 @@ import com.evolveum.midpoint.prism.query.*;
 import com.evolveum.midpoint.prism.query.builder.*;
 import com.evolveum.midpoint.repo.api.RepositoryService;
 import com.evolveum.midpoint.schema.GetOperationOptions;
+import com.evolveum.midpoint.schema.RelationalValueSearchQuery;
+import com.evolveum.midpoint.schema.RelationalValueSearchType;
 import com.evolveum.midpoint.schema.SelectorOptions;
 import com.evolveum.midpoint.schema.constants.SchemaConstants;
 import com.evolveum.midpoint.util.LocalizableMessage;
@@ -26,9 +28,11 @@ import com.evolveum.prism.xml.ns._public.query_3.SearchFilterType;
 import com.evolveum.prism.xml.ns._public.types_3.PolyStringType;
 import com.evolveum.prism.xml.ns._public.types_3.ProtectedStringType;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Timestamp;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 
+import javax.xml.datatype.XMLGregorianCalendar;
 import javax.xml.namespace.QName;
 import java.lang.reflect.Field;
 import java.util.*;
@@ -401,6 +405,27 @@ public class TypeConverter {
         ObjectQuery query = exitBuilder.build();
         query.setPaging(toObjectPaging(prismContext, message.getPaging()));
         return query;
+    }
+
+    public static RelationalValueSearchQuery toRelationalValueSearchQuery(PrismContext prismContext, RelationalValueSearchQueryMessage message) {
+        RelationalValueSearchQuery query = new RelationalValueSearchQuery(toQNameValue(message.getColumn()), message.getSearchValue(),
+                toSearchType(message.getSearchType()));
+        if (message.hasPaging()) {
+            query.setPaging(toObjectPaging(prismContext, message.getPaging()));
+        }
+        return query;
+    }
+
+    private static RelationalValueSearchType toSearchType(RelationalValueSearch message) {
+        switch (message) {
+            case EXACT:
+                return RelationalValueSearchType.EXACT;
+            case STARTS_WITH:
+                return RelationalValueSearchType.STARTS_WITH;
+            case SUBSTRING:
+                return RelationalValueSearchType.SUBSTRING;
+        }
+        return RelationalValueSearchType.EXACT;
     }
 
     public static ObjectPaging toObjectPaging(PrismContext prismContext, PagingMessage message) {
@@ -815,6 +840,8 @@ public class TypeConverter {
                 return AssignmentHolderType.COMPLEX_TYPE;
             case ARCHETYPE_TYPE:
                 return ArchetypeType.COMPLEX_TYPE;
+            case LOOKUP_TABLE_TYPE:
+                return LookupTableType.COMPLEX_TYPE;
         }
         return null;
     }
@@ -1405,6 +1432,41 @@ public class TypeConverter {
                 .build();
     }
 
+    public static LookupTableMessage toLookupTableMessage(LookupTableType lookupTable, Collection<SelectorOptions<GetOperationOptions>> options) {
+        return BuilderWrapper.wrap(LookupTableMessage.newBuilder())
+                .nullSafe(lookupTable.getOid(), (b, v) -> b.setOid(v))
+                .nullSafe(lookupTable.getVersion(), (b, v) -> b.setVersion(v))
+                .nullSafe(toPolyStringMessage(lookupTable.getName()), (b, v) -> b.setName(v))
+                .selectOptions(options)
+                .nullSafeWithRetrieve(LookupTableType.F_DESCRIPTION, lookupTable.getDescription(), (b, v) -> b.setDescription(v))
+                .nullSafeWithRetrieve(LookupTableType.F_ROW, lookupTable.getRow(), (b, v) -> {
+                    return b.addAllRow(v.stream().map(a -> {
+                        return toLookupTableRowMessage(a);
+                    }).collect(Collectors.toList()));
+                })
+                .unwrap()
+                .build();
+    }
+
+    private static LookupTableRowMessage toLookupTableRowMessage(LookupTableRowType row) {
+        return BuilderWrapper.wrap(LookupTableRowMessage.newBuilder())
+                .nullSafe(row.getId(), (b, v) -> b.setId(v))
+                .nullSafe(row.getKey(), (b, v) -> b.setKey(v))
+                .nullSafe(row.getValue(), (b, v) -> b.setValue(v))
+                .nullSafe(toPolyStringMessage(row.getLabel()), (b, v) -> b.setLabel(v))
+                .nullSafe(row.getLastChangeTimestamp(), (b, v) -> b.setLastChangeTimestamp(toTimestamp(v)))
+                .unwrap()
+                .build();
+    }
+
+    public static Timestamp toTimestamp(XMLGregorianCalendar timestamp) {
+        long millis = timestamp.toGregorianCalendar().getTimeInMillis();
+        return Timestamp.newBuilder()
+                .setSeconds(millis / 1000)
+                .setNanos((int) ((millis % 1000) * 1000000))
+                .build();
+    }
+
     public static Map<String, ItemMessage> toItemMessageMap(ExtensionType extension,
                                                             Collection<SelectorOptions<GetOperationOptions>> options,
                                                             boolean hasInclude) {
@@ -1667,6 +1729,9 @@ public class TypeConverter {
         PrismContainerValue impl = prismContext.itemFactory().createContainerValue();
         // Need to apply here
         impl.applyDefinition(definition);
+        if (message.getId() != 0) {
+            impl.setId(message.getId());
+        }
 
         for (Map.Entry<String, ItemMessage> entry : message.getValueMap().entrySet()) {
             String k = entry.getKey();

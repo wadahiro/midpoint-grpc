@@ -94,6 +94,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
     public static final String OPERATION_MODIFY_OBJECT = CLASS_DOT + "modifyObject";
     public static final String OPERATION_EXECUTE_OBJECT_UPDATE = CLASS_DOT + "executeObjectUpdate";
     public static final String OPERATION_DELETE_OBJECT = CLASS_DOT + "deleteObject";
+    public static final String OPERATION_GET_LOOKUP_TABLE = CLASS_DOT + "getLookupTable";
 
     private static final long WAIT_FOR_TASK_STOP = 2000L;
 
@@ -1844,5 +1845,45 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             throw new IllegalStateException("More than one object found for type " + type + " and name '" + name + "'");
         }
         return foundObjects.iterator().next().asObjectable();
+    }
+
+    @Override
+    public void getLookupTable(GetLookupTableRequest request, StreamObserver<GetLookupTableResponse> responseObserver) {
+        LOGGER.debug("Start getLookupTable");
+
+        LookupTableMessage foundLookupTable = runTask(ctx -> {
+            Task task = ctx.task;
+
+            OperationResult parentResult = task.getResult().createSubresult(OPERATION_GET_LOOKUP_TABLE);
+
+            String oid = resolveOid(LookupTableType.class, request.getOid(), request.getName(), task, parentResult);
+
+            List<String> options = request.getOptionsList();
+            List<String> include = request.getIncludeList();
+            List<String> exclude = request.getExcludeList();
+            List<String> resolveNames = Collections.emptyList();
+
+            Collection<SelectorOptions<GetOperationOptions>> getOptions = GetOperationOptions.fromRestOptions(options, include,
+                    exclude, resolveNames, null, prismContext);
+
+            if (request.hasRelationalValueSearchQuery()) {
+                RelationalValueSearchQuery query = toRelationalValueSearchQuery(prismContext, request.getRelationalValueSearchQuery());
+                Collection<SelectorOptions<GetOperationOptions>> queryOptions = SelectorOptions.createCollection(prismContext.toUniformPath(LookupTableType.F_ROW), GetOperationOptions.createRetrieve(query));
+                getOptions = GetOperationOptions.merge(prismContext, getOptions, queryOptions);
+            }
+
+            PrismObject<LookupTableType> lookupTable = modelCrudService.getObject(LookupTableType.class, oid, getOptions, task, parentResult);
+
+            parentResult.computeStatus();
+
+            return toLookupTableMessage(lookupTable.asObjectable(), getOptions);
+        });
+
+        responseObserver.onNext(GetLookupTableResponse.newBuilder()
+                .setResult(foundLookupTable)
+                .build());
+        responseObserver.onCompleted();
+
+        LOGGER.debug("End getLookupTable");
     }
 }
