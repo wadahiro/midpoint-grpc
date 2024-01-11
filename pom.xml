@@ -53,6 +53,13 @@
         <version.midpoint>4.4.6</version.midpoint>
         <version.grpc-java>1.42.0</version.grpc-java>
         <version.protoc>3.10.0</version.protoc>
+        <!--
+            The version of Spring Boot that midpoint depends on must match the major version of Spring Boot that grpc-spring-boot-starter depends on.
+
+            https://github.com/Evolveum/midpoint/blob/support-4.4/pom.xml
+            https://central.sonatype.com/artifact/io.github.lognet/grpc-spring-boot-starter/4.5.10
+        -->
+        <version.grpc-spring-boot-starter>4.5.10</version.grpc-spring-boot-starter>
 
         <java.version>11</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -91,7 +98,7 @@
             <dependency>
                 <groupId>io.github.lognet</groupId>
                 <artifactId>grpc-spring-boot-starter</artifactId>
-                <version>4.5.10</version>
+                <version>${version.grpc-spring-boot-starter}</version>
                 <exclusions>
                     <exclusion>
                         <groupId>org.springframework.boot</groupId>
