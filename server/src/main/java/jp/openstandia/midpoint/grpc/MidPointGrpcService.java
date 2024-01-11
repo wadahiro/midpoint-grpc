@@ -9,20 +9,20 @@ import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import io.grpc.Metadata;
 import io.grpc.Status;
+import jakarta.servlet.http.HttpServletRequestWrapper;
 import org.lognet.springboot.grpc.recovery.GRpcExceptionHandler;
 import org.lognet.springboot.grpc.recovery.GRpcExceptionScope;
+import org.lognet.springboot.grpc.recovery.GRpcServiceAdvice;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpSession;
 import javax.xml.namespace.QName;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -65,6 +65,24 @@ public interface MidPointGrpcService {
     }
 
     default void handlePolicyViolationException(Metadata responseHeaders, PolicyViolationException e) {
+    }
+
+    /**
+     * grpc-spring-boot-starter v5.0 depends on jakarta.validation.
+     * Before v5.0, it depends on javax.validation.
+     * Since javax.validation can be used in midPoint, org.lognet.springboot.grpc.autoconfigure.GRpcValidationConfiguration
+     * is registered as global gRPC Exception Handler.
+     * From v5.0, we need to register own global gRPC Exception handler as dummy because of missing jakarta.validation.
+     */
+    @GRpcServiceAdvice
+    static class DummyErrorHandler {
+        @GRpcExceptionHandler
+        public Status handle (DummyException e, GRpcExceptionScope scope){
+            return Status.UNKNOWN;
+        }
+
+        static class DummyException extends RuntimeException {
+        }
     }
 
     @GRpcExceptionHandler
