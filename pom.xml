@@ -50,12 +50,12 @@
     </distributionManagement>
 
     <properties>
-        <version.midpoint>4.4</version.midpoint>
-        <version.spring-boot>2.5.2</version.spring-boot>
+        <version.midpoint>4.4.6</version.midpoint>
+        <version.spring-boot>2.5.15</version.spring-boot>
         <version.grpc-java>1.42.0</version.grpc-java>
         <version.protoc>3.10.0</version.protoc>
 
-        <java.version>1.8</java.version>
+        <java.version>11</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.jupiter.version>5.8.1</junit.jupiter.version>
 
