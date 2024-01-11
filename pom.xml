@@ -51,7 +51,6 @@
 
     <properties>
         <version.midpoint>4.4.6</version.midpoint>
-        <version.spring-boot>2.5.15</version.spring-boot>
         <version.grpc-java>1.42.0</version.grpc-java>
         <version.protoc>3.10.0</version.protoc>
 
@@ -119,27 +118,6 @@
                 <groupId>com.google.protobuf</groupId>
                 <artifactId>protobuf-java</artifactId>
                 <version>${version.protoc}</version>
-            </dependency>
-
-            <!-- OAuth2.0 -->
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
-                <version>${version.spring-boot}</version>
-                <exclusions>
-                    <exclusion>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>org.springframework.security</groupId>
-                        <artifactId>spring-security-config</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>org.springframework.security</groupId>
-                        <artifactId>spring-security-core</artifactId>
-                    </exclusion>
-                </exclusions>
             </dependency>
 
             <!-- For client-spi -->
