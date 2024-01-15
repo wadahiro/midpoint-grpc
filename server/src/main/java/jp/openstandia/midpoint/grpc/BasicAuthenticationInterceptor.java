@@ -21,7 +21,6 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Component;
 
 @Component
-@ConditionalOnMissingBean(JWTAuthenticationInterceptor.class)
 public class BasicAuthenticationInterceptor extends AbstractGrpcAuthenticationInterceptor {
 
     private static final Trace LOGGER = TraceManager.getTrace(BasicAuthenticationInterceptor.class);
