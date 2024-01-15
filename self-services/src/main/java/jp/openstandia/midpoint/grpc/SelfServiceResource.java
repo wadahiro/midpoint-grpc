@@ -856,10 +856,15 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             final ObjectDelta<UserType> objectDelta = prismContext.deltaFactory().object().createModifyDelta(userOid, delta, UserType.class);
 
             // delta for nonce
-            NonceType nonce = user.getCredentials().getNonce();
-            if (clearNonce && nonce != null) {
-                objectDelta.addModificationDeleteContainer(ItemPath.create(UserType.F_CREDENTIALS, CredentialsType.F_NONCE),
-                        nonce.clone());
+            if (clearNonce) {
+                CredentialsType credentials = user.getCredentials();
+                if (credentials != null) {
+                    NonceType nonce = credentials.getNonce();
+                    if (nonce != null) {
+                        objectDelta.addModificationDeleteContainer(ItemPath.create(UserType.F_CREDENTIALS, CredentialsType.F_NONCE),
+                                nonce.clone());
+                    }
+                }
             }
 
             // delta for lifecycleState

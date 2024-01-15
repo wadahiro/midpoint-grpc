@@ -571,6 +571,48 @@ class SelfServiceResourceITest {
     }
 
     @Test
+    void forceUpdateCredentialWithNonceClearForNoCredentialsUser() throws Exception {
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
+
+        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+
+        Metadata headers = new Metadata();
+        headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
+
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Add
+        AddUserRequest addUserRequest = AddUserRequest.newBuilder()
+                .setProfile(UserTypeMessage.newBuilder()
+                        .setName(PolyStringMessage.newBuilder().setOrig("user001"))
+                )
+                .build();
+
+        AddUserResponse response = stub.addUser(addUserRequest);
+
+        assertNotNull(response.getOid());
+
+        // Switch to the created user
+        headers.put(Constant.SwitchToPrincipalMetadataKey, response.getOid());
+        headers.put(Constant.RunPrivilegedMetadataKey, "true");
+        stub = MetadataUtils.attachHeaders(stub, headers);
+
+        // Force update password with nonce clear
+        ForceUpdateCredentialRequest request = ForceUpdateCredentialRequest.newBuilder()
+                .setNew("password")
+                .setClearNonce(true)
+                .build();
+
+        stub.forceUpdateCredential(request);
+
+        // Delete
+        stub.deleteObject(DeleteObjectRequest.newBuilder()
+                .setOid(response.getOid())
+                .setObjectType(DefaultObjectType.USER_TYPE)
+                .build());
+    }
+
+    @Test
     void forceUpdateCredentialWithNonceClearAndActive() throws Exception {
         SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
 
