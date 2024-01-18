@@ -1,6 +1,5 @@
 package jp.openstandia.midpoint.grpc;
 
-import com.evolveum.midpoint.model.api.ModelService;
 import com.evolveum.midpoint.model.api.authentication.GuiProfiledPrincipal;
 import com.evolveum.midpoint.model.api.context.EvaluatedAssignment;
 import com.evolveum.midpoint.model.impl.lens.AssignmentCollector;
@@ -56,9 +55,6 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
 
     @Autowired
     PrismContext prismContext;
-
-    @Autowired
-    ModelService modelService;
 
     @Autowired
     SecurityEnforcer securityEnforcer;
@@ -281,9 +277,9 @@ public abstract class AbstractGrpcAuthenticationInterceptor implements ServerInt
         try {
             SecurityContextHolder.getContext().setAuthentication(auth);
 
-            PrismObject<UserType> user = modelService.getObject(UserType.class, oid, null, task, result);
+            PrismObject<UserType> user = GrpcServerConfiguration.getApplication().getRepositoryService().getObject(UserType.class, oid, null, result);
             return user;
-        } catch (SchemaException | ObjectNotFoundException | SecurityViolationException | CommunicationException | ConfigurationException | ExpressionEvaluationException e) {
+        } catch (SchemaException | ObjectNotFoundException e) {
             LOGGER.trace("Exception while authenticating user identified with oid: '{}' to gRPC service: {}", oid, e.getMessage(), e);
             throw Status.UNAUTHENTICATED
                     .withDescription(e.getMessage())
