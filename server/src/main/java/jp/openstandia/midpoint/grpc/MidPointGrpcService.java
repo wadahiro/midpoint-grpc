@@ -9,6 +9,7 @@ import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import io.grpc.Metadata;
 import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import org.lognet.springboot.grpc.recovery.GRpcExceptionHandler;
 import org.lognet.springboot.grpc.recovery.GRpcExceptionScope;
@@ -77,7 +78,7 @@ public interface MidPointGrpcService {
     @GRpcServiceAdvice
     static class DummyErrorHandler {
         @GRpcExceptionHandler
-        public Status handle (DummyException e, GRpcExceptionScope scope){
+        public Status handle(DummyException e, GRpcExceptionScope scope) {
             return Status.UNKNOWN;
         }
 
@@ -131,6 +132,9 @@ public interface MidPointGrpcService {
             return Status.ALREADY_EXISTS
                     .withDescription(e.getErrorTypeMessage())
                     .withCause(e);
+        }
+        if (cause instanceof StatusRuntimeException) {
+            return ((StatusRuntimeException) cause).getStatus();
         }
         if (cause instanceof Exception) {
             return Status.INTERNAL
