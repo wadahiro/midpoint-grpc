@@ -321,7 +321,7 @@ class SelfServiceResourceITest {
         // Add test user without credentials
         AddUserRequest addUserRequest = AddUserRequest.newBuilder()
                 .setProfile(UserTypeMessage.newBuilder()
-                        .setName(PolyStringMessage.newBuilder().setOrig("user001"))
+                        .setName(PolyStringMessage.newBuilder().setOrig("user001_no_cred"))
                 )
                 .build();
 
@@ -330,7 +330,7 @@ class SelfServiceResourceITest {
         assertNotNull(response.getOid());
 
         // Switch to the created user
-        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = newDefaultStubWithSwitchUserByOid("user001", true);
+        SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = newDefaultStubWithSwitchUserByOid("user001_no_cred", true);
 
         // Force update password with nonce clear
         ForceUpdateCredentialRequest request = ForceUpdateCredentialRequest.newBuilder()
@@ -568,6 +568,26 @@ class SelfServiceResourceITest {
         assertEquals("user001", res2.getResult().getName().getOrig());
         assertEquals("emp001", res2.getResult().getEmployeeNumber());
 
+        // Modify by name
+        ModifyUserRequest modReq = ModifyUserRequest.newBuilder()
+                .setName("user001")
+                .addModifications(UserItemDeltaMessage.newBuilder()
+                        .setUserTypePath(DefaultUserTypePath.F_NAME)
+                        .addValuesToReplace("user001_mod")
+                )
+                .build();
+
+        defaultServiceAccountStub.modifyUser(modReq);
+
+        // Get by name
+        req2 = GetUserRequest.newBuilder()
+                .setName("user001_mod")
+                .build();
+
+        res2 = defaultServiceAccountStub.getUser(req2);
+
+        assertEquals("emp001", res2.getResult().getEmployeeNumber());
+
         // Search
         SearchUsersResponse res3 = defaultServiceAccountStub.searchUsers(SearchRequest.newBuilder()
                 .setQuery(QueryMessage.newBuilder()
@@ -615,6 +635,33 @@ class SelfServiceResourceITest {
         assertEquals("role001", res2.getResult().getName().getOrig());
         assertEquals("testRole", res2.getResult().getRoleType());
 
+        // Modify by name
+        ModifyObjectRequest modReq = ModifyObjectRequest.newBuilder()
+                .setObjectType(DefaultObjectType.ROLE_TYPE)
+                .setName("role001")
+                .addModifications(ItemDeltaMessage.newBuilder()
+                        .setPath("name")
+                        .addPrismValuesToReplace(PrismValueMessage.newBuilder()
+                                .setProperty(PrismPropertyValueMessage.newBuilder()
+                                        .setPolyString(PolyStringMessage.newBuilder()
+                                                .setOrig("role001_mod")
+                                        )
+                                )
+                        )
+                )
+                .build();
+
+        defaultServiceAccountStub.modifyObject(modReq);
+
+        // Get by name
+        req2 = GetRoleRequest.newBuilder()
+                .setName("role001_mod")
+                .build();
+
+        res2 = defaultServiceAccountStub.getRole(req2);
+
+        assertEquals("role001_mod", res2.getResult().getName().getOrig());
+
         // Search
         SearchRolesResponse res3 = defaultServiceAccountStub.searchRoles(SearchRequest.newBuilder()
                 .setQuery(QueryMessage.newBuilder()
@@ -661,6 +708,34 @@ class SelfServiceResourceITest {
         assertEquals("org001", res2.getResult().getName().getOrig());
         assertEquals(1, res2.getResult().getDisplayOrder());
 
+        // Modify by name
+        ModifyObjectRequest modReq = ModifyObjectRequest.newBuilder()
+                .setObjectType(DefaultObjectType.ORG_TYPE)
+                .setName("org001")
+                .addModifications(ItemDeltaMessage.newBuilder()
+                        .setPath("name")
+                        .addPrismValuesToReplace(PrismValueMessage.newBuilder()
+                                .setProperty(PrismPropertyValueMessage.newBuilder()
+                                        .setPolyString(PolyStringMessage.newBuilder()
+                                                .setOrig("org001_mod")
+                                        )
+                                )
+                        )
+                )
+                .build();
+
+        defaultServiceAccountStub.modifyObject(modReq);
+
+        // Get by name
+        req2 = GetOrgRequest.newBuilder()
+                .setName("org001_mod")
+                .build();
+
+        res2 = defaultServiceAccountStub.getOrg(req2);
+
+        assertEquals("org001_mod", res2.getResult().getName().getOrig());
+        assertEquals(1, res2.getResult().getDisplayOrder());
+
         // Search
         SearchOrgsResponse res3 = defaultServiceAccountStub.searchOrgs(SearchRequest.newBuilder()
                 .setQuery(QueryMessage.newBuilder()
@@ -673,9 +748,9 @@ class SelfServiceResourceITest {
         assertEquals(1, res3.getNumberOfAllResults());
         assertEquals(1, res3.getResults(0).getDisplayOrder());
 
-        // Delete
+        // Delete by name
         DeleteObjectResponse res4 = defaultServiceAccountStub.deleteObject(DeleteObjectRequest.newBuilder()
-                .setOid(response.getOid())
+                .setName("org001_mod")
                 .setObjectType(DefaultObjectType.ORG_TYPE)
                 .build());
 
@@ -707,6 +782,37 @@ class SelfServiceResourceITest {
         assertEquals("service001", res2.getResult().getName().getOrig());
         assertEquals("https://example.com", res2.getResult().getUrl());
 
+        // Modify by name
+        ModifyObjectRequest modReq = ModifyObjectRequest.newBuilder()
+                .setObjectType(DefaultObjectType.SERVICE_TYPE)
+                .setName("service001")
+                .addModifications(ItemDeltaMessage.newBuilder()
+                        .setItemPath(ItemPathMessage.newBuilder()
+                                .addPath(QNameMessage.newBuilder()
+                                        .setLocalPart("name")
+                                )
+                        )
+                        .addPrismValuesToReplace(PrismValueMessage.newBuilder()
+                                .setProperty(PrismPropertyValueMessage.newBuilder()
+                                        .setPolyString(PolyStringMessage.newBuilder()
+                                                .setOrig("service001_mod")
+                                        )
+                                )
+                        )
+                )
+                .build();
+
+        defaultServiceAccountStub.modifyObject(modReq);
+
+        // Get by name
+        req2 = GetServiceRequest.newBuilder()
+                .setName("service001_mod")
+                .build();
+
+        res2 = defaultServiceAccountStub.getService(req2);
+
+        assertEquals("service001_mod", res2.getResult().getName().getOrig());
+
         // Search
         SearchServicesResponse res3 = defaultServiceAccountStub.searchServices(SearchRequest.newBuilder()
                 .setQuery(QueryMessage.newBuilder()
@@ -726,6 +832,23 @@ class SelfServiceResourceITest {
                 .build());
 
         assertNotNull(res4);
+    }
+
+    @Test
+    void recompute() throws Exception {
+        // Recompute user
+        defaultServiceAccountStub.recomputeObject(RecomputeObjectRequest.newBuilder()
+                .setObjectType(DefaultObjectType.USER_TYPE)
+                .setOid("00000000-0000-0000-0000-000000000002")
+                .build()
+        );
+
+        // Recompute role by name
+        defaultServiceAccountStub.recomputeObject(RecomputeObjectRequest.newBuilder()
+                .setObjectType(DefaultObjectType.ROLE_TYPE)
+                .setName(GRPC_SERVICE_ROLE_NAME)
+                .build()
+        );
     }
 
     @Test
