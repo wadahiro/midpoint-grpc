@@ -9,6 +9,7 @@ import com.evolveum.midpoint.util.logging.Trace;
 import com.evolveum.midpoint.util.logging.TraceManager;
 import io.grpc.Metadata;
 import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import org.lognet.springboot.grpc.recovery.GRpcExceptionHandler;
 import org.lognet.springboot.grpc.recovery.GRpcExceptionScope;
 import org.springframework.security.core.Authentication;
@@ -113,6 +114,9 @@ public interface MidPointGrpcService {
             return Status.ALREADY_EXISTS
                     .withDescription(e.getErrorTypeMessage())
                     .withCause(e);
+        }
+        if (cause instanceof StatusRuntimeException) {
+            return ((StatusRuntimeException)cause).getStatus();
         }
         if (cause instanceof Exception) {
             return Status.INTERNAL
