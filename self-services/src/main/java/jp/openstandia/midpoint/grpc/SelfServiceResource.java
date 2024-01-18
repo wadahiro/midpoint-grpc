@@ -1048,7 +1048,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
             OperationResult parentResult = task.getResult().createSubresult(OPERATION_GET_ROLE);
 
-            String oid = resolveOid(UserType.class, request.getOid(), request.getName(), task, parentResult);
+            String oid = resolveOid(RoleType.class, request.getOid(), request.getName(), task, parentResult);
 
             List<String> options = request.getOptionsList();
             List<String> include = request.getIncludeList();
@@ -1125,7 +1125,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
             OperationResult parentResult = task.getResult().createSubresult(OPERATION_GET_ORG);
 
-            String oid = resolveOid(UserType.class, request.getOid(), request.getName(), task, parentResult);
+            String oid = resolveOid(OrgType.class, request.getOid(), request.getName(), task, parentResult);
 
             List<String> options = request.getOptionsList();
             List<String> include = request.getIncludeList();
@@ -1202,7 +1202,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
             OperationResult parentResult = task.getResult().createSubresult(OPERATION_GET_SERVICE);
 
-            String oid = resolveOid(UserType.class, request.getOid(), request.getName(), task, parentResult);
+            String oid = resolveOid(ServiceType.class, request.getOid(), request.getName(), task, parentResult);
 
             List<String> options = request.getOptionsList();
             List<String> include = request.getIncludeList();
@@ -1784,7 +1784,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 clazz = ObjectTypes.getObjectTypeClass(qname);
             }
 
-            String oid = resolveOid(UserType.class, request.getOid(), request.getName(), task, parentResult);
+            String oid = resolveOid(clazz, request.getOid(), request.getName(), task, parentResult);
 
             List<String> options = request.getOptionsList();
 
@@ -1845,7 +1845,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 throw exception;
             }
 
-            String oid = resolveOid(UserType.class, request.getOid(), request.getName(), task, parentResult);
+            String oid = resolveOid(clazz, request.getOid(), request.getName(), task, parentResult);
             ModelExecuteOptions options = ModelExecuteOptions.createReconcile();
 
             ObjectDelta<? extends FocusType> emptyDelta = prismContext.deltaFactory().object()
