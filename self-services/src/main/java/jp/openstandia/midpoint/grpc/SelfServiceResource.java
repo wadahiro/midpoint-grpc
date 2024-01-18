@@ -870,10 +870,15 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
             final ObjectDelta<UserType> objectDelta = prismContext.deltaFactory().object().createModifyDelta(user.getOid(), delta, UserType.class);
 
             // delta for nonce
-            NonceType nonce = user.getCredentials().getNonce();
-            if (clearNonce && nonce != null) {
-                objectDelta.addModificationDeleteContainer(ItemPath.create(UserType.F_CREDENTIALS, CredentialsType.F_NONCE),
-                        nonce.clone());
+            if (clearNonce) {
+                CredentialsType credentials = user.getCredentials();
+                if (credentials != null) {
+                    NonceType nonce = credentials.getNonce();
+                    if (nonce != null) {
+                        objectDelta.addModificationDeleteContainer(ItemPath.create(UserType.F_CREDENTIALS, CredentialsType.F_NONCE),
+                                nonce.clone());
+                    }
+                }
             }
 
             // delta for lifecycleState
@@ -1007,7 +1012,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
             OperationResult parentResult = task.getResult().createSubresult(OPERATION_GET_ROLE);
 
-            String oid = resolveOid(UserType.class, request.getOid(), request.getName(), task, parentResult);
+            String oid = resolveOid(RoleType.class, request.getOid(), request.getName(), task, parentResult);
 
             List<String> options = request.getOptionsList();
             List<String> include = request.getIncludeList();
@@ -1084,7 +1089,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
             OperationResult parentResult = task.getResult().createSubresult(OPERATION_GET_ORG);
 
-            String oid = resolveOid(UserType.class, request.getOid(), request.getName(), task, parentResult);
+            String oid = resolveOid(OrgType.class, request.getOid(), request.getName(), task, parentResult);
 
             List<String> options = request.getOptionsList();
             List<String> include = request.getIncludeList();
@@ -1161,7 +1166,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
 
             OperationResult parentResult = task.getResult().createSubresult(OPERATION_GET_SERVICE);
 
-            String oid = resolveOid(UserType.class, request.getOid(), request.getName(), task, parentResult);
+            String oid = resolveOid(ServiceType.class, request.getOid(), request.getName(), task, parentResult);
 
             List<String> options = request.getOptionsList();
             List<String> include = request.getIncludeList();
@@ -1743,7 +1748,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 clazz = ObjectTypes.getObjectTypeClass(qname);
             }
 
-            String oid = resolveOid(UserType.class, request.getOid(), request.getName(), task, parentResult);
+            String oid = resolveOid(clazz, request.getOid(), request.getName(), task, parentResult);
 
             List<String> options = request.getOptionsList();
 
@@ -1804,7 +1809,7 @@ public class SelfServiceResource extends SelfServiceResourceGrpc.SelfServiceReso
                 throw exception;
             }
 
-            String oid = resolveOid(UserType.class, request.getOid(), request.getName(), task, parentResult);
+            String oid = resolveOid(clazz, request.getOid(), request.getName(), task, parentResult);
             ModelExecuteOptions options = ModelExecuteOptions.createReconcile();
 
             ObjectDelta<? extends FocusType> emptyDelta = prismContext.deltaFactory().object()
