@@ -36,5 +36,6 @@ public class MidPointGrpcTestRunner implements BeforeAllCallback, AfterAllCallba
         System.setProperty("midpoint.logging.alt.enabled", "true");
         System.setProperty("spring.config.additional-location", "${midpoint.home}/");
         System.setProperty("wicket.ioc.useByteBuddy", "true");
+        System.setProperty("midpoint.administrator.initialPassword", "Test5ecr3t");
     }
 }

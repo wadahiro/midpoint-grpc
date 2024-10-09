@@ -50,19 +50,28 @@
     </distributionManagement>
 
     <properties>
-        <version.midpoint>4.8</version.midpoint>
-        <version.grpc-java>1.55.1</version.grpc-java>
+        <version.midpoint>4.8.4</version.midpoint>
+        <version.grpc-java>1.57.0</version.grpc-java>
         <version.protoc>3.22.3</version.protoc>
         <!--
             The version of Spring Boot that midpoint depends on must match the major version of Spring Boot that grpc-spring-boot-starter depends on.
 
             https://github.com/Evolveum/midpoint/blob/support-4.8/pom.xml
-            https://central.sonatype.com/artifact/io.github.lognet/grpc-spring-boot-starter/4.5.10
+            https://central.sonatype.com/artifact/io.github.lognet/grpc-spring-boot-starter/5.1.4
         -->
-        <version.grpc-spring-boot-starter>5.1.2</version.grpc-spring-boot-starter>
+        <version.grpc-spring-boot-starter>5.1.4</version.grpc-spring-boot-starter>
 
         <java.version>17</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!--
+            See the versions of Spring Boot 3.3.2
+            https://repo1.maven.org/maven2/org/springframework/boot/spring-boot-dependencies/3.3.2/spring-boot-dependencies-3.3.2.pom
+        -->
+        <logback.version>1.5.6</logback.version>
+        <jackson.version>2.17.2</jackson.version>
+        <snakeyaml.version>2.2</snakeyaml.version>
+
         <junit.jupiter.version>5.8.1</junit.jupiter.version>
 
         <github.global.server>github</github.global.server>
@@ -149,6 +158,40 @@
                 <groupId>io.grpc</groupId>
                 <artifactId>grpc-stub</artifactId>
                 <version>${version.grpc-java}</version>
+            </dependency>
+
+            <!--
+                For integration test
+            -->
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-core</artifactId>
+                <version>${logback.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-classic</artifactId>
+                <version>${logback.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>${jackson.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.yaml</groupId>
+                <artifactId>snakeyaml</artifactId>
+                <version>${snakeyaml.version}</version>
+                <scope>test</scope>
             </dependency>
 
             <dependency>

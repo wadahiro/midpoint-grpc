@@ -24,6 +24,10 @@ class SelfServiceResourceITest {
     private static String GRPC_SERVICE_ROLE_OID = null;
     private static final String DEFAULT_TEST_USERNAME = "defaultUser001";
 
+    private static final String VALID_PASSWORD = "P@ssword1";
+    private static final String VALID_NEW_PASSWORD = "newP@ssword1";
+    private static final String VALID_NEW_PASSWORD2 = "newP@ssword12";
+
     @BeforeAll
     static void init() {
         channel = ManagedChannelBuilder.forAddress("localhost", 6565)
@@ -31,9 +35,9 @@ class SelfServiceResourceITest {
                 .build();
 
         // Add gRPC service account and role
-        addGrpcServiceAccount(GRPC_SERVICE_ACCOUNT_NAME, "password");
-        defaultUserStub = newStubWithSwitchUserByUsername(GRPC_SERVICE_ACCOUNT_NAME, "password", DEFAULT_TEST_USERNAME, true);
-        defaultServiceAccountStub = newStub(GRPC_SERVICE_ACCOUNT_NAME, "password", true);
+        addGrpcServiceAccount(GRPC_SERVICE_ACCOUNT_NAME, VALID_PASSWORD);
+        defaultUserStub = newStubWithSwitchUserByUsername(GRPC_SERVICE_ACCOUNT_NAME, VALID_PASSWORD, DEFAULT_TEST_USERNAME, true);
+        defaultServiceAccountStub = newStub(GRPC_SERVICE_ACCOUNT_NAME, VALID_PASSWORD, true);
     }
 
     @AfterAll
@@ -88,7 +92,7 @@ class SelfServiceResourceITest {
     void switchUserWithDuplicateName() throws Exception {
         SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
 
-        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+        String token = Base64.getEncoder().encodeToString("Administrator:Test5ecr3t".getBytes("UTF-8"));
 
         Metadata headers = new Metadata();
         headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
@@ -121,7 +125,7 @@ class SelfServiceResourceITest {
     void switchUser() throws Exception {
         SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
 
-        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+        String token = Base64.getEncoder().encodeToString("Administrator:Test5ecr3t".getBytes("UTF-8"));
 
         Metadata headers = new Metadata();
         headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
@@ -143,7 +147,7 @@ class SelfServiceResourceITest {
     void switchUserWithNotFoundUser() throws Exception {
         SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
 
-        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+        String token = Base64.getEncoder().encodeToString("Administrator:Test5ecr3t".getBytes("UTF-8"));
 
         Metadata headers = new Metadata();
         headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
@@ -167,7 +171,7 @@ class SelfServiceResourceITest {
     void switchUserWithRunPrivileged() throws Exception {
         SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
 
-        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+        String token = Base64.getEncoder().encodeToString("Administrator:Test5ecr3t".getBytes("UTF-8"));
 
         Metadata headers = new Metadata();
         headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
@@ -190,7 +194,7 @@ class SelfServiceResourceITest {
     void switchUserWithUnAuthorizedUser() throws Exception {
         SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
 
-        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+        String token = Base64.getEncoder().encodeToString("Administrator:Test5ecr3t".getBytes("UTF-8"));
 
         Metadata headers = new Metadata();
         headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
@@ -240,7 +244,7 @@ class SelfServiceResourceITest {
     void switchUserWithArchivedUser() throws Exception {
         SelfServiceResourceGrpc.SelfServiceResourceBlockingStub stub = SelfServiceResourceGrpc.newBlockingStub(channel);
 
-        String token = Base64.getEncoder().encodeToString("Administrator:5ecr3t".getBytes("UTF-8"));
+        String token = Base64.getEncoder().encodeToString("Administrator:Test5ecr3t".getBytes("UTF-8"));
 
         Metadata headers = new Metadata();
         headers.put(Constant.AuthorizationMetadataKey, "Basic " + token);
@@ -304,16 +308,16 @@ class SelfServiceResourceITest {
     @Test
     void updateCredential() throws Exception {
         UpdateCredentialRequest request = UpdateCredentialRequest.newBuilder()
-                .setOld("password")
-                .setNew("newpassword")
+                .setOld(VALID_PASSWORD)
+                .setNew(VALID_NEW_PASSWORD)
                 .build();
 
         defaultUserStub.updateCredential(request);
 
         // Back to original password
         request = UpdateCredentialRequest.newBuilder()
-                .setOld("newpassword")
-                .setNew("password")
+                .setOld(VALID_NEW_PASSWORD)
+                .setNew(VALID_PASSWORD)
                 .build();
 
         defaultUserStub.updateCredential(request);
@@ -322,7 +326,7 @@ class SelfServiceResourceITest {
     @Test
     void passwordPolicyErrorWithSingleError() throws Exception {
         UpdateCredentialRequest request = UpdateCredentialRequest.newBuilder()
-                .setOld("password")
+                .setOld(VALID_PASSWORD)
                 .setNew("123")
                 .build();
 
@@ -345,31 +349,79 @@ class SelfServiceResourceITest {
             assertEquals(1, argsList.size());
 
             Message argsWrapper = argsList.get(0);
-            assertTrue(argsWrapper.hasSingle());
+            assertFalse(argsWrapper.hasSingle(), "Should have multiple errors");
+            assertTrue(argsWrapper.hasList(), "Should have multiple errors");
 
-            SingleMessage subMsgArgs = argsWrapper.getSingle();
-            String subErrKey = subMsgArgs.getKey();
-            assertEquals("ValuePolicy.minimalSizeNotMet", subErrKey);
+            MessageList msgListArg = argsWrapper.getList();
+            List<Message> subMsgList = msgListArg.getMessageList();
+            assertEquals(3, subMsgList.size(), "Should have multiple errors");
 
-            List<Message> subMsgArgsList = subMsgArgs.getArgsList();
-            assertEquals(2, subMsgArgsList.size());
+            // One
+            Message argsWrapper1 = subMsgList.get(0);
+            assertTrue(argsWrapper1.hasSingle());
 
-            Message subMsgArg1 = subMsgArgsList.get(0);
-            assertFalse(subMsgArg1.hasSingle());
-            assertFalse(subMsgArg1.hasList());
-            assertEquals("5", subMsgArg1.getString());
+            SingleMessage subMsg1Args = argsWrapper1.getSingle();
+            String subErr1Key = subMsg1Args.getKey();
+            assertEquals("ValuePolicy.minimalSizeNotMet", subErr1Key);
 
-            Message subMsgArg2 = subMsgArgsList.get(1);
-            assertFalse(subMsgArg2.hasSingle());
-            assertFalse(subMsgArg2.hasList());
-            assertEquals("3", subMsgArg2.getString());
+            List<Message> argsList1 = subMsg1Args.getArgsList();
+
+            Message arg1 = argsList1.get(0);
+            assertFalse(arg1.hasSingle());
+            assertFalse(arg1.hasList());
+            assertEquals("8", arg1.getString());
+
+            Message arg2 = argsList1.get(1);
+            assertFalse(arg2.hasSingle());
+            assertFalse(arg2.hasList());
+            assertEquals("3", arg2.getString());
+
+            // Two
+            Message argsWrapper2 = subMsgList.get(1);
+            assertTrue(argsWrapper2.hasSingle());
+
+            SingleMessage subMsg2Args = argsWrapper2.getSingle();
+            String subErr2Key = subMsg2Args.getKey();
+            assertEquals("ValuePolicy.minimalOccurrenceNotMet", subErr2Key);
+
+            List<Message> argsList2 = subMsg2Args.getArgsList();
+
+            arg1 = argsList2.get(0);
+            assertFalse(arg1.hasSingle());
+            assertFalse(arg1.hasList());
+            assertEquals("1", arg1.getString());
+
+            arg2 = argsList2.get(1);
+            assertFalse(arg2.hasSingle());
+            assertFalse(arg2.hasList());
+            assertEquals("Lowercase characters", arg2.getString());
+
+            // Three
+            Message argsWrapper3 = subMsgList.get(2);
+            assertTrue(argsWrapper3.hasSingle());
+
+            SingleMessage subMsg3Args = argsWrapper3.getSingle();
+            String subErr3Key = subMsg3Args.getKey();
+            assertEquals("ValuePolicy.minimalOccurrenceNotMet", subErr3Key);
+
+            List<Message> argsList3 = subMsg3Args.getArgsList();
+
+            arg1 = argsList3.get(0);
+            assertFalse(arg1.hasSingle());
+            assertFalse(arg1.hasList());
+            assertEquals("1", arg1.getString());
+
+            arg2 = argsList3.get(1);
+            assertFalse(arg2.hasSingle());
+            assertFalse(arg2.hasList());
+            assertEquals("Uppercase characters", arg2.getString());
         }
     }
 
     @Test
     void passwordPolicyErrorWithMultipleError() throws Exception {
         UpdateCredentialRequest request = UpdateCredentialRequest.newBuilder()
-                .setOld("password")
+                .setOld(VALID_PASSWORD)
                 .setNew("1111")
                 .build();
 
@@ -397,7 +449,7 @@ class SelfServiceResourceITest {
 
             MessageList msgListArg = argsWrapper.getList();
             List<Message> subMsgList = msgListArg.getMessageList();
-            assertEquals(2, subMsgList.size(), "Should have multiple errors");
+            assertEquals(4, subMsgList.size(), "Should have multiple errors");
 
             Message argsWrapper1 = subMsgList.get(0);
             assertTrue(argsWrapper1.hasSingle());
@@ -412,6 +464,20 @@ class SelfServiceResourceITest {
             SingleMessage subMsg2Args = argsWrapper2.getSingle();
             String subErr2Key = subMsg2Args.getKey();
             assertEquals("ValuePolicy.minimalUniqueCharactersNotMet", subErr2Key);
+
+            Message argsWrapper3 = subMsgList.get(2);
+            assertTrue(argsWrapper2.hasSingle());
+
+            SingleMessage subMsg3Args = argsWrapper3.getSingle();
+            String subErr3Key = subMsg2Args.getKey();
+            assertEquals("ValuePolicy.minimalUniqueCharactersNotMet", subErr3Key);
+
+            Message argsWrapper4 = subMsgList.get(3);
+            assertTrue(argsWrapper2.hasSingle());
+
+            SingleMessage subMsg4Args = argsWrapper4.getSingle();
+            String subErr4Key = subMsg2Args.getKey();
+            assertEquals("ValuePolicy.minimalUniqueCharactersNotMet", subErr4Key);
         }
     }
 
@@ -419,7 +485,7 @@ class SelfServiceResourceITest {
     void forceUpdateCredential() throws Exception {
         // Force update password
         ForceUpdateCredentialRequest request = ForceUpdateCredentialRequest.newBuilder()
-                .setNew("newpassword")
+                .setNew(VALID_NEW_PASSWORD)
                 .build();
 
         defaultUserStub.forceUpdateCredential(request);
@@ -427,7 +493,7 @@ class SelfServiceResourceITest {
         // Check the password was changed
         try {
             UpdateCredentialRequest updateCredentialRequest = UpdateCredentialRequest.newBuilder()
-                    .setOld("password")
+                    .setOld(VALID_PASSWORD)
                     .setNew("foobar")
                     .build();
             defaultUserStub.updateCredential(updateCredentialRequest);
@@ -439,15 +505,15 @@ class SelfServiceResourceITest {
 
         // Force update password again
         request = ForceUpdateCredentialRequest.newBuilder()
-                .setNew("newpassword2")
+                .setNew(VALID_NEW_PASSWORD2)
                 .build();
 
         defaultUserStub.forceUpdateCredential(request);
 
         // Check the password was changed
         UpdateCredentialRequest updateCredentialRequest = UpdateCredentialRequest.newBuilder()
-                .setOld("newpassword2")
-                .setNew("password")
+                .setOld(VALID_NEW_PASSWORD2)
+                .setNew(VALID_PASSWORD)
                 .build();
         defaultUserStub.updateCredential(updateCredentialRequest);
     }
@@ -468,7 +534,7 @@ class SelfServiceResourceITest {
 
         // Force update password
         ForceUpdateCredentialRequest request = ForceUpdateCredentialRequest.newBuilder()
-                .setNew("newpassword")
+                .setNew(VALID_NEW_PASSWORD)
                 .build();
 
         defaultUserStub.forceUpdateCredential(request);
@@ -476,8 +542,8 @@ class SelfServiceResourceITest {
         // Check the password was changed
         try {
             UpdateCredentialRequest updateCredentialRequest = UpdateCredentialRequest.newBuilder()
-                    .setOld("password")
-                    .setNew("newpassword")
+                    .setOld(VALID_PASSWORD)
+                    .setNew(VALID_NEW_PASSWORD)
                     .build();
             defaultUserStub.updateCredential(updateCredentialRequest);
             fail("Password wasn't changed");
@@ -500,7 +566,7 @@ class SelfServiceResourceITest {
 
         // Back to original password with clear nonce and active
         ForceUpdateCredentialRequest forceReq = ForceUpdateCredentialRequest.newBuilder()
-                .setNew("password")
+                .setNew(VALID_PASSWORD)
                 .setClearNonce(true)
                 .build();
 
@@ -509,8 +575,8 @@ class SelfServiceResourceITest {
         // Check the password was changed
         try {
             UpdateCredentialRequest updateCredentialRequest = UpdateCredentialRequest.newBuilder()
-                    .setOld("newpassword")
-                    .setNew("password")
+                    .setOld(VALID_NEW_PASSWORD)
+                    .setNew(VALID_PASSWORD)
                     .build();
             defaultUserStub.updateCredential(updateCredentialRequest);
             fail("Password wasn't changed");
@@ -546,7 +612,7 @@ class SelfServiceResourceITest {
 
         // Force update password with nonce clear
         ForceUpdateCredentialRequest request = ForceUpdateCredentialRequest.newBuilder()
-                .setNew("password")
+                .setNew(VALID_PASSWORD)
                 .setClearNonce(true)
                 .build();
 
@@ -593,7 +659,7 @@ class SelfServiceResourceITest {
 
         // Force update password with nonce clear and activation
         ForceUpdateCredentialRequest forceReq = ForceUpdateCredentialRequest.newBuilder()
-                .setNew("newpassword")
+                .setNew(VALID_NEW_PASSWORD)
                 .setClearNonce(true)
                 .setActive(true)
                 .build();
@@ -603,8 +669,8 @@ class SelfServiceResourceITest {
         // Check the password was changed
         try {
             UpdateCredentialRequest updateCredentialRequest = UpdateCredentialRequest.newBuilder()
-                    .setOld("password")
-                    .setNew("newpassword")
+                    .setOld(VALID_PASSWORD)
+                    .setNew(VALID_NEW_PASSWORD)
                     .build();
             defaultUserStub.updateCredential(updateCredentialRequest);
             fail("Password wasn't changed");
@@ -699,7 +765,7 @@ class SelfServiceResourceITest {
 
         // Update credential
         ForceUpdateCredentialRequest forceUpdateCredentialRequest = ForceUpdateCredentialRequest.newBuilder()
-                .setNew("newpassword")
+                .setNew(VALID_NEW_PASSWORD)
                 .build();
 
         defaultUserStub.forceUpdateCredential(forceUpdateCredentialRequest);
@@ -714,8 +780,8 @@ class SelfServiceResourceITest {
 
         // Update credential again
         UpdateCredentialRequest updateCredentialRequest = UpdateCredentialRequest.newBuilder()
-                .setOld("newpassword")
-                .setNew("newpassword2")
+                .setOld(VALID_NEW_PASSWORD)
+                .setNew(VALID_NEW_PASSWORD2)
                 .build();
 
         defaultUserStub.updateCredential(updateCredentialRequest);
@@ -733,7 +799,7 @@ class SelfServiceResourceITest {
 
         // Update credential again with nonce clearing and activation
         ForceUpdateCredentialRequest forceUpdateCredentialRequestWithClearNonce = ForceUpdateCredentialRequest.newBuilder()
-                .setNew("password")
+                .setNew(VALID_PASSWORD)
                 .setClearNonce(true)
                 .setActive(true)
                 .build();
@@ -1083,6 +1149,14 @@ class SelfServiceResourceITest {
         req = GetLookupTableRequest.newBuilder()
                 .setName("Timezones")
                 .addInclude("row")
+                .setRelationalValueSearchQuery(RelationalValueSearchQueryMessage.newBuilder()
+                        .setPaging(PagingMessage.newBuilder()
+                                .addOrdering(ObjectOrderingMessage.newBuilder()
+                                        .setOrderBy("key")
+                                        .setOrderDirection(OrderDirectionType.ASCENDING)
+                                )
+                        )
+                )
                 .build();
 
         res = defaultServiceAccountStub.getLookupTable(req);
@@ -1470,7 +1544,7 @@ class SelfServiceResourceITest {
                 .addModifications(
                         UserItemDeltaMessage.newBuilder()
                                 .setPath("credentials/password/value")
-                                .addValuesToReplace("password")
+                                .addValuesToReplace(VALID_PASSWORD)
                                 .build()
                 )
                 .build();
@@ -1489,7 +1563,7 @@ class SelfServiceResourceITest {
     }
 
     private static SelfServiceResourceGrpc.SelfServiceResourceBlockingStub newStubByAdministrator() {
-        return newStub("Administrator", "5ecr3t", false);
+        return newStub("Administrator", "Test5ecr3t", false);
     }
 
     private static SelfServiceResourceGrpc.SelfServiceResourceBlockingStub newStub(String username, String password) {
@@ -1509,11 +1583,11 @@ class SelfServiceResourceITest {
     }
 
     private static SelfServiceResourceGrpc.SelfServiceResourceBlockingStub newDefaultStubWithSwitchUserByOid(String switchUsername, boolean runPrivileged) {
-        return newStub(GRPC_SERVICE_ACCOUNT_NAME, "password", null, switchUsername, runPrivileged);
+        return newStub(GRPC_SERVICE_ACCOUNT_NAME, VALID_PASSWORD, null, switchUsername, runPrivileged);
     }
 
     private static SelfServiceResourceGrpc.SelfServiceResourceBlockingStub newDefaultStubWithSwitchUserByUsername(String switchUsername, boolean runPrivileged) {
-        return newStub(GRPC_SERVICE_ACCOUNT_NAME, "password", null, switchUsername, runPrivileged);
+        return newStub(GRPC_SERVICE_ACCOUNT_NAME, VALID_PASSWORD, null, switchUsername, runPrivileged);
     }
 
     private static SelfServiceResourceGrpc.SelfServiceResourceBlockingStub newStub(String username, String password, String switchUserOid, String switchUsername, boolean runPrivileged) {
